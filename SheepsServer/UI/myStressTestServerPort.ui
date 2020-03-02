@@ -1,0 +1,701 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form_StressTestServerPort</class>
+ <widget class="QWidget" name="Form_StressTestServerPort">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>820</width>
+    <height>574</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>压力测试管理端</string>
+  </property>
+  <widget class="QTabWidget" name="tabWidget">
+   <property name="geometry">
+    <rect>
+     <x>360</x>
+     <y>30</y>
+     <width>451</width>
+     <height>541</height>
+    </rect>
+   </property>
+   <property name="currentIndex">
+    <number>0</number>
+   </property>
+   <widget class="QWidget" name="tab">
+    <attribute name="title">
+     <string>录制和回放</string>
+    </attribute>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>431</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>录制</string>
+     </property>
+     <widget class="QWidget" name="layoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>20</y>
+        <width>137</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_8">
+       <item>
+        <widget class="QPushButton" name="pushButton_openRecord">
+         <property name="text">
+          <string>启动录制</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_MsgCount">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+    <widget class="QGroupBox" name="groupBox_2">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>80</y>
+       <width>431</width>
+       <height>431</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>回放</string>
+     </property>
+     <widget class="QPushButton" name="pushButton_addTask">
+      <property name="geometry">
+       <rect>
+        <x>180</x>
+        <y>400</y>
+        <width>75</width>
+        <height>23</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>添加任务</string>
+      </property>
+     </widget>
+     <widget class="QTableWidget" name="tableWidget_desServer">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>170</y>
+        <width>411</width>
+        <height>211</height>
+       </rect>
+      </property>
+      <property name="selectionBehavior">
+       <enum>QAbstractItemView::SelectRows</enum>
+      </property>
+      <attribute name="horizontalHeaderVisible">
+       <bool>false</bool>
+      </attribute>
+      <attribute name="verticalHeaderVisible">
+       <bool>false</bool>
+      </attribute>
+      <column>
+       <property name="text">
+        <string>录制IP</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>录制Port</string>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>重放IP</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>重放Port</string>
+       </property>
+      </column>
+     </widget>
+     <widget class="Line" name="line">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>380</y>
+        <width>411</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+     <widget class="QWidget" name="layoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>20</y>
+        <width>137</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QLabel" name="label_5">
+         <property name="text">
+          <string>项    目：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="comboBox_projecet"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="layoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>50</y>
+        <width>201</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>用户总数：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="lineEdit_totalUsers"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="layoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>80</y>
+        <width>131</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>单次数量：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="lineEdit_onceUsers"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="layoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>160</x>
+        <y>80</y>
+        <width>131</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_4">
+       <item>
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>间隔(秒)：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="lineEdit_spaceTime"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="layoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>140</y>
+        <width>224</width>
+        <height>25</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_5">
+       <item>
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>回放端口：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pushButton_addServer">
+         <property name="text">
+          <string>增加</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pushButton_deleteServer">
+         <property name="text">
+          <string>删除</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="layoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>180</x>
+        <y>20</y>
+        <width>137</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_7">
+       <item>
+        <widget class="QLabel" name="label_8">
+         <property name="text">
+          <string>测试环境：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="comboBox_env"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="">
+      <property name="geometry">
+       <rect>
+        <x>21</x>
+        <y>110</y>
+        <width>219</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_6">
+       <item>
+        <widget class="QLabel" name="label_6">
+         <property name="text">
+          <string>循环模式：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="comboBox_loopType">
+         <item>
+          <property name="text">
+           <string extracomment="0">循环</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string extracomment="2">不循环</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string extracomment="1">实时回放</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_ignoreErr">
+         <property name="text">
+          <string>忽略错误</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="tab_6">
+    <attribute name="title">
+     <string>监视器</string>
+    </attribute>
+    <widget class="QGroupBox" name="groupBox_3">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>421</width>
+       <height>161</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>错误</string>
+     </property>
+     <widget class="QLabel" name="label_9">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>20</y>
+        <width>54</width>
+        <height>12</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>总数：</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_10">
+      <property name="geometry">
+       <rect>
+        <x>130</x>
+        <y>20</y>
+        <width>54</width>
+        <height>12</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>连接失败：</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_11">
+      <property name="geometry">
+       <rect>
+        <x>270</x>
+        <y>20</y>
+        <width>54</width>
+        <height>12</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>超时：</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_errtotal">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>20</y>
+        <width>54</width>
+        <height>12</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>0</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_errconnect">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>20</y>
+        <width>54</width>
+        <height>12</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>0</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_timeout">
+      <property name="geometry">
+       <rect>
+        <x>310</x>
+        <y>20</y>
+        <width>54</width>
+        <height>12</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>0</string>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+  </widget>
+  <widget class="QTabWidget" name="tabWidget_2">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>351</width>
+     <height>561</height>
+    </rect>
+   </property>
+   <property name="currentIndex">
+    <number>0</number>
+   </property>
+   <widget class="QWidget" name="tab_3">
+    <attribute name="title">
+     <string>受控端列表</string>
+    </attribute>
+    <widget class="QTableWidget" name="tableWidget_stressClients">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>331</width>
+       <height>521</height>
+      </rect>
+     </property>
+     <property name="editTriggers">
+      <set>QAbstractItemView::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <property name="columnCount">
+      <number>4</number>
+     </property>
+     <attribute name="horizontalHeaderVisible">
+      <bool>true</bool>
+     </attribute>
+     <attribute name="horizontalHeaderCascadingSectionResizes">
+      <bool>false</bool>
+     </attribute>
+     <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+      <bool>false</bool>
+     </attribute>
+     <attribute name="horizontalHeaderStretchLastSection">
+      <bool>false</bool>
+     </attribute>
+     <attribute name="verticalHeaderVisible">
+      <bool>false</bool>
+     </attribute>
+     <attribute name="verticalHeaderCascadingSectionResizes">
+      <bool>false</bool>
+     </attribute>
+     <column>
+      <property name="text">
+       <string>编号</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>IP地址</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>CPU数量</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>状态</string>
+      </property>
+     </column>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="tab_4">
+    <attribute name="title">
+     <string>连接列表</string>
+    </attribute>
+    <widget class="QTableWidget" name="tableWidget_proxyClients">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>331</width>
+       <height>521</height>
+      </rect>
+     </property>
+     <property name="editTriggers">
+      <set>QAbstractItemView::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <column>
+      <property name="text">
+       <string>编号</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>IP地址</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>PORT端口</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="tab_5">
+    <attribute name="title">
+     <string>录制列表</string>
+    </attribute>
+    <widget class="QTableWidget" name="tableWidget_recordlists">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>331</width>
+       <height>521</height>
+      </rect>
+     </property>
+     <property name="editTriggers">
+      <set>QAbstractItemView::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <column>
+      <property name="text">
+       <string>保留</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>IP地址</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>PORT端口</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="tab_2">
+    <attribute name="title">
+     <string>任务列表</string>
+    </attribute>
+    <widget class="QTableWidget" name="tableWidget_Tasks">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>331</width>
+       <height>521</height>
+      </rect>
+     </property>
+     <property name="editTriggers">
+      <set>QAbstractItemView::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <column>
+      <property name="text">
+       <string>编号</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>状态</string>
+      </property>
+      <property name="textAlignment">
+       <set>AlignLeading|AlignVCenter</set>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>说明</string>
+      </property>
+     </column>
+    </widget>
+   </widget>
+  </widget>
+  <widget class="QLabel" name="label_7">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>580</y>
+     <width>411</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>循环次数：（1非循环模式，支持实时录制，0无限循环，大于1循环指定次数）</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="layoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>580</x>
+     <y>10</y>
+     <width>233</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="0">
+     <widget class="QLineEdit" name="lineEdit_stressClient_addr">
+      <property name="text">
+       <string>127.0.0.1:1080</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QPushButton" name="pushButton_stressClientRun">
+      <property name="text">
+       <string>启动本地受控端</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
