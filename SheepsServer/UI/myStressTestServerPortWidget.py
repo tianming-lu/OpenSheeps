@@ -29,9 +29,8 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setFixedSize(self.width(), self.height())
         self.ClearThread = 0
-        os.environ['path'] += ';./cicada/'
         try:
-            self.dll = CDLL("./StressClient.dll")
+            self.dll = CDLL("./Sheeps.dll")
         except:
             pass
         self.init_ui_content()
