@@ -57,6 +57,6 @@ TaskUserLog，TaskLog：均用于输出日志，不同的是一个传递参数�
 
 #### 代码引用说明
 
-1.本系统使用了开源的cjson库：https://sourceforge.net/projects/cjson/
-2.本系统使用以前项目积累的sha1和md5算法源码，时间久远已记不清出处
-感谢以上开源代码或项目，如有侵犯版权，请与我联系
+1. 本系统使用了开源的cjson库：https://sourceforge.net/projects/cjson/
+2. 本系统使用以前项目积累的sha1和md5算法源码，时间久远已记不清出处
+3. 感谢以上开源代码或项目，如有侵犯版权，请与我联系
