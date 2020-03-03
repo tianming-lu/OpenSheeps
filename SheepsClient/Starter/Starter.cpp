@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
 		port = atoi(argv[2]);
 		listen = atoi(argv[3]);
 	}
-	strdll.dllHandle = LoadLibraryA("StressClient.dll");
+	strdll.dllHandle = LoadLibraryA("Sheeps.dll");
 	if (strdll.dllHandle == NULL)
 	{
 		printf("dll load failed.");
