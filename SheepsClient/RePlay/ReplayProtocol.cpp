@@ -2,15 +2,27 @@
 #include "ReplayProtocol.h"
 
 
-int Init(void* parm)
+int Init(HTASKCFG task)
 {	/*任务初始化，parm为当前任务配置指针，需要强制转换HTASKCFG类型*/
-	TaskLog((HTASKCFG)parm, LOG_DEBUG, "dll init\r\n");
+	TaskLog(task, LOG_DEBUG, "dll init\r\n");
 	return 0;
 }
 
-int UnInit(void* parm)
-{	/*任务初始化,动态库被释放时调用一次，parm为当前任务配置指针，需要强制转换HTASKCFG类型*/
-	TaskLog((HTASKCFG)parm, LOG_DEBUG, "dll uninit\r\n");
+int UnInit(HTASKCFG task)
+{	/*反任务初始化,动态库被释放时调用一次，parm为当前任务配置指针，需要强制转换HTASKCFG类型*/
+	TaskLog(task, LOG_DEBUG, "dll uninit\r\n");
+	return 0;
+}
+
+int ThreadInit(HTASKCFG task)
+{	/*工作线程初始化，用于初始化线程变量，工作线程开始执行时被调用一次*/
+	TaskLog(task, LOG_DEBUG, "work thread init\r\n");
+	return 0;
+}
+
+int ThreadUnInit(HTASKCFG task)
+{	/*反工作线程初始化，用于释放线程资源*/
+	TaskLog(task, LOG_DEBUG, "work thread uninit\r\n");
 	return 0;
 }
 
@@ -25,7 +37,6 @@ void DestoryUser(ReplayProtocol* hdl)
 {	/*此函数用于销毁CreateUser函数创建的对象实例*/
 	if (hdl != NULL)
 		delete hdl;
-
 }
 
 

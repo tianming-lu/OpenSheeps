@@ -55,6 +55,8 @@ typedef struct dllAPI
 	DESTORYAPI  destory;
 	INIT		init;
 	INIT		uninit;
+	INIT		threadinit;
+	INIT		threaduninit;
 }t_replay_dll;
 
 typedef struct

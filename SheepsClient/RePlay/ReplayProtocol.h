@@ -52,8 +52,10 @@ extern "C" {
 
 	RePlay_API ReplayProtocol* CreateUser(void);
 	RePlay_API void DestoryUser(ReplayProtocol* hdl);
-	RePlay_API int Init(void* parm);
-	RePlay_API int UnInit(void* parm);
+	RePlay_API int Init(HTASKCFG task);
+	RePlay_API int UnInit(HTASKCFG task);
+	RePlay_API int ThreadInit(HTASKCFG task);
+	RePlay_API int ThreadUnInit(HTASKCFG task);
 
 #ifdef __cplusplus
 }

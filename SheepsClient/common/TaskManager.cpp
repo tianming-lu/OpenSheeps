@@ -241,6 +241,8 @@ bool dll_init(t_task_config* task, char* rootpath)
 	task->dll.destory = (DESTORYAPI)GetProcAddress((HMODULE)task->dll.dllHandle, "DestoryUser");
 	task->dll.init = (INIT)GetProcAddress((HMODULE)task->dll.dllHandle, "Init");
 	task->dll.uninit = (INIT)GetProcAddress((HMODULE)task->dll.dllHandle, "UnInit");
+	task->dll.threadinit = (INIT)GetProcAddress((HMODULE)task->dll.dllHandle, "ThreadInit");
+	task->dll.threaduninit = (INIT)GetProcAddress((HMODULE)task->dll.dllHandle, "ThreadUnInit");
 
 	task->dll.init(task);
 	return true;

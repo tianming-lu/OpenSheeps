@@ -55,6 +55,9 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 {
 	t_task_config* task = (t_task_config*)pParam;
 	changTask_work_thread(task, 1);
+	if (task->dll.threadinit)
+		task->dll.threadinit(task);
+
 	t_handle_user* user = NULL;
 	UserProtocol* proto = NULL;
 	while (task->status < 4)   //任务运行中
@@ -107,6 +110,9 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 		add_to_userDes_tail(task, user);
 		Sleep(1);
 	}
+
+	if (task->dll.threaduninit)
+		task->dll.threaduninit(task);
 	changTask_work_thread(task, -1);
 	return 0;
 }
