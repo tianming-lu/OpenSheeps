@@ -23,14 +23,12 @@ public:
 
 public:
 	bool pause = false;
-	HTASKCFG task = NULL;
 	HMESSAGE message = NULL;
-	//t_msg_pointer MsgPointer = {0x0};
 
 	map<int, t_connection_info> Connection;
 
 public:
-	void ProtoInit(void* parm, int index);
+	void ProtoInit(int index);
 	bool ConnectionMade(HSOCKET hsock, char* ip, int port);
 	bool ConnectionFailed(HSOCKET hsock, char* ip, int port);
 	bool ConnectionClosed(HSOCKET hsock, char* ip, int port);

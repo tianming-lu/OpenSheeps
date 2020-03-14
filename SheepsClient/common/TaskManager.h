@@ -117,7 +117,7 @@ public:
 	MsgPointer	MsgPointer = { 0x0 };
 
 public:
-	virtual void ProtoInit(void* parm, int index) = 0;
+	virtual void ProtoInit(int index) = 0;
 	virtual bool ConnectionMade(HSOCKET hsock, char* ip, int port) = 0;
 	virtual bool ConnectionFailed(HSOCKET, char* ip, int port) = 0;
 	virtual bool ConnectionClosed(HSOCKET hsock, char* ip, int port) = 0;

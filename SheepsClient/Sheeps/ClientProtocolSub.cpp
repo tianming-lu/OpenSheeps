@@ -175,7 +175,7 @@ int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 		user->proto->factory = subfactory;
 		user->protolock = user->proto->protolock;
 
-		user->proto->ProtoInit((void*)task, task->userCount + i);
+		user->proto->ProtoInit(task->userCount + i);
 		/*task->userPointer->push_back(user);
 		user->proto->self = task->userPointer->back()->proto;*/
 		
@@ -553,7 +553,7 @@ int client_cmd_12_task_change_user_count(HSOCKET sock, int cmdNO, cJSON* root)
 		user->proto->factory = subfactory;
 		user->protolock = user->proto->protolock;
 
-		user->proto->ProtoInit((void*)task, task->userCount + i);
+		user->proto->ProtoInit(task->userCount + i);
 		/*task->userPointer->push_back(user);
 		user->proto->self = task->userPointer->back()->proto;*/
 		

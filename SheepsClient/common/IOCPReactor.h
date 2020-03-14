@@ -53,6 +53,7 @@ typedef struct _completion_key
 	mutex*				userlock;
 	BaseProtocol**		user;
 	fd_operation_data*	lpIOoperData;
+	time_t				timeout;
 }t_completion_fd, *HSOCKET;	//Íê³É¶Ë¿Ú¾ä±ú
 
 class Reactor 

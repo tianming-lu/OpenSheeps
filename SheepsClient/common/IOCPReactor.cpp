@@ -171,6 +171,7 @@ BOOL PostSend(t_completion_fd* pComKey, fd_operation_data* pIOoperData)
 		}
 		//LOG("发起发送重叠接收异常!\n");
 	}
+	pComKey->timeout = time(NULL);
 	return TRUE;
 }
 
@@ -198,7 +199,7 @@ BOOL PostAceept(t_completion_fd* pComKey, fd_operation_data* pIOoperData)
 	SOCKADDR_IN addr_conn;
 	int nSize = sizeof(addr_conn);
 	getpeername(pClientComKey->sock, (SOCKADDR*)&addr_conn, &nSize);
-	inet_ntop(AF_INET, &addr_conn.sin_addr, pClientComKey->IP, 20);
+	inet_ntop(AF_INET, &addr_conn.sin_addr, pClientComKey->IP, sizeof(pClientComKey->IP));
 	pClientComKey->PORT = ntohs(addr_conn.sin_port);
 
 	//(*(pClientComKey->user))->protolock->lock();
@@ -649,6 +650,7 @@ bool IOCPPostSendEx(t_completion_fd* pComKey, char* data, int len)    //注意�
 		}
 		//LOG("发起发送重叠接收异常!\n");
 	}
+	pComKey->timeout = time(NULL);
 	return true;
 }
 
