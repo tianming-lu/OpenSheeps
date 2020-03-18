@@ -6,13 +6,15 @@ from common.gdata import *
 class TrayIcon(QSystemTrayIcon):
     def __init__(self, papa):
         super(TrayIcon, self).__init__(parent=papa)
-        self.setToolTip("游戏服务器压力测试工具")
+        self.setToolTip("Sheeps服务器压力测试")
         self.setIcon(QIcon(QPixmap(":/Res/logo.ico")))
         self.initMenu()
         self.initUIEvent()
 
     def initServerStressTestMenu(self):
-        self.serverStressManager = QAction("主界面", self, triggered=lambda :ShowForm.append(('StressServer', 1)))
+        self.serverStressManager = QAction("主界面", self, triggered=lambda :self.iconClicked(2))
+        self.logoActon = QAction("日志", self, triggered=self.logoClicked)
+        self.quitAction = QAction("退出", self, triggered=self.Appquit)
 
 
     def initMenu(self):
@@ -20,21 +22,27 @@ class TrayIcon(QSystemTrayIcon):
         self.initServerStressTestMenu()
         self.menu.addAction(self.serverStressManager)
         self.menu.addSeparator()
-        self.quitAction = QAction("退出", self, triggered=self.Appquit)
+        self.menu.addAction(self.logoActon)
         self.menu.addAction(self.quitAction)
         self.setContextMenu(self.menu)
 
     def initUIEvent(self):
         self.activated.connect(self.iconClicked)
 
+    def logoClicked(self):
+        win = AllForm['Main']
+        if win.isVisible():
+            win.hide()
+        else:
+            win.show()
+
     def iconClicked(self, reason):
         if reason == 2 or reason == 3:
-            pw = self.parent()
-            if pw.isVisible():
-                pw.hide()
+            win = AllForm['StressServer']
+            if win.isVisible():
+                win.hide()
             else:
-                pw.showNormal()
-                pw.show()
+                win.show()
 
     def msgClicked(self):
         self.showMessage("提示", "请稍后……", icon=0)

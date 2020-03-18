@@ -59,6 +59,8 @@ if __name__ == "__main__":
     app.setWindowIcon(QIcon(QPixmap(":/Res/logo.ico")))
     app.setQuitOnLastWindowClosed(False)
     AllForm['Main'] = Form_mainWidget()
+    AllForm['StressServer'] = Form_StressTestServerPort()
+    AllForm['StressServer'].show()
 
     th = RunThread()
     th._showsignal.connect(showWindow)

@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>820</width>
-    <height>574</height>
+    <height>598</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>压力测试管理端</string>
+   <string>Sheeps 控制端 - 卢天明 - QQ641471957</string>
   </property>
   <widget class="QTabWidget" name="tabWidget">
    <property name="geometry">
@@ -293,7 +293,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <property name="geometry">
        <rect>
         <x>21</x>
@@ -666,7 +666,10 @@
     </rect>
    </property>
    <property name="text">
-    <string>循环次数：（1非循环模式，支持实时录制，0无限循环，大于1循环指定次数）</string>
+    <string>项目地址：&lt;a href=&quot;https://gitee.com/lutianming/Sheeps&quot;&gt;https://gitee.com/lutianming/Sheeps&lt;/a&gt;</string>
+   </property>
+   <property name="openExternalLinks">
+    <bool>true</bool>
    </property>
   </widget>
   <widget class="QWidget" name="layoutWidget">

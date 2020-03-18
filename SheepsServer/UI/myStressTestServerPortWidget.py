@@ -43,11 +43,9 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
         self.selectTaskid = None
 
     def closeEvent(self, QCloseEvent):
-        if self.ClearThread > 0:
-            QCloseEvent.ignore()
-            self.hide()
-        else:
-            self.st.Stop()
+        QCloseEvent.ignore()
+        self.hide()
+        LOG(1, "Sheeps：已最小化到托盘")
 
     def init_ui_event(self):
         self.pushButton_openRecord.clicked.connect(self.pushButton_openRecord_clicked)
