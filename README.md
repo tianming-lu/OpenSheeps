@@ -18,21 +18,20 @@
 
 #### 接入项目需要掌握哪些API？
 
-#Task_API HMESSAGE	TaskGetNextMessage(UserProtocol* proto);
-#Task_API bool		TaskUserDead(UserProtocol* proto, const char* fmt, ...);
-#Task_API bool		TaskUserSocketClose(HSOCKET hsock);
-#Task_API void		TaskUserLog(UserProtocol* proto, int level, const char* fmt, ...);
-#Task_API void		TaskLog(t_task_config* task, int level, const char* fmt, ...);
-#define		TaskUserSocketConnet(ip, port, proto)	IOCPConnectEx(ip, port, proto)
-#define		TaskUserSocketSend(hsock, data, len)	IOCPPostSendEx(hsock, data, len)
+Task_API HMESSAGE	TaskGetNextMessage(UserProtocol* proto);  
+Task_API bool		TaskUserDead(UserProtocol* proto, const char* fmt, ...);  
+Task_API bool		TaskUserSocketClose(HSOCKET hsock);  
+Task_API void		TaskUserLog(UserProtocol* proto, int level, const char* fmt, ...);  
+Task_API void		TaskLog(t_task_config* task, int level, const char* fmt, ...);  
+#define		TaskUserSocketConnet(ip, port, proto)	IOCPConnectEx(ip, port, proto)  
+#define		TaskUserSocketSend(hsock, data, len)	IOCPPostSendEx(hsock, data, len)  
 
 以上是完成项目接入所必须了解的API函数；
 
-#TaskGetNextMessage：用于从Task Manager中获取当前消息，详细请看示例项目中的代码处理；
-#TaskUserDead：用于向Task Manager报告用户自毁，Task Manager会将其从队列中移除；
-#TaskUserSocketConnet，TaskUserSocketSend，TaskUserSocketClose：分别用于用户发起连接、发送消息、关闭连接等网络操作，其中连接为异步连接，
-#IO Manger在连接成功或者失败后会通知用户，IO Manager会调用用户成员函数ConnectionMade或者ConnectionFailed；但是通过调用TaskUserSocketClose关闭连接时，网络连接会立即关闭，IO Manager不会再通知连接关闭事件
-#TaskUserLog，TaskLog：均用于输出日志，不同的是一个传递参数用户类指针，一个传递任务结构指针，TaskUserLog输出时会携带用户序号，用于区分不同用户的日志流
+TaskGetNextMessage：用于从Task Manager中获取当前消息，详细请看示例项目中的代码处理；  
+TaskUserDead：用于向Task Manager报告用户自毁，Task Manager会将其从队列中移除；  
+TaskUserSocketConnet，TaskUserSocketSend，TaskUserSocketClose：分别用于用户发起连接、发送消息、关闭连接等网络操作，其中连接为异步连接，IO Manger在连接成功或者失败后会通知用户，IO Manager会调用用户成员函数ConnectionMade或者ConnectionFailed；但是通过调用TaskUserSocketClose关闭连接时，网络连接会立即关闭，IO Manager不会再通知连接关闭事件；  
+TaskUserLog，TaskLog：均用于输出日志，不同的是一个传递参数用户类指针，一个传递任务结构指针，TaskUserLog输出时会携带用户序号，用于区分不同用户的日志流
 
 
 
