@@ -559,6 +559,16 @@ class StressTestServerPort():
             proto.Send(byte_msg)
         pass
 
+    def StressTaskLoglevel(self, loglevel):
+        data = {}
+        data["LogLevel"] = loglevel
+        data = bytes(str(data).replace('\'', '"'), encoding='utf-8')
+        byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 14, data)
+        # print(byte_msg)
+        for proto in StressClients.values():
+            proto.Send(byte_msg)
+        pass
+
 if __name__ == '__main__':
     # del_old_stress_record_table()
     stsp = StressTestServerPort()

@@ -57,12 +57,18 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
         self.tableWidget_recordlists.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tableWidget_recordlists.customContextMenuRequested.connect(self.tableWidget_recordlists_right_clicked)
         self.pushButton_stressClientRun.clicked.connect(self.pushButton_stressClientRun_clicked)
+        self.comboBox_loglevel.currentIndexChanged.connect(self.set_client_task_loglevel)
+
 
     def init_ui_content(self):
         for key in config['Project']:
             self.comboBox_projecet.addItem(config['Project'].get(key), int(key))
         for key in config['Environment']:
             self.comboBox_env.addItem(config['Environment'].get(key), int(key))
+        i = 0
+        for key in ["TRACE","DEBUG","NORMAL", "ERROR", "FAULT", "NONE"]:
+            self.comboBox_loglevel.addItem(key, i)
+            i += 1
 
         self.tableWidget_stressClients.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tableWidget_stressClients.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -97,6 +103,10 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
         else:
             return False
         return True
+
+    def set_client_task_loglevel(self):
+        loglevel = self.comboBox_loglevel.currentData()
+        self.st.StressTaskLoglevel(loglevel)
 
     def stopClient(self):
         ret = self.dll.StressClientStop()

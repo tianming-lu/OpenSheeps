@@ -17,9 +17,9 @@
    <property name="geometry">
     <rect>
      <x>360</x>
-     <y>30</y>
+     <y>40</y>
      <width>451</width>
-     <height>541</height>
+     <height>531</height>
     </rect>
    </property>
    <property name="currentIndex">
@@ -661,7 +661,7 @@
     <rect>
      <x>10</x>
      <y>580</y>
-     <width>411</width>
+     <width>351</width>
      <height>16</height>
     </rect>
    </property>
@@ -672,29 +672,47 @@
     <bool>true</bool>
    </property>
   </widget>
-  <widget class="QWidget" name="layoutWidget">
+  <widget class="QWidget" name="">
    <property name="geometry">
     <rect>
-     <x>580</x>
+     <x>400</x>
      <y>10</y>
-     <width>233</width>
-     <height>25</height>
+     <width>414</width>
+     <height>27</height>
     </rect>
    </property>
-   <layout class="QGridLayout" name="gridLayout">
-    <item row="0" column="0">
-     <widget class="QLineEdit" name="lineEdit_stressClient_addr">
-      <property name="text">
-       <string>127.0.0.1:1080</string>
-      </property>
-     </widget>
+   <layout class="QHBoxLayout" name="horizontalLayout_10">
+    <item>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="0" column="0">
+       <widget class="QLineEdit" name="lineEdit_stressClient_addr">
+        <property name="text">
+         <string>127.0.0.1:1080</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="pushButton_stressClientRun">
+        <property name="text">
+         <string>启动本地受控端</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
-    <item row="0" column="1">
-     <widget class="QPushButton" name="pushButton_stressClientRun">
-      <property name="text">
-       <string>启动本地受控端</string>
-      </property>
-     </widget>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_9">
+      <item>
+       <widget class="QLabel" name="label_12">
+        <property name="text">
+         <string>受控端日志等级：</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="comboBox_loglevel"/>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>
