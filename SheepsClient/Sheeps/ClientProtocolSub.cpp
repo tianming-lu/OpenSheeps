@@ -15,7 +15,7 @@ map<string, t_file_info> updatefile, allfile, localfile;
 int ClientLogInit(const char *configfile)
 {
 	char file[128] = { 0x0 };
-	GetPrivateProfileStringA("LOG", "client_file", "./cicadalog/client.log", file, sizeof(file), configfile);
+	GetPrivateProfileStringA("LOG", "client_file", "./log/client.log", file, sizeof(file), configfile);
 	int loglevel = GetPrivateProfileIntA("LOG", "client_level", 0, configfile);
 	int maxsize = GetPrivateProfileIntA("LOG", "client_size", 20, configfile);
 	int timesplit = GetPrivateProfileIntA("LOG", "client_time", 3600, configfile);
@@ -60,14 +60,24 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 
 	t_handle_user* user = NULL;
 	UserProtocol* proto = NULL;
+	size_t userAllSize = 0;
 	while (task->status < 4)   //任务运行中
 	{
 		for (int i = 0; i < 10; i++)
 		{
-			user = (t_handle_user*)get_userAll_front(task);
+			user = (t_handle_user*)get_userAll_front(task, &userAllSize);
 			if (user == NULL)
 				break;
 			proto = user->proto;
+			if (task->userCount < userAllSize)
+			{
+				user->protolock->lock();
+				proto->Destroy();
+				user->protolock->unlock();
+				add_to_userDes_tail(task, user);
+				continue;
+			}
+			
 			user->protolock->lock();
 			if (proto->SelfDead == TRUE)
 			{
@@ -82,7 +92,6 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 				else
 				{
 					proto->Destroy();
-
 					user->protolock->unlock();
 					LOG(clogId, LOG_DEBUG, "user destroy\r\n");
 					add_to_userDes_tail(task, user);
@@ -98,7 +107,7 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 
 	while (task->status == 4)  //清理资源
 	{
-		user = (t_handle_user*)get_userAll_front(task);
+		user = (t_handle_user*)get_userAll_front(task, &userAllSize);
 		if (user == NULL)
 			break;
 		proto = user->proto;
@@ -159,29 +168,39 @@ int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 	}
 	//LOG("user size %lld\n", task->userAll->size());
 
+	uint16_t StartCount = task->userCount;
+	task->userCount += userCount->valueint;
 	t_handle_user* user = NULL;
 	for (int i = 0; i < userCount->valueint; i++)
 	{
-		//user->protolock = new mutex();
-		t_handle_user* user = (t_handle_user*)GlobalAlloc(GPTR, sizeof(t_handle_user));
+		user = get_userDes_front(task);
 		if (user == NULL)
-			continue;
-		user->proto = task->dll.create();
-		if (user->proto == NULL)
-			continue;
-		user->proto->Task = task;
-		user->proto->UserNumber = task->userCount + i;
-		user->proto->self = user->proto;
-		user->proto->factory = subfactory;
-		user->protolock = user->proto->protolock;
+		{
+			user = (t_handle_user*)GlobalAlloc(GPTR, sizeof(t_handle_user));
+			if (user == NULL)
+				continue;
+			user->proto = task->dll.create();
+			if (user->proto == NULL)
+				continue;
+			user->proto->Task = task;
+			user->proto->UserNumber = StartCount + i;
+			user->proto->self = user->proto;
+			user->proto->factory = subfactory;
+			user->protolock = user->proto->protolock;
 
-		user->proto->ProtoInit(task->userCount + i);
-		/*task->userPointer->push_back(user);
-		user->proto->self = task->userPointer->back()->proto;*/
-		
+			user->proto->ProtoInit();
+			/*task->userPointer->push_back(user);
+			user->proto->self = task->userPointer->back()->proto;*/
+		}
+		else
+		{
+			user->proto->SelfDead = false;
+			user->proto->MsgPointer = { 0x0 };
+			user->proto->ReInit();
+		}
+
 		add_to_userAll_tail(task, user);
 	}
-	task->userCount += userCount->valueint;
 
 	SYSTEM_INFO sysInfor;
 	GetSystemInfo(&sysInfor);
@@ -531,51 +550,75 @@ int client_cmd_12_task_change_user_count(HSOCKET sock, int cmdNO, cJSON* root)
 		return -2;
 	}
 
+	uint16_t StartCount = task->userCount;
+	task->userCount += change->valueint;
 	t_handle_user* user = NULL;
 	for (int i = 0; i < change->valueint; i++)
 	{
-		t_handle_user* user = (t_handle_user*)GlobalAlloc(GPTR, sizeof(t_handle_user));
+		user = get_userDes_front(task);
 		if (user == NULL)
-			continue;
-		//user->protolock = new mutex();
-		if (task->dll.dllHandle == NULL)
 		{
-			MsgResponse(sock, cmdNO, 1, "dll file not found");
-			LOG(clogId, LOG_ERROR, "dll Handle is NULL!\r\n");
-			return 0;
-		}
-		user->proto = task->dll.create();
-		if (user->proto == NULL)
-			continue;
-		user->proto->Task = task;
-		user->proto->UserNumber = task->userCount + i;
-		user->proto->self = user->proto;
-		user->proto->factory = subfactory;
-		user->protolock = user->proto->protolock;
+			user = (t_handle_user*)GlobalAlloc(GPTR, sizeof(t_handle_user));
+			if (user == NULL)
+				continue;
+			if (task->dll.dllHandle == NULL)
+			{
+				MsgResponse(sock, cmdNO, 1, "dll file not found");
+				LOG(clogId, LOG_ERROR, "dll Handle is NULL!\r\n");
+				return 0;
+			}
+			user->proto = task->dll.create();
+			if (user->proto == NULL)
+				continue;
+			user->proto->Task = task;
+			user->proto->UserNumber = StartCount + i;
+			user->proto->self = user->proto;
+			user->proto->factory = subfactory;
+			user->protolock = user->proto->protolock;
 
-		user->proto->ProtoInit(task->userCount + i);
-		/*task->userPointer->push_back(user);
-		user->proto->self = task->userPointer->back()->proto;*/
+			user->proto->ProtoInit();
+			/*task->userPointer->push_back(user);
+			user->proto->self = task->userPointer->back()->proto;*/
+		}
+		else
+		{
+			user->proto->SelfDead = false;
+			user->proto->MsgPointer = { 0x0 };
+			user->proto->ReInit();
+		}
 		
 		add_to_userAll_tail(task, user);
-		
 	}
-	task->userCount += change->valueint;
+	
 	MsgResponse(sock, cmdNO, 0, "OK");
 	LOG(clogId, LOG_DEBUG, "task add taskid[%d], user[%d]  all[%d]\r\n", task->taskID, change->valueint, task->userCount);
 	return 0;
 }
 
+int client_cmd_14_charge_task_loglevel(HSOCKET sock, int cmdNO, cJSON* root)
+{
+	cJSON* loglevel = cJSON_GetObjectItem(root, "LogLevel");
+	if (loglevel == NULL || loglevel->type != cJSON_Number)
+	{
+		MsgResponse(sock, cmdNO, 1, "参数错误");
+		return -1;
+	}
+	set_task_log_level(loglevel->valueint);
+	MsgResponse(sock, cmdNO, 0, "OK");
+	return 0;
+}
+
 std::map<int, client_cmd_cb> ClientFunc{
-	{2,	client_cmd_2_task_init},
-	{3,	client_cmd_3_task_connection_create},
-	{4, client_cmd_4_task_connection_send},
-	{5, client_cmd_5_task_connection_close},
-	{6, client_cmd_6_task_finish},
-	{8, client_cmd_8_task_reinit},
-	{9, client_cmd_9_sync_files},
-	{10, client_cmd_10_download_file},
-	{12, client_cmd_12_task_change_user_count}
+	{2,		client_cmd_2_task_init},
+	{3,		client_cmd_3_task_connection_create},
+	{4,		client_cmd_4_task_connection_send},
+	{5,		client_cmd_5_task_connection_close},
+	{6,		client_cmd_6_task_finish},
+	{8,		client_cmd_8_task_reinit},
+	{9,		client_cmd_9_sync_files},
+	{10,	client_cmd_10_download_file},
+	{12,	client_cmd_12_task_change_user_count},
+	{14,	client_cmd_14_charge_task_loglevel}
 };
 
 void do_client_func_by_cmd(HSOCKET hsock, int cmdNO, cJSON* root)

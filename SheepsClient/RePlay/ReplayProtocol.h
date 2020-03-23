@@ -28,7 +28,7 @@ public:
 	map<int, t_connection_info> Connection;
 
 public:
-	void ProtoInit(int index);
+	void ProtoInit();
 	bool ConnectionMade(HSOCKET hsock, char* ip, int port);
 	bool ConnectionFailed(HSOCKET hsock, char* ip, int port);
 	bool ConnectionClosed(HSOCKET hsock, char* ip, int port);

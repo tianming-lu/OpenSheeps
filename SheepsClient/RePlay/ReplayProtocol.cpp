@@ -49,8 +49,8 @@ ReplayProtocol::~ReplayProtocol()
 {	/*析构函数*/
 }
 
-void ReplayProtocol::ProtoInit(int index)
-{	/*用户初始化，用户实例被创建后会被调用一次,index为当前任务用户唯一编号，从0开始递增*/
+void ReplayProtocol::ProtoInit()
+{	/*用户初始化，用户实例被创建后会被调用一次*/
 }
 
 bool ReplayProtocol::ConnectionMade(HSOCKET hsock, char* ip, int port)

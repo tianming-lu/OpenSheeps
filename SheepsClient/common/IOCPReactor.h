@@ -47,8 +47,8 @@ typedef struct _io_operation_data
 typedef struct _completion_key
 {
 	SOCKET				sock;
-	char				IP[16];
-	int					PORT;
+	CHAR				IP[16];
+	int32_t				PORT;
 	BaseFactory*		factory;
 	mutex*				userlock;
 	BaseProtocol**		user;
@@ -94,7 +94,7 @@ public:
 
 class BaseFactory
 {
-public:   //publice as private
+public:
 	LPFN_ACCEPTEX lpfnAcceptEx = NULL;					 //AcceptEx函数指针
 	LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExSockaddrs = NULL;  //加载GetAcceptExSockaddrs函数指针
 
@@ -104,8 +104,8 @@ public:
 
 public:
 	Reactor* reactor = NULL;
-	int			ServerPort = 0;
-	SOCKET		sListen = NULL;
+	uint32_t		ServerPort = 0;
+	SOCKET			sListen = NULL;
 	virtual bool	FactoryInit() = 0;
 	virtual bool	FactoryLoop() = 0;
 	virtual bool	FactoryClose() = 0;

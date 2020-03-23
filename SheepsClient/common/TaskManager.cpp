@@ -15,14 +15,20 @@ bool init_task_log(char* configfile)
 {
 	char file[128] = { 0x0 };
 	GetPrivateProfileStringA("LOG", "task_file", "./cicadalog/task.log", file, sizeof(file), configfile);
-	int loglevel = GetPrivateProfileIntA("LOG", "task_level", 0, "./stresstest/config.ini");
-	int maxsize = GetPrivateProfileIntA("LOG", "task_size", 20, "./stresstest/config.ini");
-	int timesplit = GetPrivateProfileIntA("LOG", "task_time", 3600, "./stresstest/config.ini");
+	int loglevel = GetPrivateProfileIntA("LOG", "task_level", 0, configfile);
+	int maxsize = GetPrivateProfileIntA("LOG", "task_size", 20, configfile);
+	int timesplit = GetPrivateProfileIntA("LOG", "task_time", 3600, configfile);
 	gHlog = RegTaskLog(file, loglevel, maxsize, timesplit, 2);
 	return true;
 }
 
-t_task_config* getTask_by_taskId(int taskID)
+void set_task_log_level(uint8_t level)
+{
+	if (gHlog != NULL)
+		gHlog->LogLevel = level;
+}
+
+t_task_config* getTask_by_taskId(uint8_t taskID)
 {
 	map<int, t_task_config*>::iterator iter;
 	iter = taskAll.find(taskID);
@@ -52,7 +58,7 @@ t_task_config* getTask_by_taskId(int taskID)
 	}
 }
 
-bool stopTaskAll(int taskID)
+bool stopTaskAll(uint8_t taskID)
 {
 	t_task_config* task;
 	map<int, t_task_config*>::iterator iter;
@@ -68,7 +74,7 @@ bool stopTaskAll(int taskID)
 	return false;
 }
 
-bool stopTask_by_taskId(int taskID)
+bool stopTask_by_taskId(uint8_t taskID)
 {
 	t_task_config* task;
 	map<int, t_task_config*>::iterator iter;
@@ -107,6 +113,7 @@ void destroyTask()
 			delete task->messageList;
 
 			t_handle_user* user = NULL;
+			size_t userAllSize = 0;
 			bool userClean = true;
 			while (user = get_userDes_front(task))
 			{
@@ -124,7 +131,7 @@ void destroyTask()
 			delete task->userDes;
 			delete task->userDesLock;
 
-			while (user = get_userAll_front(task))
+			while (user = get_userAll_front(task, &userAllSize))
 			{
 				if (user->proto->sockCount == 0)
 				{
@@ -175,7 +182,7 @@ void destroyTask()
 	}*/
 }
 
-bool changTask_work_thread(t_task_config* task, short count)
+bool changTask_work_thread(t_task_config* task, uint8_t count)
 {
 	task->workThereaLock->lock();
 	task->workThreadCount += count;
@@ -183,7 +190,7 @@ bool changTask_work_thread(t_task_config* task, short count)
 	return true;
 }
 
-bool insertMessage_by_taskId(int taskID, short type, char* ip, int port, char* content, UINT64 timestamp, int microsecond)
+bool insertMessage_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t port, char* content, uint64_t timestamp, uint32_t microsecond)
 {
 	t_task_config* task;
 	task = getTask_by_taskId(taskID);
@@ -248,7 +255,7 @@ bool dll_init(t_task_config* task, char* rootpath)
 	return true;
 }
 
-t_handle_user* get_userAll_front(t_task_config* task)
+t_handle_user* get_userAll_front(t_task_config* task, size_t* usersize)
 {
 	t_handle_user* user = NULL;
 	task->userAllLock->lock();
@@ -258,6 +265,7 @@ t_handle_user* get_userAll_front(t_task_config* task)
 	}
 	else 
 	{
+		*usersize = task->userAll->size();
 		user = task->userAll->front();
 		task->userAll->pop_front();
 	}
@@ -398,7 +406,7 @@ void delete_task_error(t_task_error* error)
 	GlobalFree(error);
 }
 
-void TaskLog(t_task_config* task, int level, const char* fmt, ...)
+void TaskLog(t_task_config* task, uint8_t level, const char* fmt, ...)
 {
 	LOG_Context* nle = (LOG_Context*)task->hlog;
 	if (nle->LogLevel > level)
@@ -420,7 +428,7 @@ void TaskLog(t_task_config* task, int level, const char* fmt, ...)
 	WriteFile(nle->File, buf, l, &written, NULL);
 }
 
-void TaskUserLog(UserProtocol* proto, int level, const char* fmt, ...)
+void TaskUserLog(UserProtocol* proto, uint8_t level, const char* fmt, ...)
 {
 	LOG_Context* nle = (LOG_Context*)proto->Task->hlog;
 	if (nle->LogLevel > level)
