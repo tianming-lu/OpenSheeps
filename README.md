@@ -17,7 +17,7 @@
 
 #### 开发环境
 
-控制端：python3.7,pyqt5
+控制端：python3.7,pyqt5  
 受控端：Visual Studio 2019, C++
 
 
