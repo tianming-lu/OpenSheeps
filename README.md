@@ -83,8 +83,3 @@ __二、回放__
 
 #### 下载二进制文件
 [点击此处进入下载](https://gitee.com/lutianming/Sheeps/releases)
-
-#### 赞助
-如果此项目对您有所帮助，你可以选择赞助，以激励作者开发
-
-![输入图片说明](https://images.gitee.com/uploads/images/2020/0319/213236_e02ab520_1564139.png "zhifubao.png")![输入图片说明](https://images.gitee.com/uploads/images/2020/0319/213251_ffdd4528_1564139.png "weixin.png")
