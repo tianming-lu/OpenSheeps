@@ -22,9 +22,6 @@ public:
 	~ReplayProtocol();
 
 public:
-	bool pause = false;
-	HMESSAGE message = NULL;
-
 	map<int, t_connection_info> Connection;
 
 public:
@@ -34,7 +31,8 @@ public:
 	bool ConnectionClosed(HSOCKET hsock, char* ip, int port);
 	int  Send(HSOCKET hsock, char* ip, int port, char* data, int len);
 	int  Recv(HSOCKET hsock, char* ip, int port, char* data, int len);
-	int	 Loop();
+	int  TimeOut();
+	int	 Event(uint8_t event_type, string ip, int port, string content);
 	int	 ReInit();
 	int  Destroy();
 

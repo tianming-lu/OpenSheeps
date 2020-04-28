@@ -6,7 +6,73 @@
 
 #pragma comment(lib, "Ws2_32.lib")	
 
-SOCKET get_listen_sock(int port)
+Reactor::~Reactor()
+{
+	while (HbuffPool.size())
+	{
+		free(HbuffPool.top());
+		HbuffPool.pop();
+	}
+	while (HsocketPool.size())
+	{
+		free(HsocketPool.top());
+		HsocketPool.pop();
+	}
+}
+
+static IOCP_SOCKET* NewIOCP_Socket(Reactor* reactor)
+{
+	IOCP_SOCKET* IocpSock = NULL;
+	reactor->HsocketPoolLock.lock();
+	if (!reactor->HsocketPool.empty())
+	{
+		IocpSock = reactor->HsocketPool.top();
+		reactor->HsocketPool.pop();
+	}
+	else
+	{
+		IocpSock = (IOCP_SOCKET*)malloc(sizeof(IOCP_SOCKET));
+	}
+	reactor->HsocketPoolLock.unlock();
+	if (IocpSock)
+		memset(IocpSock, 0, sizeof(IOCP_SOCKET));
+	return IocpSock;
+}
+
+static void ReleaseIOCP_Socket(Reactor* reactor, IOCP_SOCKET* IocpSock)
+{
+	reactor->HsocketPoolLock.lock();
+	reactor->HsocketPool.push(IocpSock);
+	reactor->HsocketPoolLock.unlock();
+}
+
+static IOCP_BUFF* NewIOCP_Buff(Reactor* reactor)
+{
+	IOCP_BUFF* IocpBuff = NULL;
+	reactor->HbuffPoolLock.lock();
+	if (!reactor->HbuffPool.empty())
+	{
+		IocpBuff = reactor->HbuffPool.top();
+		reactor->HbuffPool.pop();
+	}
+	else
+	{
+		IocpBuff = (IOCP_BUFF*)malloc(sizeof(IOCP_BUFF));
+	}
+	reactor->HbuffPoolLock.unlock();
+	if (IocpBuff)
+		memset(IocpBuff, 0, sizeof(IOCP_BUFF));
+	return IocpBuff;
+}
+
+static void ReleaseIOCP_Buff(Reactor* reactor, IOCP_BUFF* IocpBuff)
+{
+	reactor->HbuffPoolLock.lock();
+	reactor->HbuffPool.push(IocpBuff);
+	reactor->HbuffPoolLock.unlock();
+}
+
+static SOCKET GetListenSock(int port)
 {
 	SOCKET listenSock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 
@@ -28,267 +94,294 @@ SOCKET get_listen_sock(int port)
 	return listenSock;
 }
 
-BOOL AcceptClient(BaseFactory* fc)
+static bool AcceptClient(BaseFactory* fc)
 {
-	fd_operation_data* pIO;
-	pIO = (fd_operation_data*)GlobalAlloc(GPTR, sizeof(fd_operation_data));
-	if (pIO == NULL)
+	IOCP_BUFF* IocpBuff;
+	IocpBuff = NewIOCP_Buff(fc->reactor);
+	if (IocpBuff == NULL)
 	{
-		printf("内存分配失败\n");
-		return FALSE;
+		return false;
 	}
-	pIO->databuf.buf = pIO->recv_buffer;
-	pIO->databuf.len = DATA_BUFSIZE;
-	pIO->type = ACCEPT;
+	IocpBuff->databuf.buf = IocpBuff->recv_buffer;
+	IocpBuff->databuf.len = DATA_BUFSIZE;
+	IocpBuff->type = ACCEPT;
 
-	pIO->sock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-	if (pIO->sock == INVALID_SOCKET)
+	IocpBuff->sock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	if (IocpBuff->sock == INVALID_SOCKET)
 	{
-		printf("创建套接字失败\n");
-		GlobalFree(pIO);
-		return FALSE;
+		ReleaseIOCP_Buff(fc->reactor, IocpBuff);
+		return false;
 	}
 
-	/*调用AcceptEx函数，地址长度需要在原有的上面加上16个字节
-	向服务线程投递一个接收连接的的请求*/
-	BOOL rc = fc->lpfnAcceptEx(fc->sListen, pIO->sock,
-		pIO->recv_buffer, 0,
+	/*调用AcceptEx函数，地址长度需要在原有的上面加上16个字节向服务线程投递一个接收连接的的请求*/
+	bool rc = fc->reactor->lpfnAcceptEx(fc->sListen, IocpBuff->sock,
+		IocpBuff->recv_buffer, 0,
 		sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16,
-		&pIO->databuf.len, &(pIO->overlapped));
+		&IocpBuff->databuf.len, &(IocpBuff->overlapped));
 
-	if (FALSE == rc)
+	if (false == rc)
 	{
 		if (WSAGetLastError() != ERROR_IO_PENDING)
 		{
-			printf("发起新连接失败%d", WSAGetLastError());
-			GlobalFree(pIO);
-			return FALSE;
+			ReleaseIOCP_Buff(fc->reactor, IocpBuff);
+			return false;
 		}
-		//LOG("发起新连接异常%d", WSAGetLastError());
 	}
-	//LOG("发起新连接成功%d", WSAGetLastError());
-	return TRUE;
+	return true;
 }
 
-BOOL Close(t_completion_fd* pComKey, fd_operation_data* pIOoperData)
+static bool Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 {
-	if (pComKey != NULL)
+	if (IocpSock != NULL)
 	{
-		//LOG("关闭连接 %d %d %lld %d", pIOoperData->type, WSAGetLastError(), pComKey, pComKey->sock);
-		if (ACCEPT == pIOoperData->type)
+		if (ACCEPT == IocpBuff->type)
 		{
-			GlobalFree(pIOoperData);
-			AcceptClient(pComKey->factory);
-			return TRUE;
+			ReleaseIOCP_Buff(IocpSock->factory->reactor, IocpBuff);
+			AcceptClient(IocpSock->factory);
+			return true;
 		}
-		else if (WRITEEX == pIOoperData->type)
+		else if (WRITEEX == IocpBuff->type)
 		{
-			if (pIOoperData->send_buffer != NULL)
-				GlobalFree(pIOoperData->send_buffer);
-			GlobalFree(pIOoperData);
-			return TRUE;
+			if (IocpBuff->send_buffer != NULL)
+				free(IocpBuff->send_buffer);
+			ReleaseIOCP_Buff(IocpSock->factory->reactor, IocpBuff);
+			return true;
 		}
-		else if (CONNECT == pIOoperData->type)
+		else if (CONNECT == IocpBuff->type)
 		{
-			//LOG("关闭连接 %d %d", pComKey->sock, WSAGetLastError());
-			if (pComKey->sock != INVALID_SOCKET  && *(pComKey->user) != NULL)
+			if (IocpSock->sock != INVALID_SOCKET  && *(IocpSock->user) != NULL)
 			{
-				pComKey->userlock->lock();
-				if (pComKey->sock != INVALID_SOCKET && *(pComKey->user) != NULL)
+				IocpSock->userlock->lock();
+				if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
 				{
-					(*(pComKey->user))->sockCount -= 1;
-					(*(pComKey->user))->ConnectionFailed(pComKey, pComKey->IP, pComKey->PORT);
+					(*(IocpSock->user))->sockCount -= 1;
+					(*(IocpSock->user))->ConnectionFailed(IocpSock, IocpSock->IP, IocpSock->PORT);
 				}
-				pComKey->userlock->unlock();
+				IocpSock->userlock->unlock();
 			}
 		}
-		else if(READ == pIOoperData->type)
+		else if(READ == IocpBuff->type)
 		{
-			if (pComKey->sock != INVALID_SOCKET && *(pComKey->user) != NULL)
+			if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
 			{
-				pComKey->userlock->lock();
-				if (*(pComKey->user) != NULL && pComKey->sock != INVALID_SOCKET)
+				IocpSock->userlock->lock();
+				if (*(IocpSock->user) != NULL && IocpSock->sock != INVALID_SOCKET)
 				{
-					(*(pComKey->user))->sockCount -= 1;
-					(*(pComKey->user))->ConnectionClosed(pComKey, pComKey->IP, pComKey->PORT);
+					(*(IocpSock->user))->sockCount -= 1;
+					(*(IocpSock->user))->ConnectionClosed(IocpSock, IocpSock->IP, IocpSock->PORT);
 				}
-				pComKey->userlock->unlock();
+				IocpSock->userlock->unlock();
 			}
 		}
 
-		if (pComKey->sock != INVALID_SOCKET)
+		if (IocpSock->sock != INVALID_SOCKET && IocpSock->sock != NULL)
 		{
-			CancelIo((HANDLE)pComKey->sock);	//取消等待执行的异步操作
-			closesocket(pComKey->sock);
-			pComKey->sock = INVALID_SOCKET;
+			CancelIo((HANDLE)IocpSock->sock);	//取消等待执行的异步操作
+			closesocket(IocpSock->sock);
+			IocpSock->sock = INVALID_SOCKET;
 		}
-		GlobalFree(pIOoperData);
-		GlobalFree(pComKey);
+		ReleaseIOCP_Buff(IocpSock->factory->reactor, IocpBuff);
+		ReleaseIOCP_Socket(IocpSock->factory->reactor, IocpSock);
 	}
 	MemoryBarrier();
-	return TRUE;
+	return true;
 }
 
-BOOL PostRecv(t_completion_fd* pComKey, fd_operation_data* pIOoperData)
+static bool PostRecvUDP(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 {
 	DWORD flags = 0;
-	ZeroMemory(&pIOoperData->overlapped, sizeof(OVERLAPPED));
-	ZeroMemory(&pIOoperData->recv_buffer, DATA_BUFSIZE);
+	memset(&IocpBuff->overlapped, 0, sizeof(OVERLAPPED));
+	memset(&IocpBuff->recv_buffer, 0, DATA_BUFSIZE);
 
-	pIOoperData->type = READ;
-	pIOoperData->databuf.buf = pIOoperData->recv_buffer;
-	pIOoperData->databuf.len = DATA_BUFSIZE;
+	IocpBuff->type = READ;
+	IocpBuff->databuf.buf = IocpBuff->recv_buffer;
+	IocpBuff->databuf.len = DATA_BUFSIZE;
 
-	if (SOCKET_ERROR == WSARecv(pComKey->sock, &pIOoperData->databuf, 1, NULL, &flags, &pIOoperData->overlapped, NULL))
+	if (SOCKET_ERROR == WSARecvFrom(IocpSock->sock, &IocpBuff->databuf, 1, NULL, &flags, NULL, NULL, &IocpBuff->overlapped, NULL))
 	{
 		if (ERROR_IO_PENDING != WSAGetLastError())
 		{
-			//LOG("发起重叠接收失败!   %d\n", GetLastError());
-			Close(pComKey, pIOoperData);
-			return FALSE;
+			Close(IocpSock, IocpBuff);
+			return false;
 		}
-		//LOG("发起重叠接收异常!   %d\n", GetLastError());
 	}
-	return TRUE;
+	return true;
 }
 
-
-BOOL PostSend(t_completion_fd* pComKey, fd_operation_data* pIOoperData)
+static bool PostRecv(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 {
+	if (IocpSock->iotype == IOCP_UDP)
+		return PostRecvUDP(IocpSock, IocpBuff);
 	DWORD flags = 0;
-	pIOoperData->databuf.len = pIOoperData->buffer_len;
-	ZeroMemory(&pIOoperData->overlapped, sizeof(OVERLAPPED));
+	memset(&IocpBuff->overlapped, 0, sizeof(OVERLAPPED));
+	memset(&IocpBuff->recv_buffer, 0, DATA_BUFSIZE);
 
-	pIOoperData->type = WRITE;
+	IocpBuff->type = READ;
+	IocpBuff->databuf.buf = IocpBuff->recv_buffer;
+	IocpBuff->databuf.len = DATA_BUFSIZE;
 
-	if (SOCKET_ERROR == WSASend(pComKey->sock, &pIOoperData->databuf, 1, NULL, flags, &pIOoperData->overlapped, NULL))
+	if (SOCKET_ERROR == WSARecv(IocpSock->sock, &IocpBuff->databuf, 1, NULL, &flags, &IocpBuff->overlapped, NULL))
 	{
 		if (ERROR_IO_PENDING != WSAGetLastError())
 		{
-			//LOG("发起重叠发送失败!\n");
-			Close(pComKey, pIOoperData);
-			return FALSE;
+			Close(IocpSock, IocpBuff);
+			return false;
 		}
-		//LOG("发起发送重叠接收异常!\n");
 	}
-	pComKey->timeout = time(NULL);
-	return TRUE;
+	return true;
 }
 
-BOOL PostAceept(t_completion_fd* pComKey, fd_operation_data* pIOoperData)
+static bool PostSendUDP(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 {
-	BaseFactory* fc = pComKey->factory;
+	DWORD flags = 0;
+	IocpBuff->databuf.len = IocpBuff->buffer_len;
+	memset(&IocpBuff->overlapped, 0, sizeof(OVERLAPPED));
+
+	IocpBuff->type = WRITE;
+
+	if (SOCKET_ERROR == WSASendTo(IocpSock->sock, &IocpBuff->databuf, 1, NULL, flags, (sockaddr*)&IocpSock->SAddr, sizeof(IocpSock->SAddr), &IocpBuff->overlapped, NULL))
+	{
+		if (ERROR_IO_PENDING != WSAGetLastError())
+		{
+			Close(IocpSock, IocpBuff);
+			return false;
+		}
+	}
+	IocpSock->timeout = time(NULL);
+	return true;
+}
+
+static bool PostSend(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
+{
+	if (IocpSock->iotype == IOCP_UDP)
+		return PostSendUDP(IocpSock, IocpBuff);
+	DWORD flags = 0;
+	IocpBuff->databuf.len = IocpBuff->buffer_len;
+	memset(&IocpBuff->overlapped, 0, sizeof(OVERLAPPED));
+
+	IocpBuff->type = WRITE;
+
+	if (SOCKET_ERROR == WSASend(IocpSock->sock, &IocpBuff->databuf, 1, NULL, flags, &IocpBuff->overlapped, NULL))
+	{
+		if (ERROR_IO_PENDING != WSAGetLastError())
+		{
+			Close(IocpSock, IocpBuff);
+			return false;
+		}
+	}
+	IocpSock->timeout = time(NULL);
+	return true;
+}
+
+static bool PostAceept(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
+{
+	BaseFactory* fc = IocpListenSock->factory;
 	Reactor* reactor = fc->reactor;
-	setsockopt(pIOoperData->sock, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*) & (pComKey->sock), sizeof(pComKey->sock));
+	setsockopt(IocpBuff->sock, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*) & (IocpListenSock->sock), sizeof(IocpListenSock->sock));
 
-	t_completion_fd* pClientComKey = (t_completion_fd*)GlobalAlloc(GPTR, sizeof(t_completion_fd));
-	if (pClientComKey == NULL)
+	IOCP_SOCKET* IocpSock = NewIOCP_Socket(fc->reactor);
+	if (IocpSock == NULL)
 	{
-		printf("内存分配失败\n");
-		return FALSE;
+		return false;
 	}
-	memset(pClientComKey, 0, sizeof(t_completion_fd));
-	pClientComKey->sock = pIOoperData->sock;
+	memset(IocpSock, 0, sizeof(IOCP_SOCKET));
+	IocpSock->sock = IocpBuff->sock;
 	BaseProtocol* proto = fc->CreateProtocol();	//用户指针
 	proto->self = proto;
 	proto->factory = fc;
-	pClientComKey->user = &(proto->self);	//用户指针的地址
-	pClientComKey->userlock = proto->protolock;
-	pClientComKey->lpIOoperData = pIOoperData;
+	IocpSock->factory = fc;
+	IocpSock->user = &(proto->self);	//用户指针的地址
+	IocpSock->userlock = proto->protolock;
+	IocpSock->IocpBuff = IocpBuff;
 
 	SOCKADDR_IN addr_conn;
 	int nSize = sizeof(addr_conn);
-	getpeername(pClientComKey->sock, (SOCKADDR*)&addr_conn, &nSize);
-	inet_ntop(AF_INET, &addr_conn.sin_addr, pClientComKey->IP, sizeof(pClientComKey->IP));
-	pClientComKey->PORT = ntohs(addr_conn.sin_port);
-
-	//(*(pClientComKey->user))->protolock->lock();
-	//(*(pClientComKey->user))->ConnectionMade(pClientComKey, pClientComKey->IP, pClientComKey->PORT);
-	//(*(pClientComKey->user))->protolock->unlock();
+	getpeername(IocpSock->sock, (SOCKADDR*)&addr_conn, &nSize);
+	inet_ntop(AF_INET, &addr_conn.sin_addr, IocpSock->IP, sizeof(IocpSock->IP));
+	IocpSock->PORT = ntohs(addr_conn.sin_port);
 
 	SOCKADDR_IN* addrClient = NULL, * addrLocal = NULL;
 	int nClientLen = sizeof(SOCKADDR_IN), nLocalLen = sizeof(SOCKADDR_IN);
 
-	fc->lpfnGetAcceptExSockaddrs(pIOoperData->recv_buffer, 0,
+	fc->reactor->lpfnGetAcceptExSockaddrs(IocpBuff->recv_buffer, 0,
 		sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16,
 		(LPSOCKADDR*)& addrLocal, &nLocalLen,
 		(LPSOCKADDR*)& addrClient, &nClientLen);
 
-	CreateIoCompletionPort((HANDLE)pClientComKey->sock, reactor->g_hComPort, (ULONG_PTR)pClientComKey, 0);	//将监听到的套接字关联到完成端口
+	CreateIoCompletionPort((HANDLE)IocpSock->sock, reactor->ComPort, (ULONG_PTR)IocpSock, 0);	//将监听到的套接字关联到完成端口
 	proto->sockCount += 1;
-	(*(pClientComKey->user))->ConnectionMade(pClientComKey, pClientComKey->IP, pClientComKey->PORT);
+	(*(IocpSock->user))->ConnectionMade(IocpSock, IocpSock->IP, IocpSock->PORT);
 
-	PostRecv(pClientComKey, pIOoperData);
+	PostRecv(IocpSock, IocpBuff);
 
-	AcceptClient(pComKey->factory);
-	return 0;
+	AcceptClient(IocpListenSock->factory);
+	return true;
 }
 
-BOOL ProcessIO(fd_operation_data* pIOoperData, t_completion_fd* pComKey)
+static bool ProcessIO(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 {
-
-	if (pIOoperData->type == READ)	//消息接受后动作
+	if (IocpBuff->type == READ)
 	{
-		if (pComKey->sock != INVALID_SOCKET && *(pComKey->user) != NULL)
+		if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
 		{
 			int ret = CLOSE;
-			pComKey->userlock->lock();
-			if (pComKey->sock != INVALID_SOCKET && *(pComKey->user) != NULL)
-				ret = (*(pComKey->user))->Recv(pComKey, pComKey->IP, pComKey->PORT, pIOoperData->recv_buffer, pIOoperData->buffer_len);
-			pComKey->userlock->unlock();
+			IocpSock->userlock->lock();
+			if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
+				ret = (*(IocpSock->user))->Recv(IocpSock, IocpSock->IP, IocpSock->PORT, IocpBuff->recv_buffer, IocpBuff->buffer_len);
+			IocpSock->userlock->unlock();
 			switch (ret)
 			{
 			case RECV:
-				PostRecv(pComKey, pIOoperData);
+				PostRecv(IocpSock, IocpBuff);
 				break;
 			case SEND:
-				PostSend(pComKey, pIOoperData);
+				PostSend(IocpSock, IocpBuff);
 				break;
 			case SEND_CLOSE:
-				pIOoperData->close = true;
-				PostSend(pComKey, pIOoperData);
+				IocpBuff->close = true;
+				PostSend(IocpSock, IocpBuff);
 				break;
 			case CLOSE:
-				Close(pComKey, pIOoperData);
+				Close(IocpSock, IocpBuff);
 				break;
 			default:
 				break;
 			}
 		}
 	}
-	else if (pIOoperData->type == WRITE)	//发送结束后动作
+	else if (IocpBuff->type == WRITE)
 	{
-		if (pIOoperData->close == true)
-			Close(pComKey, pIOoperData);
+		if (IocpBuff->close == true)
+			Close(IocpSock, IocpBuff);
 		else
-			PostRecv(pComKey, pIOoperData);
+			PostRecv(IocpSock, IocpBuff);
 	}
-	else if (pIOoperData->type == WRITEEX)	//异步主动发送结束后动作
+	else if (IocpBuff->type == WRITEEX)
 	{
-		if (pIOoperData->send_buffer != NULL)
-			GlobalFree(pIOoperData->send_buffer);
-		GlobalFree(pIOoperData);
+		if (IocpBuff->send_buffer != NULL)
+			free(IocpBuff->send_buffer);
+		ReleaseIOCP_Buff(IocpSock->factory->reactor, IocpBuff);
 	}
-	else if (pIOoperData->type == ACCEPT)	//新连接接入后动作
+	else if (IocpBuff->type == ACCEPT)
 	{
-		PostAceept(pComKey, pIOoperData);
+		PostAceept(IocpSock, IocpBuff);
 	}
-	else if (pIOoperData->type == CONNECT)
+	else if (IocpBuff->type == CONNECT)
 	{
-		if (pComKey->sock != INVALID_SOCKET && *(pComKey->user) != NULL)
+		if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
 		{
-			pComKey->userlock->lock();
-			if (pComKey->sock != INVALID_SOCKET && *(pComKey->user) != NULL)
-				(*(pComKey->user))->ConnectionMade(pComKey, pComKey->IP, pComKey->PORT);
-			pComKey->userlock->unlock();
-			PostRecv(pComKey, pIOoperData);
+			IocpSock->userlock->lock();
+			if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
+				(*(IocpSock->user))->ConnectionMade(IocpSock, IocpSock->IP, IocpSock->PORT);
+			IocpSock->userlock->unlock();
+			PostRecv(IocpSock, IocpBuff);
 		}
 		else
 		{
-			Close(pComKey, pIOoperData);
+			Close(IocpSock, IocpBuff);
 		}
 	}
-	return TRUE;
+	return true;
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -298,38 +391,37 @@ DWORD WINAPI serverWorkerThread(LPVOID pParam)
 	Reactor* reactor = (Reactor*)pParam;
 
 	DWORD	dwIoSize;
-	t_completion_fd* pComKey;
-	fd_operation_data* lpIOoperData;		//IO数据,用于发起接收重叠操作
-	BOOL bRet;
-	while (TRUE)
+	IOCP_SOCKET* IocpSock;
+	IOCP_BUFF* IocpBuff;		//IO数据,用于发起接收重叠操作
+	bool bRet;
+	while (true)
 	{
-		bRet = FALSE;
+		bRet = false;
 		dwIoSize = -1;	//IO操作长度
-		lpIOoperData = NULL;
-		bRet = GetQueuedCompletionStatus(reactor->g_hComPort, &dwIoSize, (PULONG_PTR)&pComKey, (LPOVERLAPPED*)&lpIOoperData, INFINITE);
-		if (bRet == FALSE)
+		IocpBuff = NULL;
+		bRet = GetQueuedCompletionStatus(reactor->ComPort, &dwIoSize, (PULONG_PTR)&IocpSock, (LPOVERLAPPED*)&IocpBuff, INFINITE);
+		if (bRet == false)
 		{
-			DWORD dwIOError = GetLastError();
-			if (WAIT_TIMEOUT == dwIOError)
+			if (WAIT_TIMEOUT == GetLastError())
 			{
 				continue;
 			}
-			else if (NULL != lpIOoperData)
+			else if (NULL != IocpBuff)
 			{
-				Close(pComKey, lpIOoperData);
+				Close(IocpSock, IocpBuff);
 			}
 		}
 		else
 		{
-			if (0 == dwIoSize && (READ == lpIOoperData->type || WRITE == lpIOoperData->type || WRITEEX == lpIOoperData->type))
+			if (0 == dwIoSize && (READ == IocpBuff->type || WRITE == IocpBuff->type || WRITEEX == IocpBuff->type))
 			{
-				Close(pComKey, lpIOoperData);
+				Close(IocpSock, IocpBuff);
 				continue;
 			}
 			else
 			{
-				lpIOoperData->buffer_len = dwIoSize;
-				ProcessIO(lpIOoperData, pComKey);
+				IocpBuff->buffer_len = dwIoSize;
+				ProcessIO(IocpSock, IocpBuff);
 			}
 		}
 	}
@@ -341,17 +433,15 @@ DWORD WINAPI mainIOCPServer(LPVOID pParam)
 {
 	Reactor* reactor = (Reactor*)pParam;
 	for (unsigned int i = 0; i < reactor->CPU_COUNT; i++)
-	//for (unsigned int i = 0; i < 1; i++)
 	{
 		HANDLE ThreadHandle;
 		ThreadHandle = CreateThread(NULL, 0, serverWorkerThread, pParam, 0, NULL);
 		if (NULL == ThreadHandle) {
-			printf("创建工作线程失败！");
 			return -4;
 		}
 		CloseHandle(ThreadHandle);
 	}
-	while (reactor->g_Run)
+	while (reactor->Run)
 	{
 		map<short, BaseFactory*>::iterator iter;
 		for (iter = reactor->FactoryAll.begin(); iter != reactor->FactoryAll.end(); iter++)
@@ -368,20 +458,42 @@ int IOCPServerStart(Reactor* reactor)
 	WSADATA wsData;
 	if (0 != WSAStartup(0x0202, &wsData))
 	{
-		printf("加载套接字库失败!   %d\n", WSAGetLastError());
 		return SOCKET_ERROR;
 	}
 
-	reactor->g_hComPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-	if (reactor->g_hComPort == NULL)
+	reactor->ComPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+	if (reactor->ComPort == NULL)
 	{
-		printf("Create completionport error!   %d\n", WSAGetLastError());
 		return -2;
 	}
 
 	SYSTEM_INFO sysInfor;
 	GetSystemInfo(&sysInfor);
 	reactor->CPU_COUNT = sysInfor.dwNumberOfProcessors;
+
+	SOCKET listenSock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	//使用WSAIoctl获取AcceptEx函数指针
+	DWORD dwbytes = 0;
+	GUID guidAcceptEx = WSAID_ACCEPTEX;
+	if (0 != WSAIoctl(listenSock, SIO_GET_EXTENSION_FUNCTION_POINTER,
+		&guidAcceptEx, sizeof(guidAcceptEx),
+		&reactor->lpfnAcceptEx, sizeof(reactor->lpfnAcceptEx),
+		&dwbytes, NULL, NULL))
+	{
+		return -3;
+	}
+	// 获取GetAcceptExSockAddrs函数指针，也是同理
+	GUID guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
+	if (0 != WSAIoctl(listenSock, SIO_GET_EXTENSION_FUNCTION_POINTER,
+		&guidGetAcceptExSockaddrs,
+		sizeof(guidGetAcceptExSockaddrs),
+		&reactor->lpfnGetAcceptExSockaddrs,
+		sizeof(reactor->lpfnGetAcceptExSockaddrs),
+		&dwbytes, NULL, NULL))
+	{
+		return -4;
+	}
+	closesocket(listenSock);
 
 	HANDLE ThreadHandle = CreateThread(NULL, 0, mainIOCPServer, reactor, 0, NULL);
 	if (NULL == ThreadHandle) {
@@ -393,55 +505,33 @@ int IOCPServerStart(Reactor* reactor)
 
 void IOCPServerStop(Reactor* reactor)
 {
-	reactor->g_Run = FALSE;
+	reactor->Run = false;
 }
 
 int IOCPFactoryRun(BaseFactory* fc)
 {	
+	fc->FactoryInit();
+
 	if (fc->ServerPort != 0)
 	{
-		fc->sListen = get_listen_sock(fc->ServerPort);
+		fc->sListen = GetListenSock(fc->ServerPort);
 		if (fc->sListen == SOCKET_ERROR)
 			return -1;
 
-		//使用WSAIoctl获取AcceptEx函数指针
-		DWORD dwbytes = 0;
-		//Accept function GUID
-		GUID guidAcceptEx = WSAID_ACCEPTEX;
-		if (0 != WSAIoctl(fc->sListen, SIO_GET_EXTENSION_FUNCTION_POINTER,
-			&guidAcceptEx, sizeof(guidAcceptEx),
-			&fc->lpfnAcceptEx, sizeof(fc->lpfnAcceptEx),
-			&dwbytes, NULL, NULL))
-		{
-			return -2;
-		}
-
-		// 获取GetAcceptExSockAddrs函数指针，也是同理
-		GUID guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
-		if (0 != WSAIoctl(fc->sListen, SIO_GET_EXTENSION_FUNCTION_POINTER,
-			&guidGetAcceptExSockaddrs,
-			sizeof(guidGetAcceptExSockaddrs),
-			&fc->lpfnGetAcceptExSockaddrs,
-			sizeof(fc->lpfnGetAcceptExSockaddrs),
-			&dwbytes, NULL, NULL))
-		{
-			return -3;
-		}
-
-		t_completion_fd* pListenComKey = (t_completion_fd*)GlobalAlloc(GPTR, sizeof(t_completion_fd));
-		if (pListenComKey == NULL)
+		IOCP_SOCKET* IcpSock = NewIOCP_Socket(fc->reactor);
+		if (IcpSock == NULL)
 		{
 			closesocket(fc->sListen);
-			return -4;
+			return -2;
 		}
-		pListenComKey->factory = fc;
-		pListenComKey->sock = fc->sListen;
+		IcpSock->factory = fc;
+		IcpSock->sock = fc->sListen;
 
-		CreateIoCompletionPort((HANDLE)fc->sListen, fc->reactor->g_hComPort, (ULONG_PTR)pListenComKey, 0);  //注意：此处可能存在多余操作
+		CreateIoCompletionPort((HANDLE)fc->sListen, fc->reactor->ComPort, (ULONG_PTR)IcpSock, 0);
 		for (DWORD i = 0; i < fc->reactor->CPU_COUNT; i++)
 			AcceptClient(fc);
 	}
-	fc->FactoryInit();
+	
 	fc->reactor->FactoryAll.insert(pair<short, BaseFactory*>(fc->ServerPort, fc));
 	return 0;
 }
@@ -458,104 +548,85 @@ int IOCPFactoryStop(BaseFactory* fc)
 	return 0;
 }
 
-/*SOCKET IOCPConnect(const char* ip, int port, BaseProtocol** proto)
-{
-	BaseFactory* fc = (*proto)->factory;
-	SOCKET sockClt = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockClt == INVALID_SOCKET)
-	{
-		printf("socket() fail:%d\n", WSAGetLastError());
-		return NULL;
-	}
-
-	SOCKADDR_IN addrSrv;
-	memset(&addrSrv, 0, sizeof(addrSrv));
-	addrSrv.sin_family = AF_INET;
-	inet_pton(AF_INET, ip, &addrSrv.sin_addr);
-	addrSrv.sin_port = htons(port);
-
-	int err = connect(sockClt, (SOCKADDR*)& addrSrv, sizeof(SOCKADDR));
-	if (err == -1)
-	{
-		(*proto)->ConnectionFailed((char*)ip, port);
-		return NULL;
-	}
-
-	fd_operation_data* pIOoperData;
-	t_completion_fd* pClientComKey;
-	pIOoperData = (fd_operation_data*)GlobalAlloc(GPTR, sizeof(fd_operation_data));
-	pClientComKey = (t_completion_fd*)GlobalAlloc(GPTR, sizeof(t_completion_fd));
-	if (pClientComKey == NULL || pIOoperData == NULL)
-	{
-		printf("内存分配失败\n");
-		closesocket(sockClt);
-		return NULL;
-	}
-	memset(pClientComKey, 0, sizeof(t_completion_fd));
-	memset(pIOoperData, 0, sizeof(fd_operation_data));
-	pIOoperData->sock = sockClt;
-	pClientComKey->sock = sockClt;
-	memcpy(pClientComKey->IP, ip, strlen(ip));
-	pClientComKey->PORT = port;
-	pClientComKey->lpIOoperData = pIOoperData;
-
-	//setsockopt(pIOoperData->sock, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*) & (pClientComKey->sock), sizeof(pClientComKey->sock));
-	pClientComKey->user = proto;
-	//pClientComKey->user->sock = pClientComKey->sock;
-	(*(pClientComKey->user))->ConnectionMade(pClientComKey, pClientComKey->IP, pClientComKey->PORT);
-
-	CreateIoCompletionPort((HANDLE)pClientComKey->sock, fc->reactor->g_hComPort, (ULONG_PTR)pClientComKey, 0);	//将监听到的套接字关联到完成端口
-	PostRecv(pClientComKey, pIOoperData);
-
-	return sockClt;
-}*/
-
-HSOCKET IOCPConnectEx(const char* ip, int port, BaseProtocol* proto)
+static HSOCKET IOCPConnectUDP(const char* ip, int port, BaseProtocol* proto, uint8_t iotype)
 {
 	BaseFactory* fc = proto->factory;
-	fd_operation_data* pIO;
-	pIO = (fd_operation_data*)GlobalAlloc(GPTR, sizeof(fd_operation_data));
-	if (pIO == NULL)
+	IOCP_SOCKET* IocpSock = NewIOCP_Socket(fc->reactor);
+	if (IocpSock == NULL)
 	{
-		printf("内存分配失败\n");
 		return NULL;
 	}
-	pIO->databuf.buf = pIO->recv_buffer;
-	pIO->databuf.len = DATA_BUFSIZE;
-	pIO->type = CONNECT;
-	pIO->overlapped.hEvent = NULL;
-	//pIO->sock = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, NULL, WSA_FLAG_OVERLAPPED);
-	pIO->sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (pIO->sock == INVALID_SOCKET)
-	{
-		printf("socket create fail:%d\n", WSAGetLastError());
-		closesocket(pIO->sock);
-		GlobalFree(pIO);
-		return NULL;
-	}
-	setsockopt(pIO->sock, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*) & (fc->sListen), sizeof(fc->sListen));
+	IocpSock->sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	IocpSock->iotype = iotype;
+
+	IocpSock->SAddr.sin_family = AF_INET;
+	IocpSock->SAddr.sin_port = htons(port);
+	inet_pton(AF_INET, ip, &IocpSock->SAddr.sin_addr);
+
+	IocpSock->factory = fc;
+	memcpy(IocpSock->IP, ip, strlen(ip));
+	IocpSock->PORT = port;
+	IocpSock->user = &(proto->self);
+	IocpSock->userlock = proto->protolock;
 
 	sockaddr_in local_addr;
-	ZeroMemory(&local_addr, sizeof(sockaddr_in));
+	memset(&local_addr, 0, sizeof(sockaddr_in));
 	local_addr.sin_family = AF_INET;
 
-	int irt = bind(pIO->sock, (sockaddr*)(&local_addr), sizeof(sockaddr_in));
-	t_completion_fd* pClientComKey = (t_completion_fd*)GlobalAlloc(GPTR, sizeof(t_completion_fd));
-	if (pClientComKey == NULL)
+	bind(IocpSock->sock, (sockaddr*)(&local_addr), sizeof(sockaddr_in));
+	IocpSock->IocpBuff = NewIOCP_Buff(fc->reactor);
+
+	CreateIoCompletionPort((HANDLE)IocpSock->sock, fc->reactor->ComPort, (ULONG_PTR)IocpSock, 0);
+	proto->sockCount += 1;
+
+	PostRecv(IocpSock, IocpSock->IocpBuff);
+	return IocpSock;
+}
+HSOCKET IOCPConnectEx(const char* ip, int port, BaseProtocol* proto, uint8_t iotype)
+{
+	if (iotype == IOCP_UDP)
+		return IOCPConnectUDP(ip, port, proto, iotype);
+	BaseFactory* fc = proto->factory;
+	IOCP_BUFF* IocpBuff;
+	IocpBuff = NewIOCP_Buff(fc->reactor);
+	if (IocpBuff == NULL)
 	{
-		printf("内存分配失败\n");
-		closesocket(pIO->sock);
-		GlobalFree(pIO);
 		return NULL;
 	}
-	memset(pClientComKey, 0, sizeof(t_completion_fd));
-	pClientComKey->sock = pIO->sock;
-	memcpy(pClientComKey->IP, ip, strlen(ip));
-	pClientComKey->PORT = port;
-	pClientComKey->user = &(proto->self);
-	pClientComKey->userlock = proto->protolock;
-	pClientComKey->lpIOoperData = pIO;
-	//LOG("sockex is made  %d. Error code = %d\n", pIO->sock, WSAGetLastError());
+	IocpBuff->databuf.buf = IocpBuff->recv_buffer;
+	IocpBuff->databuf.len = DATA_BUFSIZE;
+	IocpBuff->type = CONNECT;
+	IocpBuff->overlapped.hEvent = NULL;
+	//pIO->sock = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, NULL, WSA_FLAG_OVERLAPPED);
+	IocpBuff->sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (IocpBuff->sock == INVALID_SOCKET)
+	{
+		closesocket(IocpBuff->sock);
+		ReleaseIOCP_Buff(fc->reactor, IocpBuff);
+		return NULL;
+	}
+	setsockopt(IocpBuff->sock, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*) & (fc->sListen), sizeof(fc->sListen));
+
+	sockaddr_in local_addr;
+	memset(&local_addr, 0, sizeof(sockaddr_in));
+	local_addr.sin_family = AF_INET;
+
+	int irt = bind(IocpBuff->sock, (sockaddr*)(&local_addr), sizeof(sockaddr_in));
+	IOCP_SOCKET* IocpSock = NewIOCP_Socket(fc->reactor);
+	if (IocpSock == NULL)
+	{
+		closesocket(IocpBuff->sock);
+		ReleaseIOCP_Buff(fc->reactor, IocpBuff);
+		return NULL;
+	}
+	IocpSock->factory = fc;
+	IocpSock->sock = IocpBuff->sock;
+	IocpSock->iotype = iotype;
+	memcpy(IocpSock->IP, ip, strlen(ip));
+	IocpSock->PORT = port;
+	IocpSock->user = &(proto->self);
+	IocpSock->userlock = proto->protolock;
+	IocpSock->IocpBuff = IocpBuff;
 
 	SOCKADDR_IN addrSrv;
 	memset(&addrSrv, 0, sizeof(addrSrv));
@@ -566,99 +637,113 @@ HSOCKET IOCPConnectEx(const char* ip, int port, BaseProtocol* proto)
 	LPFN_CONNECTEX lpfnConnectEx = NULL;
 	GUID GuidConnectEx = WSAID_CONNECTEX;
 	DWORD dwBytes = 0;
-	if (SOCKET_ERROR == WSAIoctl(pClientComKey->sock, SIO_GET_EXTENSION_FUNCTION_POINTER,
+	if (SOCKET_ERROR == WSAIoctl(IocpSock->sock, SIO_GET_EXTENSION_FUNCTION_POINTER,
 		&GuidConnectEx, sizeof(GuidConnectEx),
 		&lpfnConnectEx, sizeof(lpfnConnectEx), &dwBytes, 0, 0))
 	{
 		if (ERROR_IO_PENDING != WSAGetLastError())
 		{
-			printf("WSAIoctl is failed  %lld. Error code = %d\n", pIO->sock, WSAGetLastError());
-			closesocket(pClientComKey->sock);
-			GlobalFree(pIO);
-			GlobalFree(pClientComKey);
+			closesocket(IocpSock->sock);
+			ReleaseIOCP_Buff(fc->reactor, IocpBuff);
+			ReleaseIOCP_Socket(fc->reactor, IocpSock);
 			return NULL;
 		}
-		//LOG("WSAIoctl fate err. Error code = %d\n", WSAGetLastError());
 	}
-	CreateIoCompletionPort((HANDLE)pClientComKey->sock, fc->reactor->g_hComPort, (ULONG_PTR)pClientComKey, 0);	//将监听到的套接字关联到完成端口
+	CreateIoCompletionPort((HANDLE)IocpSock->sock, fc->reactor->ComPort, (ULONG_PTR)IocpSock, 0);
 	proto->sockCount += 1;
 
 	PVOID lpSendBuffer = NULL;
 	DWORD dwSendDataLength = 0;
 	DWORD dwBytesSent = 0;
-	BOOL bResult = lpfnConnectEx(pIO->sock,
+	BOOL bResult = lpfnConnectEx(IocpBuff->sock,
 		(SOCKADDR*)&addrSrv,	// [in] 对方地址
 		sizeof(addrSrv),		// [in] 对方地址长度
 		lpSendBuffer,			// [in] 连接后要发送的内容，这里不用
 		dwSendDataLength,		// [in] 发送内容的字节数 ，这里不用
 		&dwBytesSent,			// [out] 发送了多少个字节，这里不用
-		&(pIO->overlapped));	// [in] 这东西复杂，下一篇有详解
+		&(IocpBuff->overlapped));
 
-	if (!bResult)      // 返回值处理
+	if (!bResult)
 	{
-		if (WSAGetLastError() != ERROR_IO_PENDING)   // 调用失败
+		if (WSAGetLastError() != ERROR_IO_PENDING)
 		{
-			//printf("ConnextEx error:%lld  %d  %lld\n", pIO->sock, WSAGetLastError(), pClientComKey);
-			closesocket(pClientComKey->sock);
-			GlobalFree(pIO);
-			GlobalFree(pClientComKey);    //已经注册到IOCP后，由IOCP释放资源，主动释放会造成程序崩溃
+			closesocket(IocpSock->sock);
+			ReleaseIOCP_Buff(fc->reactor, IocpBuff);
+			ReleaseIOCP_Socket(fc->reactor, IocpSock);
 			return NULL;
 		}
-		//LOG("ConnextEx fate error: %d\n", WSAGetLastError());
 	}
-	return pClientComKey;
+	return IocpSock;
 }
 
-bool IOCPPostSendEx(t_completion_fd* pComKey, char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
+static bool IOCPPostSendUDP(IOCP_SOCKET* IocpSock, char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
 {
-	if (pComKey == NULL)
+	if (IocpSock != NULL && IocpSock->sock != INVALID_SOCKET)
 	{
-		return FALSE;
+		sendto(IocpSock->sock, data, len, 0, (sockaddr*)&IocpSock->SAddr, sizeof(IocpSock->SAddr));
 	}
-
-	DWORD flags = 0;
-	fd_operation_data* pIOoperData = (fd_operation_data*)GlobalAlloc(GPTR, sizeof(fd_operation_data));
-	if (pIOoperData == NULL)
-	{
-		printf("内存分配失败\n");
-		return false;
-	}
-
-	pIOoperData->send_buffer = (char*)GlobalAlloc(GPTR, len);
-	if (pIOoperData->send_buffer == NULL)
-	{
-		GlobalFree(pIOoperData);
-		return false;
-	}
-	memcpy(pIOoperData->send_buffer, data, len);
-
-	pIOoperData->databuf.len = len;
-	pIOoperData->databuf.buf = pIOoperData->send_buffer;
-	ZeroMemory(&pIOoperData->overlapped, sizeof(OVERLAPPED));
-
-	//pIOoperData->type = WRITE;
-	pIOoperData->type = WRITEEX;
-
-	if (SOCKET_ERROR == WSASend(pComKey->sock, &pIOoperData->databuf, 1, NULL, flags, &pIOoperData->overlapped, NULL))
-	{
-		if (ERROR_IO_PENDING != WSAGetLastError())
-		{
-			//LOG("发起重叠发送失败!\n");
-			GlobalFree(pIOoperData->send_buffer);
-			GlobalFree(pIOoperData);
-			return false;
-		}
-		//LOG("发起发送重叠接收异常!\n");
-	}
-	pComKey->timeout = time(NULL);
+	
 	return true;
 }
 
-bool IOCPCloseHsocket(t_completion_fd*  pComKey)
+static bool IOCPPostSend(IOCP_SOCKET* IocpSock, char* data, int len)
 {
-	if (pComKey == NULL ||pComKey->sock == INVALID_SOCKET)
+	if (IocpSock->iotype == IOCP_UDP)
+		return IOCPPostSendUDP(IocpSock, data, len);
+	if (IocpSock != NULL && IocpSock->sock != INVALID_SOCKET)
+	{
+		send(IocpSock->sock, data, len, 0);
+	}
+	return true;
+}
+
+bool IOCPPostSendEx(IOCP_SOCKET* IocpSock, char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
+{
+	return IOCPPostSend(IocpSock, data, len);
+	if (IocpSock == NULL)
+	{
 		return false;
-	closesocket(pComKey->sock);
+	}
+
+	DWORD flags = 0;
+	IOCP_BUFF* IocpBuff = NewIOCP_Buff(IocpSock->factory->reactor);
+	if (IocpBuff == NULL)
+	{
+		return false;
+	}
+
+	IocpBuff->send_buffer = (char*)malloc(len);
+	if (IocpBuff->send_buffer == NULL)
+	{
+		ReleaseIOCP_Buff(IocpSock->factory->reactor, IocpBuff);
+		return false;
+	}
+	memcpy(IocpBuff->send_buffer, data, len);
+
+	IocpBuff->databuf.len = len;
+	IocpBuff->databuf.buf = IocpBuff->send_buffer;
+	memset(&IocpBuff->overlapped, 0, sizeof(OVERLAPPED));
+
+	IocpBuff->type = WRITEEX;
+
+	if (SOCKET_ERROR == WSASend(IocpSock->sock, &IocpBuff->databuf, 1, NULL, flags, &IocpBuff->overlapped, NULL))
+	{
+		if (ERROR_IO_PENDING != WSAGetLastError())
+		{
+			free(IocpBuff->send_buffer);
+			ReleaseIOCP_Buff(IocpSock->factory->reactor, IocpBuff);
+			return false;
+		}
+	}
+	IocpSock->timeout = time(NULL);
+	return true;
+}
+
+bool IOCPCloseHsocket(IOCP_SOCKET*  IocpSock)
+{
+	if (IocpSock == NULL ||IocpSock->sock == INVALID_SOCKET)
+		return false;
+	closesocket(IocpSock->sock);
 	return true;
 }
 

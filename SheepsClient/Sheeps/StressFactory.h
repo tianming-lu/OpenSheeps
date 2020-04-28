@@ -20,7 +20,6 @@ public:
 	bool	FactoryInit();
 	bool	FactoryLoop();
 	bool	FactoryClose();
-	bool	TcpConnect();
 	BaseProtocol* CreateProtocol();
 	bool	DeleteProtocol(BaseProtocol* proto);
 };

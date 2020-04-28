@@ -6,6 +6,7 @@
 #include "stdio.h"
 #include <map>
 #include <mutex>
+#include <stack>
 
 #if defined COMMON_LIB || defined STRESS_EXPORTS
 #define Iocp_API __declspec(dllexport)
@@ -25,13 +26,16 @@
 #define SEND_CLOSE	2
 #define CLOSE		3
 
+#define IOCP_TCP 0
+#define IOCP_UDP 1
+
 using namespace std;
 
 class BaseFactory;
 class BaseProtocol;
 
 //扩展的输入输出结构
-typedef struct _io_operation_data
+typedef struct _IOCP_BUFF
 {
 	OVERLAPPED	overlapped;
 	WSABUF		databuf;
@@ -41,75 +45,76 @@ typedef struct _io_operation_data
 	BYTE		type;
 	SOCKET		sock;
 	bool		close;
-}fd_operation_data;
+}IOCP_BUFF;
 
 //完成键
-typedef struct _completion_key
+typedef struct _IOCP_SOCKET
 {
 	SOCKET				sock;
+	uint8_t				iotype;
 	CHAR				IP[16];
 	int32_t				PORT;
+	SOCKADDR_IN			SAddr;
 	BaseFactory*		factory;
 	mutex*				userlock;
 	BaseProtocol**		user;
-	fd_operation_data*	lpIOoperData;
+	IOCP_BUFF*			IocpBuff;
 	time_t				timeout;
-}t_completion_fd, *HSOCKET;	//完成端口句柄
+}IOCP_SOCKET, *HSOCKET;	//完成端口句柄
 
 class Reactor 
 {
 public:
 	Reactor() {};
-	virtual ~Reactor() {};
+	virtual ~Reactor();
 
 public:
-	HANDLE g_hComPort = NULL;
-	bool   g_Run = TRUE;
+	HANDLE	ComPort = NULL;
+	bool	Run = true;
+	DWORD	CPU_COUNT = 1;
 
-	DWORD CPU_COUNT = 1;
-	map<short, BaseFactory*> FactoryAll;
+	LPFN_ACCEPTEX				lpfnAcceptEx = NULL;					 //AcceptEx函数指针
+	LPFN_GETACCEPTEXSOCKADDRS	lpfnGetAcceptExSockaddrs = NULL;  //加载GetAcceptExSockaddrs函数指针
+
+	map<short, BaseFactory*>	FactoryAll;
+	stack<IOCP_SOCKET*>			HsocketPool;
+	mutex						HsocketPoolLock;
+	stack<IOCP_BUFF*>			HbuffPool;
+	mutex						HbuffPoolLock;
 };
 
 class BaseProtocol
 {
 public:
 	BaseProtocol() {};
-	virtual ~BaseProtocol() {
-		delete this->protolock;
-	};
+	virtual ~BaseProtocol() {delete this->protolock;};
 
 public:
-	BaseFactory* factory = NULL;
-	BaseProtocol* self = NULL;
-	mutex* protolock = new mutex;
-	uint8_t sockCount = 0;
+	BaseFactory*	factory = NULL;
+	BaseProtocol*	self = NULL;
+	mutex*			protolock = new mutex;
+	uint8_t			sockCount = 0;
 
 public:
 	virtual bool ConnectionMade(HSOCKET hsock, char *ip, int port) = 0;
 	virtual bool ConnectionFailed(HSOCKET, char *ip, int port) = 0;
 	virtual bool ConnectionClosed(HSOCKET hsock, char *ip, int port) = 0;
-	//virtual int  Send(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
 	virtual int	 Recv(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
 };
 
 class BaseFactory
 {
 public:
-	LPFN_ACCEPTEX lpfnAcceptEx = NULL;					 //AcceptEx函数指针
-	LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExSockaddrs = NULL;  //加载GetAcceptExSockaddrs函数指针
-
-public:
 	BaseFactory() {};
 	virtual ~BaseFactory() {};
 
 public:
-	Reactor* reactor = NULL;
+	Reactor*		reactor = NULL;
 	uint32_t		ServerPort = 0;
 	SOCKET			sListen = NULL;
 	virtual bool	FactoryInit() = 0;
 	virtual bool	FactoryLoop() = 0;
 	virtual bool	FactoryClose() = 0;
-	virtual bool	TcpConnect() = 0;
 	virtual BaseProtocol* CreateProtocol() = 0;
 	virtual bool	DeleteProtocol(BaseProtocol* proto) = 0;
 };
@@ -123,10 +128,9 @@ Iocp_API int		IOCPServerStart(Reactor* reactor);
 Iocp_API void		IOCPServerStop(Reactor* reactor);
 Iocp_API int		IOCPFactoryRun(BaseFactory* fc);
 Iocp_API int		IOCPFactoryStop(BaseFactory* fc);
-//Iocp_API SOCKET		IOCPConnect(const char* ip, int port, BaseProtocol** proto);
-Iocp_API HSOCKET	IOCPConnectEx(const char* ip, int port, BaseProtocol* proto);
-Iocp_API bool		IOCPPostSendEx(t_completion_fd* pComKey, char* data, int len);
-Iocp_API bool		IOCPCloseHsocket(t_completion_fd* pComKey);
+Iocp_API HSOCKET	IOCPConnectEx(const char* ip, int port, BaseProtocol* proto, uint8_t iotype);
+Iocp_API bool		IOCPPostSendEx(IOCP_SOCKET* IocpSock, char* data, int len);
+Iocp_API bool		IOCPCloseHsocket(IOCP_SOCKET* IocpSock);
 Iocp_API bool		IOCPDestroyProto(BaseProtocol* proto);
 
 #ifdef __cplusplus

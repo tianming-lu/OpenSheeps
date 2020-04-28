@@ -48,11 +48,6 @@ bool StressFactory::FactoryClose()
 	return true;
 }
 
-bool StressFactory::TcpConnect()
-{
-	return true;
-}
-
 BaseProtocol* StressFactory::CreateProtocol()
 {
 	return NULL;

@@ -110,7 +110,8 @@ public:
 public:
 	HTASKCFG	Task = NULL;
 	uint16_t	UserNumber = 0;
-	bool		SelfDead = FALSE;
+	bool		SelfDead = false;
+	bool		PlayPause = false;
 	MsgPointer	MsgPointer = { 0x0 };
 
 public:
@@ -120,7 +121,8 @@ public:
 	virtual bool ConnectionClosed(HSOCKET hsock, char* ip, int port) = 0;
 	virtual int  Send(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
 	virtual int	 Recv(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
-	virtual int	 Loop() = 0;
+	virtual int  TimeOut() = 0;
+	virtual int	 Event(uint8_t event_type, string ip, int port, string content) = 0;
 	virtual int	 ReInit() = 0;
 	virtual int  Destroy() = 0;
 };
@@ -155,7 +157,7 @@ Task_API bool		TaskUserDead(UserProtocol* proto, const char* fmt, ...);
 Task_API bool		TaskUserSocketClose(HSOCKET hsock);
 Task_API void		TaskUserLog(UserProtocol* proto, uint8_t level, const char* fmt, ...);
 Task_API void		TaskLog(t_task_config* task, uint8_t level, const char* fmt, ...);
-#define		TaskUserSocketConnet(ip, port, proto)	IOCPConnectEx(ip, port, proto)
+#define		TaskUserSocketConnet(ip, port, proto, iotype)	IOCPConnectEx(ip, port, proto, iotype)
 #define		TaskUserSocketSend(hsock, data, len)	IOCPPostSendEx(hsock, data, len)
 
 #ifdef __cplusplus

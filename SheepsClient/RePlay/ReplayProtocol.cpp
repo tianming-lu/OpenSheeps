@@ -55,7 +55,7 @@ void ReplayProtocol::ProtoInit()
 
 bool ReplayProtocol::ConnectionMade(HSOCKET hsock, char* ip, int port)
 {	/*当用户连接目标ip端口成功后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
-	TaskLog(this->Task, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
+	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
 	map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	t_connection_info info = { 0x0 };
 	info.hsock = hsock;
@@ -71,22 +71,21 @@ bool ReplayProtocol::ConnectionMade(HSOCKET hsock, char* ip, int port)
 		it->second.sendbuf.clear();
 		it->second.recvbuf.clear();
 	}
-	this->pause = false;
+	this->PlayPause = false;
 	return true;
 }
 
 bool ReplayProtocol::ConnectionFailed(HSOCKET hsock, char* ip, int port)
 {	/*当用户连接目标ip端口失败后，调用此函数，并传递对应网络地址（ip）和端口（port）*/
-	TaskLog(this->Task, LOG_FAULT,"%s:%d [%s:%d]\r\n", __func__, __LINE__, ip, port);
-	this->MsgPointer = { 0x0 };
-	this->pause = false;
+	TaskUserLog(this, LOG_FAULT,"%s:%d [%s:%d]\r\n", __func__, __LINE__, ip, port);
+	this->PlayPause = false;
 	TaskUserDead(this, "connection failed");
 	return true;
 }
 
 bool ReplayProtocol::ConnectionClosed(HSOCKET hsock, char* ip, int port)   //类销毁后，可能导致野指针
 {	/*当用户连接关闭后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
-	TaskLog(this->Task, LOG_FAULT, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
+	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
 	map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	if (it != this->Connection.end())
 	{
@@ -107,29 +106,30 @@ int ReplayProtocol::Send(HSOCKET hsock, char* ip, int port, char* data, int len)
 
 int ReplayProtocol::Recv(HSOCKET hsock, char* ip, int port, char* data, int len)
 {	/*当用户连接收到消息后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port），以及数据指针（data）和消息长度（len）*/
-	TaskLog(this->Task, LOG_DEBUG, "%s:%d [%s:%d][%.*s]\r\n", __func__, __LINE__, ip, port, len, data);
+	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d][%.*s]\r\n", __func__, __LINE__, ip, port, len, data);
 	return this->CheckReq(hsock->sock, data, len);
 }
 
-int ReplayProtocol::Loop()
-{	/*任务运行过程中循环调用次函数，执行用户主动行为*/
-	if (this->pause == true)
-		return 0;
+int ReplayProtocol::TimeOut()
+{
+	TaskUserLog(this, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
+	return 0;
+}
 
-	this->message = TaskGetNextMessage(this);  /*获取下一步用户需要处理的事件消息*/
-	if (this->message == NULL)
-		return 0;
+int ReplayProtocol::Event(uint8_t event_type, string ip, int port, string content)
+{
+	TaskUserLog(this, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
 	HSOCKET* hsock;
-	switch (this->message->type)
+	switch (event_type)
 	{
 	case TYPE_CONNECT: /*连接事件*/
-		TaskLog(this->Task, LOG_DEBUG, "user connect[%s:%d]\r\n", this->message->ip.c_str(), this->message->port);
-		this->pause = true;
-		TaskUserSocketConnet(this->message->ip.c_str(), this->message->port, this->self);
+		TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]\r\n", ip.c_str(), port);
+		this->PlayPause = true;
+		TaskUserSocketConnet(ip.c_str(), port, this, IOCP_TCP);
 		break;
 	case TYPE_CLOSE:	/*关闭连接事件*/
-		TaskLog(this->Task, LOG_DEBUG, "user conclose[%s:%d]\r\n", this->message->ip.c_str(), this->message->port);
-		hsock = this->GetScokFromConnection(this->message->ip.c_str(), this->message->port);
+		TaskUserLog(this, LOG_DEBUG, "user conclose[%s:%d]\r\n", ip.c_str(), port);
+		hsock = this->GetScokFromConnection(ip.c_str(), port);
 		if (hsock != NULL)
 		{
 			TaskUserSocketClose(*hsock);
@@ -137,16 +137,12 @@ int ReplayProtocol::Loop()
 		}
 		break;
 	case TYPE_SEND:	/*向连接发送消息事件*/
-		TaskLog(this->Task, LOG_DEBUG, "user send[%s:%d [%s]]\r\n", this->message->ip.c_str(), this->message->port, this->message->content.c_str());
-		hsock = this->GetScokFromConnection(this->message->ip.c_str(), this->message->port);
+		TaskUserLog(this, LOG_DEBUG, "user send[%s:%d [%s]]\r\n", ip.c_str(), port, content.c_str());
+		hsock = this->GetScokFromConnection(ip.c_str(), port);
 		if (hsock != NULL)
 		{
-			TaskUserSocketSend(*hsock, (char*)(this->message->content.c_str()), (int)this->message->content.size());
+			TaskUserSocketSend(*hsock, (char*)(content.c_str()), (int)content.size());
 		}
-		break;
-	case TYPE_REINIT:	/*用户重置事件，关闭所有连接，初始化用户资源*/
-		TaskLog(this->Task, LOG_NORMAL, "user loop[%d]\r\n", this->message->isloop);
-		this->ReInit();
 		break;
 	default:
 		break;
@@ -156,14 +152,14 @@ int ReplayProtocol::Loop()
 
 int ReplayProtocol::ReInit()
 {	/*用户重置到初始状态*/
-	TaskLog(this->Task, LOG_NORMAL, "%s:%d\r\n", __func__, __LINE__);
+	TaskUserLog(this, LOG_NORMAL, "%s:%d\r\n", __func__, __LINE__);
 	this->CloseAllConnection();
 	return 0;
 }
 
 int ReplayProtocol::Destroy()
 {	/*任务终止时，调用次函数，关闭所有连接，并且HSOCKET 句柄变量置为NULL*/
-	TaskLog(this->Task, LOG_NORMAL, "%s:%d\r\n", __func__, __LINE__);
+	TaskUserLog(this, LOG_NORMAL, "%s:%d\r\n", __func__, __LINE__);
 	this->CloseAllConnection();
 	return  0;
 }

@@ -51,6 +51,43 @@ static int MsgSend(HSOCKET sock, int cmdNo, char* data, int len)
 	return 0;
 }
 
+static void ReInit(UserProtocol* proto)
+{
+	proto->SelfDead = false;
+	proto->MsgPointer = { 0x0 };
+	proto->ReInit();
+}
+
+static void Loop(UserProtocol* proto)
+{
+	if (proto->PlayPause == true)
+	{
+		proto->TimeOut();
+		return;
+	}
+
+	HMESSAGE message = TaskGetNextMessage(proto);  /*获取下一步用户需要处理的事件消息*/
+	if (message == NULL)
+	{
+		proto->TimeOut();
+		return;
+	}
+	switch (message->type)
+	{
+	case TYPE_CONNECT: /*连接事件*/
+	case TYPE_CLOSE:	/*关闭连接事件*/
+	case TYPE_SEND:	/*向连接发送消息事件*/
+		proto->Event(message->type, message->ip, message->port, message->content);
+		break;
+	case TYPE_REINIT:	/*用户重置事件，关闭所有连接，初始化用户资源*/
+		ReInit(proto);
+		break;
+	default:
+		break;
+	}
+	return;
+}
+
 DWORD WINAPI taskWorkerThread(LPVOID pParam)
 {
 	t_task_config* task = (t_task_config*)pParam;
@@ -83,9 +120,7 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 			{
 				if (task->ignoreErr)
 				{
-					proto->ReInit();
-					proto->MsgPointer = { 0x0 };
-					proto->SelfDead = FALSE;
+					ReInit(user->proto);
 					user->protolock->unlock();
 					add_to_userAll_tail(task, user);
 				}
@@ -98,7 +133,7 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 				}
 				continue;
 			}
-			proto->Loop();
+			Loop(proto);
 			user->protolock->unlock();
 			add_to_userAll_tail(task, user);
 		}
@@ -194,9 +229,7 @@ int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 		}
 		else
 		{
-			user->proto->SelfDead = false;
-			user->proto->MsgPointer = { 0x0 };
-			user->proto->ReInit();
+			ReInit(user->proto);
 		}
 
 		add_to_userAll_tail(task, user);
@@ -582,9 +615,7 @@ int client_cmd_12_task_change_user_count(HSOCKET sock, int cmdNO, cJSON* root)
 		}
 		else
 		{
-			user->proto->SelfDead = false;
-			user->proto->MsgPointer = { 0x0 };
-			user->proto->ReInit();
+			ReInit(user->proto);
 		}
 		
 		add_to_userAll_tail(task, user);

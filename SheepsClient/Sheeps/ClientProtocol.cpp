@@ -78,7 +78,7 @@ int StressProtocol::Loop()
 	{
 		char ip[20] = { 0x0 };
 		GetHostByName((char*)this->StressSerIP, ip, sizeof(ip));
-		this->StressHsocket = IOCPConnectEx(ip, this->StressSerPort, this);
+		this->StressHsocket = IOCPConnectEx(ip, this->StressSerPort, this, IOCP_TCP);
 	}
 
 	destroyTask();   //定期清理已经结束的任务，释放资源

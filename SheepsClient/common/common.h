@@ -12,7 +12,7 @@ extern "C"
 {
 #endif
 
-Common_API int GetHostByName(char* host, char* buf, size_t size);
+Common_API int GetHostByName(char* name, char* buf, size_t size);
 
 #ifdef __cplusplus
 }

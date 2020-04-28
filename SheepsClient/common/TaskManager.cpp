@@ -423,6 +423,7 @@ void TaskLog(t_task_config* task, uint8_t level, const char* fmt, ...)
 	va_start(ap, fmt);
 	l += vsnprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, fmt, ap);
 	va_end(ap);
+	l += snprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, "\r\n");
 
 	DWORD written;
 	WriteFile(nle->File, buf, l, &written, NULL);
@@ -439,12 +440,13 @@ void TaskUserLog(UserProtocol* proto, uint8_t level, const char* fmt, ...)
 	time_t now = time(NULL);
 	localtime_s(&tmm, &now);
 	char* slog = GetLogStr(level);
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, GetCurrentThreadId(), proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[NO.%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, GetCurrentThreadId(), proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
 	l += vsnprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, fmt, ap);
 	va_end(ap);
+	l += snprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, "\r\n");
 
 	DWORD written;
 	WriteFile(nle->File, buf, l, &written, NULL);
