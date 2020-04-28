@@ -525,7 +525,7 @@
    </widget>
    <widget class="QWidget" name="tab_4">
     <attribute name="title">
-     <string>连接列表</string>
+     <string>代理列表</string>
     </attribute>
     <widget class="QTableWidget" name="tableWidget_proxyClients">
      <property name="geometry">

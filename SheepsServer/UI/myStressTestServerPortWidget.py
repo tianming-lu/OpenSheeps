@@ -191,7 +191,7 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
                 if index == rowCount:
                     break
             for client in clients.values():
-                if self.proxyClietExiest(client.fd) == False:
+                if self.proxyClietExiest(client.conn.fileno()) == False:
                     self.proxyClients_add_row(client)
 
     def proxyClietExiest(self, id):
@@ -203,14 +203,13 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
 
     def proxyClients_add_row(self, client):
         self.tableWidget_proxyClients.insertRow(self.tableWidget_proxyClients.rowCount())
-        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 0, QTableWidgetItem(f'{client.fd}'))
+        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 0, QTableWidgetItem(f'{client.conn.fileno()}'))
         self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 1, QTableWidgetItem(f'{client.proxyAddr}'))
         self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 2, QTableWidgetItem(f'{client.proxyPort}'))
 
     def refrushRecords(self):
         recordsList = get_record_message_servers()
         recordsList = self.recordCovertFormat(recordsList)
-        # print(recordsList)
         if len(recordsList) == 0:
             while self.tableWidget_recordlists.rowCount() > 0:
                 self.tableWidget_recordlists.removeRow(0)
@@ -238,8 +237,9 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
             formatend = []
             format1 = record[len(basestr):len(record)]
             format2 = format1.split('_')
-            formatend.append(f'{format2[0]}.{format2[1]}.{format2[2]}.{format2[3]}')
-            formatend.append(format2[4])
+            ilen = len(format2)
+            formatend.append(".".join(format2[0:ilen-1]))
+            formatend.append(format2[ilen - 1])
             recordformat.append(formatend)
         return recordformat
 
@@ -282,7 +282,7 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
                 if index == rowCount:
                     break
             for client in clients.values():
-                if self.stressClietExiest(client.fd, client) == False:
+                if self.stressClietExiest(client.conn.fileno(), client) == False:
                     self.stressClients_add_row(client)
 
     def stressClietExiest(self, id, client):
@@ -294,7 +294,7 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
 
     def stressClients_add_row(self, client):
         self.tableWidget_stressClients.insertRow(self.tableWidget_stressClients.rowCount())
-        self.tableWidget_stressClients.setItem(self.tableWidget_stressClients.rowCount() - 1, 0, QTableWidgetItem(f'{client.fd}'))
+        self.tableWidget_stressClients.setItem(self.tableWidget_stressClients.rowCount() - 1, 0, QTableWidgetItem(f'{client.conn.fileno()}'))
         self.tableWidget_stressClients.setItem(self.tableWidget_stressClients.rowCount() - 1, 1, QTableWidgetItem(f'{client.PeerAddr}'))
         self.tableWidget_stressClients.setItem(self.tableWidget_stressClients.rowCount() - 1, 2, QTableWidgetItem(f'{client.CpuCount}'))
         self.tableWidget_stressClients.setItem(self.tableWidget_stressClients.rowCount() - 1, 3, QTableWidgetItem(f'{client.StressState}'))

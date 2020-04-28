@@ -354,7 +354,7 @@ class Ui_Form_StressTestServerPort(object):
         item.setText(_translate("Form_StressTestServerPort", "IP地址"))
         item = self.tableWidget_proxyClients.horizontalHeaderItem(2)
         item.setText(_translate("Form_StressTestServerPort", "PORT端口"))
-        self.tabWidget_2.setTabText(self.tabWidget_2.indexOf(self.tab_4), _translate("Form_StressTestServerPort", "连接列表"))
+        self.tabWidget_2.setTabText(self.tabWidget_2.indexOf(self.tab_4), _translate("Form_StressTestServerPort", "代理列表"))
         item = self.tableWidget_recordlists.horizontalHeaderItem(0)
         item.setText(_translate("Form_StressTestServerPort", "保留"))
         item = self.tableWidget_recordlists.horizontalHeaderItem(1)

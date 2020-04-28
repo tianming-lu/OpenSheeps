@@ -51,123 +51,148 @@ class StressTask():
         self.Err = {}
 
 class ServerProtocol(BaseProtocol):
-    def __init__(self, conn,  server):
-        BaseProtocol.__init__(self, conn, server)
+    def __init__(self, server):
+        BaseProtocol.__init__(self, server)
         #common
-        self.ClientType = 0     # 2代理客户端 1压力客户端
-        peer = self.conn.getpeername()
-        self.PeerAddr = peer[0]
-        self.PeerPort = peer[1]
+        self.conn = None
+        self.fd = 0
+        self.ClientType = 0     # 2代理客户端 1压力客户端 0未知
+
         #proxy
         self.ServerState = 0  # 0未验证 1验证成功 2代理成功
         self.remote = None
-        self.RemoteProtocol = None
+        self.remoteproxy = None
+
         #stress
         self.buff = b''
         self.CpuCount = 0
         self.StressState = '连接成功'
-        self.dead = False
 
-    def ConnectionMade(self):
-        # print(self.PeerAddr, self.PeerPort)
-        pass
-
-    def ConnectionClosed(self):
-        #stress
-        if self.dead is True:
-            return
-
-        global MaxCpuCount
-        MaxCpuCount -= self.CpuCount
-        if f'{self.fd}' in StressClients.keys():
-            del StressClients[f'{self.fd}']
-        #proxy
-        if self.ServerState == 2:
-            if StressRecord == True:
-                StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 2, ''))
-            if f'{self.fd}' in ProxyClients.keys():
-                del ProxyClients[f'{self.fd}']
-            self.service.close(self.remote, self.RemoteProtocol)
-        # common
-        self.ServerState = 0
-        self.ClientType = 0
-        self.dead = True
-
-    def Recv(self, data):
+    def ConnectionMade(self, conn, ip, port):
         if self.ClientType == 0:
-            self.auth(data)
-        elif self.ClientType == 1:
-            self.StressRecv(data)
-        else:
-            self.ProxyRecv(data)
+            self.conn = conn
+            self.fd = self.conn.fileno()
+            self.PeerAddr = ip
+            self.PeerPort = port
 
-    def auth(self, data):
+    def ConnectionClosed(self, conn):
+        if self.ClientType == 1:
+            global MaxCpuCount
+            MaxCpuCount -= self.CpuCount
+            if f'{self.conn.fileno()}' in StressClients.keys():
+                del StressClients[f'{self.fd}']
+        #proxy
+        elif self.ClientType == 2 and self.ServerState == 2:
+            #print("ConnectionClosed", conn.fileno())
+            if conn == self.conn:
+                if f'{self.conn.fileno()}' in ProxyClients.keys():
+                    del ProxyClients[f'{self.fd}']
+                if StressRecord == True:
+                    StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 2, ''))
+                self.conn = None
+                self.service.close(self.remote, self)
+                self.service.close(self.remoteproxy, self)
+            elif conn == self.remote:
+                self.remote = None
+                self.service.close(self.conn, self)
+
+    def Recv(self, conn, ip, port, data):
+        #print(ip, port, data)
+        if self.ClientType == 0:
+            self.auth(conn, data)
+        elif self.ClientType == 1:
+            self.StressRecv(conn, data)
+        else:
+            self.ProxyRecv(conn, ip, port, data)
+
+    def auth(self, conn, data):
         # print('登录验证：',data[0])
         if data[0] == 5:
             self.ClientType = 2
-            self.conn.send(b'\x05\x00')
+            self.Send(conn, b'\x05\x00')
             self.ServerState = 1
             return True
         else:
-            self.StressRecv(data)
+            self.StressRecv(conn, data)
             self.ClientType = 1
 
-    def ProxyRecv(self, data):
+    def ProxyRecv(self, conn, ip, port, data):
         if self.ServerState == 1:
-            self.connect_dst_server(data)
+            self.connect_dst_server(conn, data)
         else:
-            self.remoteMsg(data)
+            if conn == self.conn:
+                self.Send(self.remote, data)
+                if StressRecord == True:
+                    StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 1, str(base64.standard_b64encode(data), encoding='utf-8')))
+            elif conn == self.remote:
+                if self.proxyCmd == 0x01:
+                    self.Send(self.conn, data)
+                    if StressRecord == True:
+                        StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 3, str(base64.standard_b64encode(data), encoding='utf-8')))
+                if self.proxyCmd == 0x03:
+                    #print(ip, port, data)
+                    self.remoteproxy_addr = ip
+                    self.remoteproxy_port = port
+                    self.remoteproxy_data = data[0:10]
 
-    def connect_dst_server(self, data):
+                    self.proxyAddr = socket.inet_ntoa(data[4:8])
+                    self.proxyPort = struct.unpack('>H', data[8:10])[0]
+                    todata = data[10: len(data)]
+                    self.remoteproxy.sendto(todata, (self.proxyAddr, self.proxyPort))
+                    if StressRecord == True:
+                        StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 4, str(base64.standard_b64encode(todata), encoding='utf-8')))
+                    #print(ip, port, todata, toaddr, toport)
+            elif conn == self.remoteproxy:
+                #print(ip, port, data)
+                self.remote.sendto(self.remoteproxy_data + data, (self.remoteproxy_addr, self.remoteproxy_port))
+                if StressRecord == True:
+                    StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 5, str(base64.standard_b64encode(data), encoding='utf-8')))
+
+    def connect_dst_server(self, conn, data):
         # print("进行代理设置：")
         self.proxyVer = data[0]
         self.proxyCmd = data[1]
+        #if self.proxyCmd == 0x03:
+        #    print("proxy udp connect", data)
         self.proxyType = data[3]
         if self.proxyType == 0x01:
             self.proxyAddr = socket.inet_ntoa(data[4: len(data) - 2])
         if self.proxyType == 0x03:
-            self.proxyAddr = str(data[5:len(data) - 2],encoding='utf-8')
+            self.proxyAddr = str(data[5:len(data) - 2], encoding='utf-8')
         self.proxyPort = struct.unpack('>H', data[len(data) - 2: len(data)])[0]
 
-        protocol = self.service.TCPConnect(self.proxyAddr, self.proxyPort, ClientProtocol)
-        if protocol == None:
-            return False
-        # remote, protocol = res
-        self.remote = protocol.conn
-        self.RemoteProtocol = protocol
-        protocol.remote = self.conn
-        protocol.RemoteProtocol = self
-
-        if StressRecord == True:
-            StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 0, ''))
+        if self.proxyCmd == 0x01:
+            self.remote = self.service.TCPConnect(self.proxyAddr, self.proxyPort, self)
+            if StressRecord == True:
+                StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 0, ''))
+        elif self.proxyCmd == 0x03:
+            self.remote = self.service.UDPConnect("0.0.0.0", 0, self)
+            self.remoteproxy = self.service.UDPConnect("0.0.0.0", 0, self)
+            #print(self.remote.getsockname())
 
         replay = b'\x05\x00\x00\x01'
-        loaddr = self.conn.getsockname()
-        replay += socket.inet_aton(loaddr[0]) + struct.pack(">H", loaddr[1])
-        self.conn.send(replay)
-        ProxyClients[f'{self.fd}'] = self
+        if self.proxyCmd == 0x01:
+            loaddr = conn.getsockname()
+            replay += socket.inet_aton(loaddr[0]) + struct.pack(">H", loaddr[1])
+        elif self.proxyCmd == 0x03:
+            loaddr1 = conn.getsockname()
+            loaddr2 = self.remote.getsockname()
+            replay += socket.inet_aton(loaddr1[0]) + struct.pack(">H", loaddr2[1])
+        self.Send(conn, replay)
+        ProxyClients[f'{self.conn.fileno()}'] = self
         self.ServerState = 2
         return True
 
-    def remoteMsg(self, data):
-        try:
-            self.remote.send(data)
-        except:
-            return False
-        if StressRecord == True:
-            # StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 1, data.hex()))
-            StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 1, str(base64.standard_b64encode(data), encoding='utf-8')))
-
-    def StressRecv(self, data):
+    def StressRecv(self, conn, data):
         self.buff += data
         while True:
-            ret = self.StressRecvCheck()
+            ret = self.StressRecvCheck(conn)
             if ret == 0:
                 break
             self.buff = self.buff[ret:len(self.buff)]
             pass
 
-    def StressRecvCheck(self):
+    def StressRecvCheck(self, conn):
         if len(self.buff) < 8:
             return 0
         msglen, cmdNo = struct.unpack('2I', self.buff[0:8])
@@ -185,29 +210,29 @@ class ServerProtocol(BaseProtocol):
             LOG(1, traceback.format_exc())
             return msglen
         # print(msglen, cmdNo, body)
-        self.StressRequest(cmdNo, body)
+        self.StressRequest(conn, cmdNo, body)
         return msglen
 
-    def StressRequest(self, cmdMo, body):
+    def StressRequest(self, conn, cmdMo, body):
         try:
             func = getattr(self, f'StressRequestCmdNo_{cmdMo}')
-            func(body)
+            func(conn, body)
             return True
         except:
             # LOG(1, traceback.format_exc())
             return False
 
-    def StressRequestCmdNo_1(self, body):
+    def StressRequestCmdNo_1(self, conn, body):
         self.CpuCount = body.get('CPU')
         if self.CpuCount == None:
             return None
         global MaxCpuCount
         MaxCpuCount += self.CpuCount
         StressClients[f'{self.fd}'] = self
-        self.Send(b'#\x00\x00\x00\x01\x00\x00\x00{"retCode":0,"retMsg":"OK"}')
-        self.StressSendFilelist()
+        self.Send(conn, b'#\x00\x00\x00\x01\x00\x00\x00{"retCode":0,"retMsg":"OK"}')
+        self.StressSendFilelist(conn)
 
-    def StressSendFilelist(self):
+    def StressSendFilelist(self, conn):
         jsonroot = {}
         filelist = []
         rootpath = ".\\"
@@ -227,8 +252,8 @@ class ServerProtocol(BaseProtocol):
         jsonroot["filelist"] = filelist
         data = bytes(str(jsonroot).replace('\'', '"'), encoding='utf-8')
         byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 9, data)
-        print(byte_msg)
-        self.Send(byte_msg)
+        # print(byte_msg)
+        self.Send(conn, byte_msg)
 
     def getfilemd5(self, file):
         with open(file, 'rb') as f:
@@ -237,16 +262,16 @@ class ServerProtocol(BaseProtocol):
             hash = md5obj.hexdigest()
         return hash
 
-    def StressRequestCmdNo_10(self, body):
+    def StressRequestCmdNo_10(self, conn, body):
         self.StressState = '资源同步中'
         file = body.get("File")
         offset = body.get("Offset")
         size = body.get("Size")
-        self.StressSendFileData(file, offset, size)
+        self.StressSendFileData(conn, file, offset, size)
         # th = threading.Thread(target=self.StressSendFileData, args=(file, offset, size))
         # th.start()
 
-    def StressSendFileData(self, file, offset, size):
+    def StressSendFileData(self, conn, file, offset, size):
         file = file.replace('\\\\', '\\')
         f = open(file, 'rb')
         f.seek(offset, 0)
@@ -270,14 +295,14 @@ class ServerProtocol(BaseProtocol):
             data["retMsg"] = "OK"
             data = bytes(str(data).replace('\'', '"'), encoding='utf-8')
             byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 10, data)
-            self.Send(byte_msg)
+            self.Send(conn, byte_msg)
         f.close()
 
-    def StressRequestCmdNo_11(self, body):
+    def StressRequestCmdNo_11(self, conn, body):
         self.StressState = '就绪'
         pass
 
-    def StressRequestCmdNo_13(self, body):
+    def StressRequestCmdNo_13(self, conn, body):
         taskid = body.get("TaskID")
         errid = body.get("ErrType")
         task = StressTasks[f"{taskid}"]
@@ -288,38 +313,6 @@ class ServerProtocol(BaseProtocol):
         # print(errobj)
 
     def StressSend(self, cmdNo, data):
-        pass
-
-class ClientProtocol(BaseProtocol):
-    def __init__(self, conn,  server):
-        BaseProtocol.__init__(self, conn, server)
-        self.remote = None
-        self.RemoteProtocol = None
-        self.dead = False
-        peer = self.conn.getpeername()
-        self.PeerAddr = peer[0]
-        self.PeerPort = peer[1]
-
-    def ConnectionMade(self):
-        # print('made', self.conn)
-        pass
-
-    def ConnectionClosed(self):
-        if self.dead is True:
-            return
-        self.service.close(self.remote, self.RemoteProtocol)
-        self.dead = True
-        pass
-
-    def Recv(self, data):
-        try:
-            self.remote.send(data)
-            if StressRecord == True:
-                # StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 1, data.hex()))
-                StressRecordMsg.append((self.PeerAddr, self.PeerPort, time.time(), 3, str(base64.standard_b64encode(data), encoding='utf-8')))
-        except:
-            # print(traceback.format_exc())
-            pass
         pass
 
 
@@ -430,7 +423,7 @@ class StressTestServerPort():
                 data["IgnoreErr"] = True
             data = bytes(str(json.dumps(data)).replace('\'','"'), encoding='utf-8')
             byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 2, data)
-            proto.Send(byte_msg)
+            proto.Send(proto.conn, byte_msg)
             machineId += 1
         pass
 
@@ -459,7 +452,7 @@ class StressTestServerPort():
                         data["Change"] = int(usercount)
                         data = bytes(str(data).replace('\'', '"'), encoding='utf-8')
                         byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 12, data)
-                        proto.Send(byte_msg)
+                        proto.Send(proto.conn, byte_msg)
                 last_change_user = cur_chang_user
             '''分批增加用户'''
             '''按时间顺序发送录制消息'''
@@ -526,7 +519,7 @@ class StressTestServerPort():
         data = bytes(str(json.dumps(data)).replace('\'', '"'), encoding='utf-8')
         byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8,  8, data)
         for proto in task.config.StressClients.values():
-            proto.Send(byte_msg)
+            proto.Send(proto.conn, byte_msg)
         pass
 
     def PublishTaskMsg(self, task, recordtype, ip, port, content, recordtime):
@@ -547,7 +540,7 @@ class StressTestServerPort():
         data = bytes(str(data).replace('\'','"'), encoding='utf-8')
         byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, recordtype+3, data)
         for proto in task.config.StressClients.values():
-            proto.Send(byte_msg)
+            proto.Send(proto.conn, byte_msg)
 
     def StressTaskEnd(self, task):
         task.TaskTempMsg.clear()
@@ -556,7 +549,7 @@ class StressTestServerPort():
         data = bytes(str(data).replace('\'','"'), encoding='utf-8')
         byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 6, data)
         for proto in task.config.StressClients.values():
-            proto.Send(byte_msg)
+            proto.Send(proto.conn, byte_msg)
         pass
 
     def StressTaskLoglevel(self, loglevel):
@@ -566,7 +559,7 @@ class StressTestServerPort():
         byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 14, data)
         # print(byte_msg)
         for proto in StressClients.values():
-            proto.Send(byte_msg)
+            proto.Send(proto.conn, byte_msg)
         pass
 
 if __name__ == '__main__':
