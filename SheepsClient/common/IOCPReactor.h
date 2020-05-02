@@ -29,8 +29,6 @@
 #define IOCP_TCP 0
 #define IOCP_UDP 1
 
-using namespace std;
-
 class BaseFactory;
 class BaseProtocol;
 
@@ -56,7 +54,7 @@ typedef struct _IOCP_SOCKET
 	int32_t				PORT;
 	SOCKADDR_IN			SAddr;
 	BaseFactory*		factory;
-	mutex*				userlock;
+	std::mutex*				userlock;
 	BaseProtocol**		user;
 	IOCP_BUFF*			IocpBuff;
 	time_t				timeout;
@@ -76,11 +74,11 @@ public:
 	LPFN_ACCEPTEX				lpfnAcceptEx = NULL;					 //AcceptEx函数指针
 	LPFN_GETACCEPTEXSOCKADDRS	lpfnGetAcceptExSockaddrs = NULL;  //加载GetAcceptExSockaddrs函数指针
 
-	map<short, BaseFactory*>	FactoryAll;
-	stack<IOCP_SOCKET*>			HsocketPool;
-	mutex						HsocketPoolLock;
-	stack<IOCP_BUFF*>			HbuffPool;
-	mutex						HbuffPoolLock;
+	std::map<short, BaseFactory*>	FactoryAll;
+	std::stack<IOCP_SOCKET*>			HsocketPool;
+	std::mutex						HsocketPoolLock;
+	std::stack<IOCP_BUFF*>			HbuffPool;
+	std::mutex						HbuffPoolLock;
 };
 
 class BaseProtocol
@@ -92,7 +90,7 @@ public:
 public:
 	BaseFactory*	factory = NULL;
 	BaseProtocol*	self = NULL;
-	mutex*			protolock = new mutex;
+	std::mutex*			protolock = new std::mutex;
 	uint8_t			sockCount = 0;
 
 public:

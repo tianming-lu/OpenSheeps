@@ -443,7 +443,7 @@ DWORD WINAPI mainIOCPServer(LPVOID pParam)
 	}
 	while (reactor->Run)
 	{
-		map<short, BaseFactory*>::iterator iter;
+		std::map<short, BaseFactory*>::iterator iter;
 		for (iter = reactor->FactoryAll.begin(); iter != reactor->FactoryAll.end(); iter++)
 		{
 			iter->second->FactoryLoop();
@@ -532,13 +532,13 @@ int IOCPFactoryRun(BaseFactory* fc)
 			AcceptClient(fc);
 	}
 	
-	fc->reactor->FactoryAll.insert(pair<short, BaseFactory*>(fc->ServerPort, fc));
+	fc->reactor->FactoryAll.insert(std::pair<short, BaseFactory*>(fc->ServerPort, fc));
 	return 0;
 }
 
 int IOCPFactoryStop(BaseFactory* fc)
 {
-	map<short, BaseFactory*>::iterator iter;
+	std::map<short, BaseFactory*>::iterator iter;
 	iter = fc->reactor->FactoryAll.find(fc->ServerPort);
 	if (iter != fc->reactor->FactoryAll.end())
 	{

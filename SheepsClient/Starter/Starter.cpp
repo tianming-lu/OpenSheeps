@@ -14,7 +14,16 @@ int main(int argc, char* argv[])
 	char* ip = (char*)defaultIP;
 	short port = defaultPort;
 	short listen = defaultlisten;
-	if (argc == 4)
+	if (argc == 2)
+	{
+		listen = atoi(argv[1]);
+	}
+	else if (argc == 3)
+	{
+		ip = argv[1];
+		port = atoi(argv[2]);
+	}
+	else if (argc == 4)
 	{
 		ip = argv[1];
 		port = atoi(argv[2]);

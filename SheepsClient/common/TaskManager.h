@@ -33,13 +33,13 @@ class UserProtocol;
 
 typedef struct {
 	uint8_t		type;
-	string		ip;
+	std::string		ip;
 	union {
 		uint32_t port;
 		uint32_t isloop;
 	};
 	uint64_t	recordtime;		//微秒
-	string		content;
+	std::string		content;
 }t_message_data, *HMESSAGE;
 
 typedef UserProtocol* (*CREATEAPI)();
@@ -67,7 +67,7 @@ typedef struct
 
 typedef struct
 {
-	mutex*			protolock;
+	std::mutex*			protolock;
 	UserProtocol*	proto;
 }t_handle_user;
 
@@ -83,21 +83,21 @@ typedef struct {
 	bool		ignoreErr;
 
 	uint8_t		workThreadCount;  //任务工作线程，所有线程退出后开始销毁任务
-	mutex*		workThereaLock;
+	std::mutex*		workThereaLock;
 
-	vector<t_message_data*> *messageList;    //任务消息缓存
+	std::vector<t_message_data*> *messageList;    //任务消息缓存
 	bool		stopMessageCache;
 
 	//list<t_handle_user*>  *userPointer;
-	list<t_handle_user*> *userAll;			//运行任务中用户列表
-	mutex*		userAllLock;
-	list<t_handle_user*> *userDes;			//运行结束用户列表
-	mutex*		userDesLock;
+	std::list<t_handle_user*> *userAll;			//运行任务中用户列表
+	std::mutex*		userAllLock;
+	std::list<t_handle_user*> *userDes;			//运行结束用户列表
+	std::mutex*		userDesLock;
 
 	t_replay_dll dll;
 
-	list<t_task_error*> *taskErr;
-	mutex*		taskErrlock;
+	std::list<t_task_error*> *taskErr;
+	std::mutex*		taskErrlock;
 }t_task_config, *HTASKCFG;
 
 class UserProtocol :
@@ -122,7 +122,7 @@ public:
 	virtual int  Send(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
 	virtual int	 Recv(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
 	virtual int  TimeOut() = 0;
-	virtual int	 Event(uint8_t event_type, string ip, int port, string content) = 0;
+	virtual int	 Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;
 	virtual int	 ReInit() = 0;
 	virtual int  Destroy() = 0;
 };

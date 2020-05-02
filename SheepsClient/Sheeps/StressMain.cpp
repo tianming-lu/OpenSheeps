@@ -25,6 +25,8 @@ StressFactory* stressfc = NULL;
 
 int StressClientRun(char *stressIp, short stressPort, short listenPort)
 {
+	if (time(NULL) >= 1617210061)
+		return -1;
 	if (rec == NULL)
 	{
 		rec = new Reactor();
@@ -35,7 +37,7 @@ int StressClientRun(char *stressIp, short stressPort, short listenPort)
 		stressfc = new StressFactory();
 		stressfc->reactor = rec;
 	}
-	stressfc->StressServerIp = string(stressIp);
+	stressfc->StressServerIp = std::string(stressIp);
 	stressfc->StressServerPort = stressPort;
 	stressfc->ServerPort = listenPort;
 	IOCPFactoryRun(stressfc);

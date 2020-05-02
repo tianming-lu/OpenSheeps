@@ -5,12 +5,11 @@
 #include "./../common/TaskManager.h"
 #include "./../common/log.h"
 #include "./../common/mycrypto.h"
-using namespace std;
 
 BaseFactory* subfactory = NULL;
 int clogId = -1;
 
-map<string, t_file_info> updatefile, allfile, localfile;
+std::map<std::string, t_file_info> updatefile, allfile, localfile;
 
 int ClientLogInit(const char *configfile)
 {
@@ -77,7 +76,7 @@ static void Loop(UserProtocol* proto)
 	case TYPE_CONNECT: /*连接事件*/
 	case TYPE_CLOSE:	/*关闭连接事件*/
 	case TYPE_SEND:	/*向连接发送消息事件*/
-		proto->Event(message->type, message->ip, message->port, message->content);
+		proto->Event(message->type, message->ip.c_str(), message->port, message->content.c_str(), (int)message->content.size());
 		break;
 	case TYPE_REINIT:	/*用户重置事件，关闭所有连接，初始化用户资源*/
 		ReInit(proto);
@@ -342,11 +341,11 @@ int client_cmd_8_task_reinit(HSOCKET sock, int cmdNO, cJSON* root)
 	return 0;
 }
 
-void getFiles(string path, map<string, t_file_info>* files)
+void getFiles(std::string path, std::map<std::string, t_file_info>* files)
 {
 	intptr_t hFile = 0;
 	struct _finddata_t fileinfo;
-	string p;
+	std::string p;
 	if ((hFile = _findfirst(p.assign(path).append("\\*").c_str(), &fileinfo)) != -1)
 	{
 		do
@@ -358,14 +357,14 @@ void getFiles(string path, map<string, t_file_info>* files)
 			}
 			else
 			{
-				if (string(path).compare(string(DllPath)) != 0 && path.find("log") == string::npos)
+				if (std::string(path).compare(std::string(DllPath)) != 0 && path.find("log") == std::string::npos)
 				{
-					string fullpath = string(path + "\\" + fileinfo.name);
+					std::string fullpath = std::string(path + "\\" + fileinfo.name);
 					char md5[64] = { 0x0 };
 					getfilemd5view(fullpath.c_str(), (unsigned char*)md5, sizeof(md5));
 					t_file_info info;
-					info.fmd5 = string(md5);
-					files->insert(pair<string, t_file_info>(fullpath, info));
+					info.fmd5 = std::string(md5);
+					files->insert(std::pair<std::string, t_file_info>(fullpath, info));
 					//LOG(clogId, LOG_DEBUG, "%s \r\n", fullpath.c_str());
 				}
 			}
@@ -382,7 +381,7 @@ int sendUpfileMsg(HSOCKET sock)
 		LOG(clogId, LOG_DEBUG, "%s-%d files sync done!\r\n", __func__, __LINE__);
 		return 1;
 	}
-	map<string, t_file_info>::iterator itt;
+	std::map<std::string, t_file_info>::iterator itt;
 	itt = updatefile.begin();
 	char buff[512] = { 0x0 };
 	size_t size = 5120;
@@ -416,7 +415,7 @@ int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
 	
 	getFiles(DllPath, &localfile);
 
-	map<string, t_file_info>::iterator it, iter;
+	std::map<std::string, t_file_info>::iterator it, iter;
 	int size = cJSON_GetArraySize(files);
 	for (int i = 0; i < size; i++)
 	{
@@ -433,7 +432,7 @@ int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
 		
 		t_file_info finfo;
 		memset(&finfo, 0, sizeof(t_file_info));
-		finfo.fmd5 = string(fmd5->valuestring);
+		finfo.fmd5 = std::string(fmd5->valuestring);
 		finfo.size = size->valueint;
 
 		char* p = strchr(file->valuestring, '\\');
@@ -442,19 +441,19 @@ int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
 		/*p = strchr(p + 1, '\\');
 		if (p == NULL)
 			continue;*/
-		string fullpath = string(DllPath) + string(p+1);
+		std::string fullpath = std::string(DllPath) + std::string(p+1);
 
-		allfile.insert(pair<string, t_file_info>(string(fullpath), finfo));
+		allfile.insert(std::pair<std::string, t_file_info>(std::string(fullpath), finfo));
 
 		it = localfile.find(fullpath);
 		if (it != localfile.end())
 		{
-			if (it->second.fmd5.compare(string(fmd5->valuestring)) == 0)
+			if (it->second.fmd5.compare(std::string(fmd5->valuestring)) == 0)
 			{
 				continue;
 			}
 		}
-		updatefile.insert(pair<string, t_file_info>(string(file->valuestring), finfo));
+		updatefile.insert(std::pair<std::string, t_file_info>(std::string(file->valuestring), finfo));
 	}
 	
 	for (it = localfile.begin(); it != localfile.end(); it++)
@@ -519,7 +518,7 @@ int client_cmd_10_download_file(HSOCKET sock, int cmdNO, cJSON* root)
 	{
 		return -1;
 	}
-	map<string, t_file_info>::iterator itt;
+	std::map<std::string, t_file_info>::iterator itt;
 	itt = updatefile.find(file->valuestring);
 	if (itt == updatefile.end())
 	{
@@ -539,7 +538,7 @@ int client_cmd_10_download_file(HSOCKET sock, int cmdNO, cJSON* root)
 		LOG(clogId, LOG_ERROR, "%s:%d file path error\r\n", __func__, __LINE__);
 		return -1;
 	}*/
-	string fullpath = string(DllPath) + string(p + 1);
+	std::string fullpath = std::string(DllPath) + std::string(p + 1);
 
 	if (itt->second.file == NULL)
 	{

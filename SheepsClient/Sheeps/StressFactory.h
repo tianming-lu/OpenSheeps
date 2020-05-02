@@ -2,8 +2,6 @@
 #include "ClientProtocol.h"
 #include <string>
 
-using namespace std;
-
 class StressFactory :
 	public BaseFactory
 {
@@ -12,7 +10,7 @@ public:
 	~StressFactory();
 
 public:
-	string StressServerIp;
+	std::string StressServerIp;
 	short StressServerPort;
 	StressProtocol* StressProto = NULL;
 

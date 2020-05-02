@@ -2,12 +2,12 @@
 #include "./../common/log.h"
 #include "mycrypto.h"
 
-map<int, t_task_config*> taskAll;
-map<int, t_task_config*> taskDel;
+std::map<int, t_task_config*> taskAll;
+std::map<int, t_task_config*> taskDel;
 //map<time_t, list<t_handle_user*>*> userRubbish;
 
-list<t_task_error*> taskError;
-mutex taskErrLock;
+std::list<t_task_error*> taskError;
+std::mutex taskErrLock;
 
 HLOG_Context gHlog = NULL;
 
@@ -30,7 +30,7 @@ void set_task_log_level(uint8_t level)
 
 t_task_config* getTask_by_taskId(uint8_t taskID)
 {
-	map<int, t_task_config*>::iterator iter;
+	std::map<int, t_task_config*>::iterator iter;
 	iter = taskAll.find(taskID);
 	if (iter != taskAll.end())
 	{
@@ -44,16 +44,16 @@ t_task_config* getTask_by_taskId(uint8_t taskID)
 			return NULL;
 		}
 		task->hlog = gHlog;
-		task->workThereaLock = new mutex;
-		task->messageList = new vector<t_message_data*>;
+		task->workThereaLock = new std::mutex;
+		task->messageList = new std::vector<t_message_data*>;
 		//task->userPointer = new list<t_handle_user*>;
-		task->userAll = new list<t_handle_user*>;
-		task->userAllLock = new mutex;
-		task->userDes = new list<t_handle_user*>;
-		task->userDesLock = new mutex;
+		task->userAll = new std::list<t_handle_user*>;
+		task->userAllLock = new std::mutex;
+		task->userDes = new std::list<t_handle_user*>;
+		task->userDesLock = new std::mutex;
 		task->taskErr = &taskError;
 		task->taskErrlock = &taskErrLock;
-		taskAll.insert(pair<int, t_task_config*>(taskID, task));
+		taskAll.insert(std::pair<int, t_task_config*>(taskID, task));
 		return task;
 	}
 }
@@ -61,12 +61,12 @@ t_task_config* getTask_by_taskId(uint8_t taskID)
 bool stopTaskAll(uint8_t taskID)
 {
 	t_task_config* task;
-	map<int, t_task_config*>::iterator iter;
+	std::map<int, t_task_config*>::iterator iter;
 	for (iter = taskAll.begin(); iter != taskAll.end(); iter++)
 	{
 		task = iter->second;
 		taskAll.erase(iter);
-		taskDel.insert(pair<int, t_task_config*>(taskID, task));
+		taskDel.insert(std::pair<int, t_task_config*>(taskID, task));
 		task->status = 4;
 		iter = taskAll.begin();
 		return true;
@@ -77,13 +77,13 @@ bool stopTaskAll(uint8_t taskID)
 bool stopTask_by_taskId(uint8_t taskID)
 {
 	t_task_config* task;
-	map<int, t_task_config*>::iterator iter;
+	std::map<int, t_task_config*>::iterator iter;
 	iter = taskAll.find(taskID);
 	if (iter != taskAll.end())
 	{
 		task = iter->second;
 		taskAll.erase(iter);
-		taskDel.insert(pair<int, t_task_config*>(taskID, task));
+		taskDel.insert(std::pair<int, t_task_config*>(taskID, task));
 		task->status = 4;
 		return true;
 	}
@@ -94,7 +94,7 @@ void destroyTask()
 {
 	time_t ctime = time(NULL);
 	t_task_config* task = NULL;
-	map<int, t_task_config*>::iterator iter;
+	std::map<int, t_task_config*>::iterator iter;
 	iter = taskDel.begin();
 	while (iter != taskDel.end())
 	{
@@ -103,7 +103,7 @@ void destroyTask()
 		if (task->workThreadCount == 0 )
 		{
 			LOG(clogId, LOG_DEBUG, "%s:%d Clean Task !", __func__, __LINE__);
-			vector<t_message_data*>::iterator it;
+			std::vector<t_message_data*>::iterator it;
 			for (it = task->messageList->begin(); it != task->messageList->end(); it++)
 			{
 				GlobalFree(*it);
@@ -204,7 +204,7 @@ bool insertMessage_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t po
 	}
 	message->type = type;
 	if (ip)
-		message->ip = string(ip);
+		message->ip = std::string(ip);
 	message->port = port;
 	if (content)
 	{
@@ -221,7 +221,7 @@ bool insertMessage_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t po
 		}
 		decode_base64(&temp, &str);
 
-		message->content = string((char*)temp.data, temp.len);
+		message->content = std::string((char*)temp.data, temp.len);
 		GlobalFree(temp.data);
 	}
 	message->recordtime = timestamp * 1000000 + microsecond;

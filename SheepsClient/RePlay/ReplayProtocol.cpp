@@ -56,12 +56,12 @@ void ReplayProtocol::ProtoInit()
 bool ReplayProtocol::ConnectionMade(HSOCKET hsock, char* ip, int port)
 {	/*当用户连接目标ip端口成功后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
-	map<int, t_connection_info>::iterator it = this->Connection.find(port);
+	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	t_connection_info info = { 0x0 };
 	info.hsock = hsock;
 	if (it == this->Connection.end())
 	{
-		this->Connection.insert(pair<int, t_connection_info>(port, info));
+		this->Connection.insert(std::pair<int, t_connection_info>(port, info));
 	}
 	else
 	{
@@ -86,7 +86,7 @@ bool ReplayProtocol::ConnectionFailed(HSOCKET hsock, char* ip, int port)
 bool ReplayProtocol::ConnectionClosed(HSOCKET hsock, char* ip, int port)   //类销毁后，可能导致野指针
 {	/*当用户连接关闭后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
 	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
-	map<int, t_connection_info>::iterator it = this->Connection.find(port);
+	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	if (it != this->Connection.end())
 	{
 		if (hsock == it->second.hsock)
@@ -116,20 +116,20 @@ int ReplayProtocol::TimeOut()
 	return 0;
 }
 
-int ReplayProtocol::Event(uint8_t event_type, string ip, int port, string content)
+int ReplayProtocol::Event(uint8_t event_type, const char* ip, int port, const char* content, int clen)
 {
 	TaskUserLog(this, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
 	HSOCKET* hsock;
 	switch (event_type)
 	{
 	case TYPE_CONNECT: /*连接事件*/
-		TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]\r\n", ip.c_str(), port);
+		TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]\r\n", ip, port);
 		this->PlayPause = true;
-		TaskUserSocketConnet(ip.c_str(), port, this, IOCP_TCP);
+		TaskUserSocketConnet(ip, port, this, IOCP_TCP);
 		break;
 	case TYPE_CLOSE:	/*关闭连接事件*/
-		TaskUserLog(this, LOG_DEBUG, "user conclose[%s:%d]\r\n", ip.c_str(), port);
-		hsock = this->GetScokFromConnection(ip.c_str(), port);
+		TaskUserLog(this, LOG_DEBUG, "user conclose[%s:%d]\r\n", ip, port);
+		hsock = this->GetScokFromConnection(ip, port);
 		if (hsock != NULL)
 		{
 			TaskUserSocketClose(*hsock);
@@ -137,11 +137,11 @@ int ReplayProtocol::Event(uint8_t event_type, string ip, int port, string conten
 		}
 		break;
 	case TYPE_SEND:	/*向连接发送消息事件*/
-		TaskUserLog(this, LOG_DEBUG, "user send[%s:%d [%s]]\r\n", ip.c_str(), port, content.c_str());
-		hsock = this->GetScokFromConnection(ip.c_str(), port);
+		TaskUserLog(this, LOG_DEBUG, "user send[%s:%d [%s]]\r\n", ip, port, content);
+		hsock = this->GetScokFromConnection(ip, port);
 		if (hsock != NULL)
 		{
-			TaskUserSocketSend(*hsock, (char*)(content.c_str()), (int)content.size());
+			TaskUserSocketSend(*hsock, (char*)content, clen);
 		}
 		break;
 	default:
@@ -167,7 +167,7 @@ int ReplayProtocol::Destroy()
 //自定义类成员函数
 HSOCKET* ReplayProtocol::GetScokFromConnection(const char* ip, int port)
 {
-	map<int, t_connection_info>::iterator it = this->Connection.find(port);
+	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	if (it != this->Connection.end())
 	{
 		return &(it->second.hsock);
@@ -177,7 +177,7 @@ HSOCKET* ReplayProtocol::GetScokFromConnection(const char* ip, int port)
 
 bool ReplayProtocol::CloseAllConnection()
 {
-	map<int, t_connection_info>::iterator iter;
+	std::map<int, t_connection_info>::iterator iter;
 	for (iter = this->Connection.begin(); iter != this->Connection.end(); iter++)
 	{
 		if (iter->second.hsock != NULL)

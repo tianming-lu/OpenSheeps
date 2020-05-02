@@ -10,7 +10,7 @@ extern int clogId;
 
 typedef struct
 {
-	string	fmd5;
+	std::string	fmd5;
 	size_t	size;
 	size_t	offset;
 	int		type;

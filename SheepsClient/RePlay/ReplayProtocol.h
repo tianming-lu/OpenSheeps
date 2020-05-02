@@ -10,8 +10,8 @@
 
 typedef struct {
 	HSOCKET hsock;
-	string sendbuf;
-	string recvbuf;
+	std::string sendbuf;
+	std::string recvbuf;
 }t_connection_info;
 
 class ReplayProtocol :
@@ -22,7 +22,7 @@ public:
 	~ReplayProtocol();
 
 public:
-	map<int, t_connection_info> Connection;
+	std::map<int, t_connection_info> Connection;
 
 public:
 	void ProtoInit();
@@ -32,7 +32,7 @@ public:
 	int  Send(HSOCKET hsock, char* ip, int port, char* data, int len);
 	int  Recv(HSOCKET hsock, char* ip, int port, char* data, int len);
 	int  TimeOut();
-	int	 Event(uint8_t event_type, string ip, int port, string content);
+	int	 Event(uint8_t event_type, const char* ip, int port, const char* content, int clen);
 	int	 ReInit();
 	int  Destroy();
 
