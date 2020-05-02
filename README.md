@@ -24,6 +24,47 @@
 
 
 #### 如何接入项目？
+1.创建一个dll工程项目（固定编译输出：Replay.dll），导出四个接口：
+
+```
+#define RePlay_API __declspec(dllexport)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	RePlay_API ReplayProtocol* CreateUser(void);    /*创建一个压测用户，并返回其指针*/
+	RePlay_API void DestoryUser(ReplayProtocol* hdl);    /*销毁一个压测用户*/
+	RePlay_API int Init(HTASKCFG task);    /*dll被加载时执行*/
+	RePlay_API int UnInit(HTASKCFG task);    /*dll被释放时执行*/
+
+#ifdef __cplusplus
+}
+```
+2.压测用户类详细说明:
+
+```
+class ReplayProtocol :
+	public UserProtocol
+{
+public:
+	ReplayProtocol();
+	~ReplayProtocol();
+
+public:
+	void ProtoInit();    /*当前压测用户初始化，TaskManager调用*/
+	bool ConnectionMade(HSOCKET hsock, char* ip, int port);    /*IOManager通知网络连接成功调用此成员函数*/
+	bool ConnectionFailed(HSOCKET hsock, char* ip, int port);    /*IOManager通知网络连接失败调用此成员函数*/
+	bool ConnectionClosed(HSOCKET hsock, char* ip, int port);    /*IOManager通知网络连接关闭调用此成员函数*/
+	int  Recv(HSOCKET hsock, char* ip, int port, char* data, int len);    /*IOManager通知又连接接收到消息调用此成员函数*/
+	int  Event(uint8_t event_type, string ip, int port, string content);    /*TaskManager调用此成员函数，通知压测用户处理网络事件，分别为打开网络连接，关闭网络连接，发送消息*/
+        int  TimeOut();    /*TaskManager无事件通知压测用户时会重复调用此函数*/
+	int  ReInit();    /*TaskManager重置用户状态调用*/
+	int  Destroy();    /*TaskManager从队列中移除当前压测用户时调用*/
+};
+```
+ReplayProtocol类继承自压测用户基类UserProtocol，其定义在头文件TaskManager.h中
+
 请查看项目示例：example，该项目中每个函数均有备注其作用说明
 此项目为Visual Studio 2019创建，使用C++开发，压力测试框架不支持32位程序，所以此项目应该编译为64位程序。
 将编译好的Replay.dll文件放到0目录
