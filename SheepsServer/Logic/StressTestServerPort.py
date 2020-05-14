@@ -501,7 +501,7 @@ class StressTestServerPort():
             record_ip, record_port, play_ip, play_prot = task.config.DesServers[i]
             tablename = f't_data_stress_record_{record_ip.replace(".","_")}_{record_port}'
             if table_exiest(tablename):
-                tem = 'select recordtime,recordtype,ip,port,content from {} where recordtype < 3'.format(tablename)
+                tem = 'select recordtime,recordtype,ip,port,content from {} where recordtype < 3 or recordtype = 4'.format(tablename)
                 if len(sqlcmd) > 0:
                     tem = ' union ' + tem
                 sqlcmd = sqlcmd + tem
@@ -523,6 +523,8 @@ class StressTestServerPort():
         pass
 
     def PublishTaskMsg(self, task, recordtype, ip, port, content, recordtime):
+        if recordtype == 4:
+            recordtype = 1
         data = {}
         data["TaskID"] = task.TaskId
         data["Host"] = ip

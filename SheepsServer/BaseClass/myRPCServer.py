@@ -116,8 +116,11 @@ class MyRPCServer():
                 return
             protocol.Recv(conn, hsock.ip, hsock.port, data)
         elif hsock.type == 2:
-            data, addr = conn.recvfrom(1024)
-            protocol.Recv(conn, addr[0], addr[1], data)
+            try:
+                data, addr = conn.recvfrom(40960)
+                protocol.Recv(conn, addr[0], addr[1], data)
+            except:
+                self.close(conn, protocol)
 
     def TCPConnect(self, host, port, proto):
         conn = socket(AF_INET, SOCK_STREAM)
