@@ -4,7 +4,7 @@
 
 #### 介绍
 
-此系统是通用于TCP服务器的压力测试工具，初始是为了完成对游戏服务器的压力测试，探知游戏服务器所能承载的最大在线人数，经历多次迭代，最终演化成型，并命名为Sheeps（羊群）。
+此系统是通用于TCP服务器的压力测试工具,现已支持UDP服务器，初始是为了完成对游戏服务器的压力测试，探知游戏服务器所能承载的最大在线人数，经历多次迭代，最终演化成型，并命名为Sheeps（羊群）。
 
 
 #### 架构图示
@@ -24,7 +24,7 @@
 
 
 #### 如何接入项目？
-1.创建一个dll工程项目（固定编译输出：Replay.dll），导出四个接口：
+1.创建一个dll工程项目（固定编译输出：Replay.dll），实现并导出四个接口：
 
 ```
 #define RePlay_API __declspec(dllexport)
@@ -33,37 +33,44 @@
 extern "C" {
 #endif
 
-	RePlay_API ReplayProtocol* CreateUser(void);    /*创建一个压测用户，并返回其指针*/
-	RePlay_API void DestoryUser(ReplayProtocol* hdl);    /*销毁一个压测用户*/
+	RePlay_API UserProtocol* CreateUser(void);    /*创建一个压测用户，并返回其指针,UserProtocol继承自ReplayProtocol*/
+	RePlay_API void DestoryUser(UserProtocol* hdl);    /*销毁一个压测用户*/
 	RePlay_API int Init(HTASKCFG task);    /*dll被加载时执行*/
 	RePlay_API int UnInit(HTASKCFG task);    /*dll被释放时执行*/
 
 #ifdef __cplusplus
 }
 ```
-2.压测用户类详细说明:
+2.压测用户基类详细说明:
 
 ```
 class ReplayProtocol :
-	public UserProtocol
+	public BaseProtocol
 {
 public:
 	ReplayProtocol();
 	~ReplayProtocol();
 
 public:
-	void ProtoInit();    /*当前压测用户初始化，TaskManager调用*/
-	bool ConnectionMade(HSOCKET hsock, char* ip, int port);    /*IOManager通知网络连接成功调用此成员函数*/
-	bool ConnectionFailed(HSOCKET hsock, char* ip, int port);    /*IOManager通知网络连接失败调用此成员函数*/
-	bool ConnectionClosed(HSOCKET hsock, char* ip, int port);    /*IOManager通知网络连接关闭调用此成员函数*/
-	int  Recv(HSOCKET hsock, char* ip, int port, char* data, int len);    /*IOManager通知又连接接收到消息调用此成员函数*/
-	int  Event(uint8_t event_type, string ip, int port, string content);    /*TaskManager调用此成员函数，通知压测用户处理网络事件，分别为打开网络连接，关闭网络连接，发送消息*/
-        int  TimeOut();    /*TaskManager无事件通知压测用户时会重复调用此函数*/
-	int  ReInit();    /*TaskManager重置用户状态调用*/
-	int  Destroy();    /*TaskManager从队列中移除当前压测用户时调用*/
+	HTASKCFG	Task = NULL;    /*压测任务句柄*/
+	uint16_t	UserNumber = 0;    /*用户编号，同一个任务中的用户编号唯一，从0递增，一般用于分配用户账号*/
+	bool		SelfDead = false;    /*用户死亡标识，为true时，TaskManager会将该用户移出队列*/
+	bool		PlayPause = false;    /*回放标识，为true时暂停回放，TaskManager不会调用用户成员函数Event*/
+	MsgPointer	MsgPointer = { 0x0 };    /*回放消息坐标，一般情况下不需要主动修改其中的值*/
+
+public:const
+	virtual void ProtoInit() = 0;    /*当前压测用户初始化，TaskManager调用*/
+	virtual bool ConnectionMade(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接成功调用此成员函数*/
+	virtual bool ConnectionFailed(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接失败调用此成员函数*/
+	virtual bool ConnectionClosed(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接关闭调用此成员函数*/
+	virtual int  Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;    /*IOManager通知又连接接收到消息调用此成员函数*/
+	virtual int  Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;    /*TaskManager调用此成员函数，通知压测用户处理网络事件，分别为打开网络连接，关闭网络连接，发送消息*/
+        virtual int  TimeOut() = 0;    /*TaskManager无事件通知压测用户时会重复调用此函数*/
+	virtual int  ReInit() = 0;    /*TaskManager重置用户状态调用*/
+	virtual int  Destroy() = 0;    /*TaskManager从队列中移除当前压测用户时调用*/
 };
 ```
-ReplayProtocol类继承自压测用户基类UserProtocol，其定义在头文件TaskManager.h中
+ReplayProtocol类继承自BaseProtocol类，其定义在头文件IOCPReactor.h中
 
 请查看项目示例：example，该项目中每个函数均有备注其作用说明
 此项目为Visual Studio 2019创建，使用C++开发，压力测试框架不支持32位程序，所以此项目应该编译为64位程序。
@@ -73,21 +80,19 @@ ReplayProtocol类继承自压测用户基类UserProtocol，其定义在头文件
 #### 接入项目需要掌握哪些API？
 
 
-```
-Task_API HMESSAGE	TaskGetNextMessage(UserProtocol* proto);  
-Task_API bool		TaskUserDead(UserProtocol* proto, const char* fmt, ...);  
+``` 
+Task_API bool		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);  
 Task_API bool		TaskUserSocketClose(HSOCKET hsock);  
-Task_API void		TaskUserLog(UserProtocol* proto, int level, const char* fmt, ...);  
+Task_API void		TaskUserLog(ReplayProtocol* proto, int level, const char* fmt, ...);  
 Task_API void		TaskLog(t_task_config* task, int level, const char* fmt, ...);  
-#define		TaskUserSocketConnet(ip, port, proto)	IOCPConnectEx(ip, port, proto)  
+#define		TaskUserSocketConnet(ip, port, proto, iotype)	IOCPConnectEx(ip, port, proto, iotype)  
 #define		TaskUserSocketSend(hsock, data, len)	IOCPPostSendEx(hsock, data, len)  
 ```
 
 
 以上是完成项目接入所必须了解的API函数；
-
-`TaskGetNextMessage`：用于从Task Manager中获取当前消息，详细请看示例项目中的代码处理；  
-`TaskUserDead`：用于向Task Manager报告用户自毁，Task Manager会将其从队列中移除；  
+  
+`TaskUserDead`：用于向Task Manager报告用户自毁，并告知原因，Task Manager会将其从队列中移除；  
 `TaskUserSocketConnet`，`TaskUserSocketSend`，`TaskUserSocketClose`：分别用于用户发起连接、发送消息、关闭连接等网络操作，其中连接为异步连接，IO Manger在连接成功或者失败后会通知用户，IO Manager会调用用户成员函数`ConnectionMade`或者`ConnectionFailed`；但是通过调用`TaskUserSocketClose`关闭连接时，网络连接会立即关闭，IO Manager不会再通知连接关闭事件；  
 `TaskUserLog`，`TaskLog`：均用于输出日志，不同的是一个传递参数用户类指针，一个传递任务结构指针，`TaskUserLog`输出时会携带用户序号，用于区分不同用户的日志流
 
