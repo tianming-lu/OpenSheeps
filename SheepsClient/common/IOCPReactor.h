@@ -54,7 +54,7 @@ typedef struct _IOCP_SOCKET
 	int32_t				PORT;
 	SOCKADDR_IN			SAddr;
 	BaseFactory*		factory;
-	std::mutex*				userlock;
+	std::mutex*			userlock;
 	BaseProtocol**		user;
 	IOCP_BUFF*			IocpBuff;
 	time_t				timeout;
@@ -75,7 +75,7 @@ public:
 	LPFN_GETACCEPTEXSOCKADDRS	lpfnGetAcceptExSockaddrs = NULL;  //º”‘ÿGetAcceptExSockaddrs∫Ø ˝÷∏’Î
 
 	std::map<short, BaseFactory*>	FactoryAll;
-	std::stack<IOCP_SOCKET*>			HsocketPool;
+	std::stack<IOCP_SOCKET*>		HsocketPool;
 	std::mutex						HsocketPoolLock;
 	std::stack<IOCP_BUFF*>			HbuffPool;
 	std::mutex						HbuffPoolLock;
@@ -85,19 +85,19 @@ class BaseProtocol
 {
 public:
 	BaseProtocol() {};
-	virtual ~BaseProtocol() {delete this->protolock;};
+	virtual ~BaseProtocol() {delete this->_protolock;};
 
 public:
-	BaseFactory*	factory = NULL;
-	BaseProtocol*	self = NULL;
-	std::mutex*			protolock = new std::mutex;
-	uint8_t			sockCount = 0;
+	BaseFactory*	_factory = NULL;
+	BaseProtocol*	_self = NULL;
+	std::mutex*		_protolock = new std::mutex;
+	uint8_t			_sockCount = 0;
 
 public:
-	virtual bool ConnectionMade(HSOCKET hsock, char *ip, int port) = 0;
-	virtual bool ConnectionFailed(HSOCKET, char *ip, int port) = 0;
-	virtual bool ConnectionClosed(HSOCKET hsock, char *ip, int port) = 0;
-	virtual int	 Recv(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
+	virtual bool ConnectionMade(HSOCKET hsock, const char *ip, int port) = 0;
+	virtual bool ConnectionFailed(HSOCKET, const char *ip, int port) = 0;
+	virtual bool ConnectionClosed(HSOCKET hsock, const char *ip, int port) = 0;
+	virtual int	 Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;
 };
 
 class BaseFactory
@@ -127,7 +127,7 @@ Iocp_API void		IOCPServerStop(Reactor* reactor);
 Iocp_API int		IOCPFactoryRun(BaseFactory* fc);
 Iocp_API int		IOCPFactoryStop(BaseFactory* fc);
 Iocp_API HSOCKET	IOCPConnectEx(const char* ip, int port, BaseProtocol* proto, uint8_t iotype);
-Iocp_API bool		IOCPPostSendEx(IOCP_SOCKET* IocpSock, char* data, int len);
+Iocp_API bool		IOCPPostSendEx(IOCP_SOCKET* IocpSock, const char* data, int len);
 Iocp_API bool		IOCPCloseHsocket(IOCP_SOCKET* IocpSock);
 Iocp_API bool		IOCPDestroyProto(BaseProtocol* proto);
 

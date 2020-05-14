@@ -154,7 +154,7 @@ static bool Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 				IocpSock->userlock->lock();
 				if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
 				{
-					(*(IocpSock->user))->sockCount -= 1;
+					(*(IocpSock->user))->_sockCount -= 1;
 					(*(IocpSock->user))->ConnectionFailed(IocpSock, IocpSock->IP, IocpSock->PORT);
 				}
 				IocpSock->userlock->unlock();
@@ -167,7 +167,7 @@ static bool Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 				IocpSock->userlock->lock();
 				if (*(IocpSock->user) != NULL && IocpSock->sock != INVALID_SOCKET)
 				{
-					(*(IocpSock->user))->sockCount -= 1;
+					(*(IocpSock->user))->_sockCount -= 1;
 					(*(IocpSock->user))->ConnectionClosed(IocpSock, IocpSock->IP, IocpSock->PORT);
 				}
 				IocpSock->userlock->unlock();
@@ -287,11 +287,11 @@ static bool PostAceept(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 	memset(IocpSock, 0, sizeof(IOCP_SOCKET));
 	IocpSock->sock = IocpBuff->sock;
 	BaseProtocol* proto = fc->CreateProtocol();	//用户指针
-	proto->self = proto;
-	proto->factory = fc;
+	proto->_self = proto;
+	proto->_factory = fc;
 	IocpSock->factory = fc;
-	IocpSock->user = &(proto->self);	//用户指针的地址
-	IocpSock->userlock = proto->protolock;
+	IocpSock->user = &(proto->_self);	//用户指针的地址
+	IocpSock->userlock = proto->_protolock;
 	IocpSock->IocpBuff = IocpBuff;
 
 	SOCKADDR_IN addr_conn;
@@ -309,7 +309,7 @@ static bool PostAceept(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 		(LPSOCKADDR*)& addrClient, &nClientLen);
 
 	CreateIoCompletionPort((HANDLE)IocpSock->sock, reactor->ComPort, (ULONG_PTR)IocpSock, 0);	//将监听到的套接字关联到完成端口
-	proto->sockCount += 1;
+	proto->_sockCount += 1;
 	(*(IocpSock->user))->ConnectionMade(IocpSock, IocpSock->IP, IocpSock->PORT);
 
 	PostRecv(IocpSock, IocpBuff);
@@ -550,7 +550,7 @@ int IOCPFactoryStop(BaseFactory* fc)
 
 static HSOCKET IOCPConnectUDP(const char* ip, int port, BaseProtocol* proto, uint8_t iotype)
 {
-	BaseFactory* fc = proto->factory;
+	BaseFactory* fc = proto->_factory;
 	IOCP_SOCKET* IocpSock = NewIOCP_Socket(fc->reactor);
 	if (IocpSock == NULL)
 	{
@@ -566,8 +566,8 @@ static HSOCKET IOCPConnectUDP(const char* ip, int port, BaseProtocol* proto, uin
 	IocpSock->factory = fc;
 	memcpy(IocpSock->IP, ip, strlen(ip));
 	IocpSock->PORT = port;
-	IocpSock->user = &(proto->self);
-	IocpSock->userlock = proto->protolock;
+	IocpSock->user = &(proto->_self);
+	IocpSock->userlock = proto->_protolock;
 
 	sockaddr_in local_addr;
 	memset(&local_addr, 0, sizeof(sockaddr_in));
@@ -577,7 +577,7 @@ static HSOCKET IOCPConnectUDP(const char* ip, int port, BaseProtocol* proto, uin
 	IocpSock->IocpBuff = NewIOCP_Buff(fc->reactor);
 
 	CreateIoCompletionPort((HANDLE)IocpSock->sock, fc->reactor->ComPort, (ULONG_PTR)IocpSock, 0);
-	proto->sockCount += 1;
+	proto->_sockCount += 1;
 
 	PostRecv(IocpSock, IocpSock->IocpBuff);
 	return IocpSock;
@@ -586,7 +586,7 @@ HSOCKET IOCPConnectEx(const char* ip, int port, BaseProtocol* proto, uint8_t iot
 {
 	if (iotype == IOCP_UDP)
 		return IOCPConnectUDP(ip, port, proto, iotype);
-	BaseFactory* fc = proto->factory;
+	BaseFactory* fc = proto->_factory;
 	IOCP_BUFF* IocpBuff;
 	IocpBuff = NewIOCP_Buff(fc->reactor);
 	if (IocpBuff == NULL)
@@ -624,8 +624,8 @@ HSOCKET IOCPConnectEx(const char* ip, int port, BaseProtocol* proto, uint8_t iot
 	IocpSock->iotype = iotype;
 	memcpy(IocpSock->IP, ip, strlen(ip));
 	IocpSock->PORT = port;
-	IocpSock->user = &(proto->self);
-	IocpSock->userlock = proto->protolock;
+	IocpSock->user = &(proto->_self);
+	IocpSock->userlock = proto->_protolock;
 	IocpSock->IocpBuff = IocpBuff;
 
 	SOCKADDR_IN addrSrv;
@@ -650,7 +650,7 @@ HSOCKET IOCPConnectEx(const char* ip, int port, BaseProtocol* proto, uint8_t iot
 		}
 	}
 	CreateIoCompletionPort((HANDLE)IocpSock->sock, fc->reactor->ComPort, (ULONG_PTR)IocpSock, 0);
-	proto->sockCount += 1;
+	proto->_sockCount += 1;
 
 	PVOID lpSendBuffer = NULL;
 	DWORD dwSendDataLength = 0;
@@ -676,7 +676,7 @@ HSOCKET IOCPConnectEx(const char* ip, int port, BaseProtocol* proto, uint8_t iot
 	return IocpSock;
 }
 
-static bool IOCPPostSendUDP(IOCP_SOCKET* IocpSock, char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
+static bool IOCPPostSendUDP(IOCP_SOCKET* IocpSock, const char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
 {
 	if (IocpSock != NULL && IocpSock->sock != INVALID_SOCKET)
 	{
@@ -686,7 +686,7 @@ static bool IOCPPostSendUDP(IOCP_SOCKET* IocpSock, char* data, int len)    //注
 	return true;
 }
 
-static bool IOCPPostSend(IOCP_SOCKET* IocpSock, char* data, int len)
+static bool IOCPPostSend(IOCP_SOCKET* IocpSock, const char* data, int len)
 {
 	if (IocpSock->iotype == IOCP_UDP)
 		return IOCPPostSendUDP(IocpSock, data, len);
@@ -697,7 +697,7 @@ static bool IOCPPostSend(IOCP_SOCKET* IocpSock, char* data, int len)
 	return true;
 }
 
-bool IOCPPostSendEx(IOCP_SOCKET* IocpSock, char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
+bool IOCPPostSendEx(IOCP_SOCKET* IocpSock, const char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
 {
 	return IOCPPostSend(IocpSock, data, len);
 	if (IocpSock == NULL)
@@ -749,9 +749,9 @@ bool IOCPCloseHsocket(IOCP_SOCKET*  IocpSock)
 
 bool IOCPDestroyProto(BaseProtocol* proto)
 {
-	if (proto->sockCount > 0)
+	if (proto->_sockCount > 0)
 		return false;
-	BaseFactory* fc = proto->factory;
-	fc->DeleteProtocol(proto->self);
+	BaseFactory* fc = proto->_factory;
+	fc->DeleteProtocol(proto->_self);
 	return true;
 }

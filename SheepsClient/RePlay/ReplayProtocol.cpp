@@ -26,13 +26,13 @@ int ThreadUnInit(HTASKCFG task)
 	return 0;
 }
 
-ReplayProtocol* CreateUser(void)
+UserProtocol* CreateUser(void)
 {	/*´Ëº¯Êý´´½¨Ò»¸ö¼Ì³Ð×ÔUserProtocolµÄ¶ÔÏóÊµÀý£¬²¢·µ»ØÆäÖ¸Õë*/
-	ReplayProtocol* hdl = new ReplayProtocol;
+	UserProtocol* hdl = new UserProtocol;
 	return hdl;
 }
 
-void DestoryUser(ReplayProtocol* hdl)
+void DestoryUser(UserProtocol* hdl)
 {	/*´Ëº¯ÊýÓÃÓÚÏú»ÙCreateUserº¯Êý´´½¨µÄ¶ÔÏóÊµÀý*/
 	if (hdl != NULL)
 		delete hdl;
@@ -40,20 +40,20 @@ void DestoryUser(ReplayProtocol* hdl)
 
 
 //Ààº¯Êý¶¨Òå
-ReplayProtocol::ReplayProtocol()
+UserProtocol::UserProtocol()
 {	/*¹¹Ôìº¯Êý*/
 }
 
 
-ReplayProtocol::~ReplayProtocol()
+UserProtocol::~UserProtocol()
 {	/*Îö¹¹º¯Êý*/
 }
 
-void ReplayProtocol::ProtoInit()
+void UserProtocol::ProtoInit()
 {	/*ÓÃ»§³õÊ¼»¯£¬ÓÃ»§ÊµÀý±»´´½¨ºó»á±»µ÷ÓÃÒ»´Î*/
 }
 
-bool ReplayProtocol::ConnectionMade(HSOCKET hsock, char* ip, int port)
+bool UserProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 {	/*µ±ÓÃ»§Á¬½ÓÄ¿±êip¶Ë¿Ú³É¹¦ºó£¬µ÷ÓÃ´Ëº¯Êý£¬hsockÎªÁ¬½Ó¾ä±ú£¬²¢´«µÝ¶ÔÓ¦ÍøÂçµØÖ·£¨ip£©ºÍ¶Ë¿Ú£¨port£©*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
 	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
@@ -75,7 +75,7 @@ bool ReplayProtocol::ConnectionMade(HSOCKET hsock, char* ip, int port)
 	return true;
 }
 
-bool ReplayProtocol::ConnectionFailed(HSOCKET hsock, char* ip, int port)
+bool UserProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 {	/*µ±ÓÃ»§Á¬½ÓÄ¿±êip¶Ë¿ÚÊ§°Üºó£¬µ÷ÓÃ´Ëº¯Êý£¬²¢´«µÝ¶ÔÓ¦ÍøÂçµØÖ·£¨ip£©ºÍ¶Ë¿Ú£¨port£©*/
 	TaskUserLog(this, LOG_FAULT,"%s:%d [%s:%d]\r\n", __func__, __LINE__, ip, port);
 	this->PlayPause = false;
@@ -83,7 +83,7 @@ bool ReplayProtocol::ConnectionFailed(HSOCKET hsock, char* ip, int port)
 	return true;
 }
 
-bool ReplayProtocol::ConnectionClosed(HSOCKET hsock, char* ip, int port)   //ÀàÏú»Ùºó£¬¿ÉÄÜµ¼ÖÂÒ°Ö¸Õë
+bool UserProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)   //ÀàÏú»Ùºó£¬¿ÉÄÜµ¼ÖÂÒ°Ö¸Õë
 {	/*µ±ÓÃ»§Á¬½Ó¹Ø±Õºó£¬µ÷ÓÃ´Ëº¯Êý£¬hsockÎªÁ¬½Ó¾ä±ú£¬²¢´«µÝ¶ÔÓ¦ÍøÂçµØÖ·£¨ip£©ºÍ¶Ë¿Ú£¨port£©*/
 	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld\r\n", __func__, __LINE__, ip, port, hsock->sock);
 	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
@@ -99,24 +99,24 @@ bool ReplayProtocol::ConnectionClosed(HSOCKET hsock, char* ip, int port)   //ÀàÏ
 	return true;
 }
 
-int ReplayProtocol::Send(HSOCKET hsock, char* ip, int port, char* data, int len)
+int UserProtocol::Send(HSOCKET hsock, char* ip, int port, char* data, int len)
 {	/*ÎÞ±ê×¼¶¨Òå*/
 	return true;
 }
 
-int ReplayProtocol::Recv(HSOCKET hsock, char* ip, int port, char* data, int len)
+int UserProtocol::Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len)
 {	/*µ±ÓÃ»§Á¬½ÓÊÕµ½ÏûÏ¢ºó£¬µ÷ÓÃ´Ëº¯Êý£¬hsockÎªÁ¬½Ó¾ä±ú£¬²¢´«µÝ¶ÔÓ¦ÍøÂçµØÖ·£¨ip£©ºÍ¶Ë¿Ú£¨port£©£¬ÒÔ¼°Êý¾ÝÖ¸Õë£¨data£©ºÍÏûÏ¢³¤¶È£¨len£©*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d][%.*s]\r\n", __func__, __LINE__, ip, port, len, data);
 	return this->CheckReq(hsock->sock, data, len);
 }
 
-int ReplayProtocol::TimeOut()
+int UserProtocol::TimeOut()
 {
 	TaskUserLog(this, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
 	return 0;
 }
 
-int ReplayProtocol::Event(uint8_t event_type, const char* ip, int port, const char* content, int clen)
+int UserProtocol::Event(uint8_t event_type, const char* ip, int port, const char* content, int clen)
 {
 	TaskUserLog(this, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
 	HSOCKET* hsock;
@@ -150,14 +150,14 @@ int ReplayProtocol::Event(uint8_t event_type, const char* ip, int port, const ch
 	return 0;
 }
 
-int ReplayProtocol::ReInit()
+int UserProtocol::ReInit()
 {	/*ÓÃ»§ÖØÖÃµ½³õÊ¼×´Ì¬*/
 	TaskUserLog(this, LOG_NORMAL, "%s:%d\r\n", __func__, __LINE__);
 	this->CloseAllConnection();
 	return 0;
 }
 
-int ReplayProtocol::Destroy()
+int UserProtocol::Destroy()
 {	/*ÈÎÎñÖÕÖ¹Ê±£¬µ÷ÓÃ´Îº¯Êý£¬¹Ø±ÕËùÓÐÁ¬½Ó£¬²¢ÇÒHSOCKET ¾ä±ú±äÁ¿ÖÃÎªNULL*/
 	TaskUserLog(this, LOG_NORMAL, "%s:%d\r\n", __func__, __LINE__);
 	this->CloseAllConnection();
@@ -165,7 +165,7 @@ int ReplayProtocol::Destroy()
 }
 
 //×Ô¶¨ÒåÀà³ÉÔ±º¯Êý
-HSOCKET* ReplayProtocol::GetScokFromConnection(const char* ip, int port)
+HSOCKET* UserProtocol::GetScokFromConnection(const char* ip, int port)
 {
 	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	if (it != this->Connection.end())
@@ -175,7 +175,7 @@ HSOCKET* ReplayProtocol::GetScokFromConnection(const char* ip, int port)
 	return NULL;
 }
 
-bool ReplayProtocol::CloseAllConnection()
+bool UserProtocol::CloseAllConnection()
 {
 	std::map<int, t_connection_info>::iterator iter;
 	for (iter = this->Connection.begin(); iter != this->Connection.end(); iter++)
@@ -189,7 +189,7 @@ bool ReplayProtocol::CloseAllConnection()
 	return true;
 }
 
-int ReplayProtocol::CheckReq(SOCKET sock, char* data, int len)
+int UserProtocol::CheckReq(SOCKET sock, const char* data, int len)
 {
 	int clen = len;// this->CheckRequest(sock, this->recvBuff.data, this->recvBuff.offset);
 	if (clen < 0)
@@ -199,7 +199,7 @@ int ReplayProtocol::CheckReq(SOCKET sock, char* data, int len)
 	return RECV;
 }
 
-int ReplayProtocol::CheckRequest(SOCKET sock, char* data, int len)
+int UserProtocol::CheckRequest(SOCKET sock, char* data, int len)
 {
 	return 0;
 }

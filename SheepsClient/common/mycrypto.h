@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "sha1.h"
-#include "md5.h"
 
 #if defined COMMON_LIB || defined STRESS_EXPORTS
 #define crypto_API __declspec(dllexport)

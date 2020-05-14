@@ -117,7 +117,7 @@ void destroyTask()
 			bool userClean = true;
 			while (user = get_userDes_front(task))
 			{
-				if (user->proto->sockCount == 0)
+				if (user->proto->_sockCount == 0)
 				{ 
 					task->dll.destory(user->proto);		//若连接未关闭，可能导致崩溃
 				}
@@ -133,7 +133,7 @@ void destroyTask()
 
 			while (user = get_userAll_front(task, &userAllSize))
 			{
-				if (user->proto->sockCount == 0)
+				if (user->proto->_sockCount == 0)
 				{
 					task->dll.destory(user->proto);		//若连接未关闭，可能导致崩溃
 				}
@@ -321,7 +321,19 @@ int64_t GetSysTimeMicros()
 	return tt;
 }
 
-HMESSAGE TaskGetNextMessage(UserProtocol* proto)
+void update_user_time_clock(ReplayProtocol* proto)
+{
+	HMsgPointer pointer = &proto->MsgPointer;
+	
+	if (pointer->last > 0)
+	{
+		UINT64 nowtime = GetSysTimeMicros();
+		proto->MsgPointer.start_real += nowtime - proto->MsgPointer.last;
+		proto->MsgPointer.last = nowtime;
+	}
+}
+
+HMESSAGE task_get_next_message(ReplayProtocol* proto)
 {
 	HMsgPointer pointer = &(proto->MsgPointer);
 	t_task_config* task = proto->Task;
@@ -346,6 +358,7 @@ HMESSAGE TaskGetNextMessage(UserProtocol* proto)
 		if (realtime < shouldtime)
 			return NULL;
 		pointer->index += 1;
+		pointer->last = nowtime;
 		return msg;
 	}
 	return NULL;
@@ -357,13 +370,13 @@ bool TaskUserSocketClose(HSOCKET hsock)
 		return false;
 	SOCKET sock = hsock->sock;
 	hsock->sock = INVALID_SOCKET;
-	(*(hsock->user))->sockCount -= 1;
+	(*(hsock->user))->_sockCount -= 1;
 	CancelIo((HANDLE)sock);
 	closesocket(sock);
 	return true;
 }
 
-bool TaskUserDead(UserProtocol* proto, const char* fmt, ...)
+bool TaskUserDead(ReplayProtocol* proto, const char* fmt, ...)
 {
 	proto->SelfDead = TRUE;
 
@@ -429,7 +442,7 @@ void TaskLog(t_task_config* task, uint8_t level, const char* fmt, ...)
 	WriteFile(nle->File, buf, l, &written, NULL);
 }
 
-void TaskUserLog(UserProtocol* proto, uint8_t level, const char* fmt, ...)
+void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 {
 	LOG_Context* nle = (LOG_Context*)proto->Task->hlog;
 	if (nle->LogLevel > level)

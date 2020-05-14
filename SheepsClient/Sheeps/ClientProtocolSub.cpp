@@ -50,22 +50,23 @@ static int MsgSend(HSOCKET sock, int cmdNo, char* data, int len)
 	return 0;
 }
 
-static void ReInit(UserProtocol* proto)
+static void ReInit(ReplayProtocol* proto)
 {
 	proto->SelfDead = false;
 	proto->MsgPointer = { 0x0 };
 	proto->ReInit();
 }
 
-static void Loop(UserProtocol* proto)
+static void Loop(ReplayProtocol* proto)
 {
 	if (proto->PlayPause == true)
 	{
 		proto->TimeOut();
+		update_user_time_clock(proto);
 		return;
 	}
 
-	HMESSAGE message = TaskGetNextMessage(proto);  /*获取下一步用户需要处理的事件消息*/
+	HMESSAGE message = task_get_next_message(proto);  /*获取下一步用户需要处理的事件消息*/
 	if (message == NULL)
 	{
 		proto->TimeOut();
@@ -95,7 +96,7 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 		task->dll.threadinit(task);
 
 	t_handle_user* user = NULL;
-	UserProtocol* proto = NULL;
+	ReplayProtocol* proto = NULL;
 	size_t userAllSize = 0;
 	while (task->status < 4)   //任务运行中
 	{
@@ -160,6 +161,39 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 	return 0;
 }
 
+static t_handle_user* create_new_user(t_task_config* task, int userNumber)
+{
+	t_handle_user* user = get_userDes_front(task);
+	if (user == NULL)
+	{
+		if (task->dll.dllHandle == NULL)
+			return NULL;
+		user = (t_handle_user*)GlobalAlloc(GPTR, sizeof(t_handle_user));
+		if (user == NULL)
+			return NULL;
+		user->proto = task->dll.create();
+		if (user->proto == NULL)
+		{
+			GlobalFree(user);
+			return NULL;
+		}
+		user->proto->Task = task;
+		user->proto->UserNumber = userNumber;
+		user->proto->_self = user->proto;
+		user->proto->_factory = subfactory;
+		user->protolock = user->proto->_protolock;
+
+		user->proto->ProtoInit();
+		/*task->userPointer->push_back(user);
+		user->proto->self = task->userPointer->back()->proto;*/
+	}
+	else
+	{
+		ReInit(user->proto);
+	}
+	return user;
+}
+
 int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
@@ -207,30 +241,7 @@ int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 	t_handle_user* user = NULL;
 	for (int i = 0; i < userCount->valueint; i++)
 	{
-		user = get_userDes_front(task);
-		if (user == NULL)
-		{
-			user = (t_handle_user*)GlobalAlloc(GPTR, sizeof(t_handle_user));
-			if (user == NULL)
-				continue;
-			user->proto = task->dll.create();
-			if (user->proto == NULL)
-				continue;
-			user->proto->Task = task;
-			user->proto->UserNumber = StartCount + i;
-			user->proto->self = user->proto;
-			user->proto->factory = subfactory;
-			user->protolock = user->proto->protolock;
-
-			user->proto->ProtoInit();
-			/*task->userPointer->push_back(user);
-			user->proto->self = task->userPointer->back()->proto;*/
-		}
-		else
-		{
-			ReInit(user->proto);
-		}
-
+		user = create_new_user(task, StartCount + i);
 		add_to_userAll_tail(task, user);
 	}
 
@@ -587,36 +598,7 @@ int client_cmd_12_task_change_user_count(HSOCKET sock, int cmdNO, cJSON* root)
 	t_handle_user* user = NULL;
 	for (int i = 0; i < change->valueint; i++)
 	{
-		user = get_userDes_front(task);
-		if (user == NULL)
-		{
-			user = (t_handle_user*)GlobalAlloc(GPTR, sizeof(t_handle_user));
-			if (user == NULL)
-				continue;
-			if (task->dll.dllHandle == NULL)
-			{
-				MsgResponse(sock, cmdNO, 1, "dll file not found");
-				LOG(clogId, LOG_ERROR, "dll Handle is NULL!\r\n");
-				return 0;
-			}
-			user->proto = task->dll.create();
-			if (user->proto == NULL)
-				continue;
-			user->proto->Task = task;
-			user->proto->UserNumber = StartCount + i;
-			user->proto->self = user->proto;
-			user->proto->factory = subfactory;
-			user->protolock = user->proto->protolock;
-
-			user->proto->ProtoInit();
-			/*task->userPointer->push_back(user);
-			user->proto->self = task->userPointer->back()->proto;*/
-		}
-		else
-		{
-			ReInit(user->proto);
-		}
-		
+		user = create_new_user(task, StartCount + i);
 		add_to_userAll_tail(task, user);
 	}
 	

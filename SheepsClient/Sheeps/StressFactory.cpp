@@ -5,8 +5,6 @@
 #include "./../common/log.h"
 #include "./../common/TaskManager.h"
 
-//const char* ConfigFile = "./stresstest/config.ini";
-
 StressFactory::StressFactory()
 {
 }
@@ -23,8 +21,8 @@ bool StressFactory::FactoryInit()
 		ClientLogInit(ConfigFile);
 		init_task_log(ConfigFile);
 		this->StressProto = new StressProtocol();
-		this->StressProto->factory = this;
-		this->StressProto->self = (BaseProtocol*)(this->StressProto);
+		this->StressProto->_factory = this;
+		this->StressProto->_self = (BaseProtocol*)(this->StressProto);
 		this->StressProto->StressSerIP = this->StressServerIp.c_str();
 		this->StressProto->StressSerPort = this->StressServerPort;
 	}

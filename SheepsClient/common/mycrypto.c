@@ -1,6 +1,8 @@
 #include "mycrypto.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "sha1.h"
+#include "md5.h"
 
 //base64
 static void encode_base64_internal(Base64_Context *dst, Base64_Context *src, const u_char *basis, uint8_t padding)

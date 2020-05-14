@@ -8,7 +8,7 @@ class StressProtocol :
 	public BaseProtocol
 {
 public:
-	t_socket_buff recvBuff = {0};
+	std::string recvBuff;
 
 public:
 	StressProtocol();
@@ -21,19 +21,14 @@ public:
 
 
 public:
-	void ProtoInit(void* parm, int index);
-	bool ConnectionMade(HSOCKET sock, char* ip, int port);
-	bool ConnectionFailed(HSOCKET sock, char* ip, int port);
-	bool ConnectionClosed(HSOCKET sock, char* ip, int port);
-	int Send(HSOCKET hsock, char* ip, int port, char* data, int len);
-	int	 Recv(HSOCKET hsock, char* ip, int port, char* data, int len);
+	bool ConnectionMade(HSOCKET sock, const char* ip, int port);
+	bool ConnectionFailed(HSOCKET sock, const char* ip, int port);
+	bool ConnectionClosed(HSOCKET sock, const char* ip, int port);
+	int	 Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len);
 	int	 Loop();
-	int	 ReInit();
 	int  Destroy();
 
 	bool ReportError();
-	bool AddBuff(HSOCKET sock, char* data, int len);
-	bool DestroyBuff(HSOCKET sock, int len);
-	int  CheckReq(HSOCKET sock, char* data, int len);
-	int  CheckRequest(HSOCKET sock, char* data, int len);
+	int  CheckReq(HSOCKET sock, const char* data, int len);
+	int  CheckRequest(HSOCKET sock, const char* data, int len);
 };

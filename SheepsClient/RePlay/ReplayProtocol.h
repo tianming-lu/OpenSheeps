@@ -14,23 +14,23 @@ typedef struct {
 	std::string recvbuf;
 }t_connection_info;
 
-class ReplayProtocol :
-	public UserProtocol
+class UserProtocol :
+	public ReplayProtocol
 {
 public:
-	ReplayProtocol();
-	~ReplayProtocol();
+	UserProtocol();
+	~UserProtocol();
 
 public:
 	std::map<int, t_connection_info> Connection;
 
 public:
 	void ProtoInit();
-	bool ConnectionMade(HSOCKET hsock, char* ip, int port);
-	bool ConnectionFailed(HSOCKET hsock, char* ip, int port);
-	bool ConnectionClosed(HSOCKET hsock, char* ip, int port);
+	bool ConnectionMade(HSOCKET hsock, const char* ip, int port);
+	bool ConnectionFailed(HSOCKET hsock, const char* ip, int port);
+	bool ConnectionClosed(HSOCKET hsock, const char* ip, int port);
 	int  Send(HSOCKET hsock, char* ip, int port, char* data, int len);
-	int  Recv(HSOCKET hsock, char* ip, int port, char* data, int len);
+	int  Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len);
 	int  TimeOut();
 	int	 Event(uint8_t event_type, const char* ip, int port, const char* content, int clen);
 	int	 ReInit();
@@ -38,7 +38,7 @@ public:
 
 	HSOCKET* GetScokFromConnection(const char* ip, int port);
 	bool CloseAllConnection();
-	int CheckReq(SOCKET sock, char* data, int len);
+	int CheckReq(SOCKET sock, const char* data, int len);
 	int CheckRequest(SOCKET sock, char* data, int len);
 };
 
@@ -46,8 +46,8 @@ public:
 extern "C" {
 #endif
 
-	RePlay_API ReplayProtocol* CreateUser(void);
-	RePlay_API void DestoryUser(ReplayProtocol* hdl);
+	RePlay_API UserProtocol* CreateUser(void);
+	RePlay_API void DestoryUser(UserProtocol* hdl);
 	RePlay_API int Init(HTASKCFG task);
 	RePlay_API int UnInit(HTASKCFG task);
 	RePlay_API int ThreadInit(HTASKCFG task);

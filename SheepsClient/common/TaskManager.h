@@ -27,9 +27,10 @@ typedef struct {
 	uint32_t	index;
 	uint64_t	start_record;		//微秒
 	uint64_t	start_real;			//微秒
+	uint64_t	last;
 }MsgPointer, *HMsgPointer;
 
-class UserProtocol;
+class ReplayProtocol;
 
 typedef struct {
 	uint8_t		type;
@@ -42,8 +43,8 @@ typedef struct {
 	std::string		content;
 }t_message_data, *HMESSAGE;
 
-typedef UserProtocol* (*CREATEAPI)();
-typedef void(*DESTORYAPI)(UserProtocol*);
+typedef ReplayProtocol* (*CREATEAPI)();
+typedef void(*DESTORYAPI)(ReplayProtocol*);
 typedef int(*INIT)(void*);
 typedef struct dllAPI
 {
@@ -68,7 +69,7 @@ typedef struct
 typedef struct
 {
 	std::mutex*			protolock;
-	UserProtocol*	proto;
+	ReplayProtocol*	proto;
 }t_handle_user;
 
 typedef struct {
@@ -100,12 +101,12 @@ typedef struct {
 	std::mutex*		taskErrlock;
 }t_task_config, *HTASKCFG;
 
-class UserProtocol :
+class ReplayProtocol :
 	public BaseProtocol
 {
 public:
-	UserProtocol() {};
-	virtual ~UserProtocol() {};
+	ReplayProtocol() {};
+	virtual ~ReplayProtocol() {};
 
 public:
 	HTASKCFG	Task = NULL;
@@ -116,11 +117,10 @@ public:
 
 public:
 	virtual void ProtoInit() = 0;
-	virtual bool ConnectionMade(HSOCKET hsock, char* ip, int port) = 0;
-	virtual bool ConnectionFailed(HSOCKET, char* ip, int port) = 0;
-	virtual bool ConnectionClosed(HSOCKET hsock, char* ip, int port) = 0;
-	virtual int  Send(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
-	virtual int	 Recv(HSOCKET hsock, char* ip, int port, char* data, int len) = 0;
+	virtual bool ConnectionMade(HSOCKET hsock, const char* ip, int port) = 0;
+	virtual bool ConnectionFailed(HSOCKET, const char* ip, int port) = 0;
+	virtual bool ConnectionClosed(HSOCKET hsock, const char* ip, int port) = 0;
+	virtual int	 Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;
 	virtual int  TimeOut() = 0;
 	virtual int	 Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;
 	virtual int	 ReInit() = 0;
@@ -150,12 +150,13 @@ bool			add_to_userDes_tail(t_task_config* task, t_handle_user* user);
 
 t_task_error*	get_task_error_front();
 void			delete_task_error(t_task_error* error);
+void			update_user_time_clock(ReplayProtocol* proto);
+HMESSAGE		task_get_next_message(ReplayProtocol* proto);
 
 //项目业务逻辑API
-Task_API HMESSAGE	TaskGetNextMessage(UserProtocol* proto);
-Task_API bool		TaskUserDead(UserProtocol* proto, const char* fmt, ...);
+Task_API bool		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
 Task_API bool		TaskUserSocketClose(HSOCKET hsock);
-Task_API void		TaskUserLog(UserProtocol* proto, uint8_t level, const char* fmt, ...);
+Task_API void		TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);
 Task_API void		TaskLog(t_task_config* task, uint8_t level, const char* fmt, ...);
 #define		TaskUserSocketConnet(ip, port, proto, iotype)	IOCPConnectEx(ip, port, proto, iotype)
 #define		TaskUserSocketSend(hsock, data, len)	IOCPPostSendEx(hsock, data, len)
