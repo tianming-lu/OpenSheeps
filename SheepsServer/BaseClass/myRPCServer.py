@@ -5,17 +5,18 @@ from socket import *
 import selectors
 import threading
 import traceback
-
-ThreadData = threading.local()
-
+import time
 
 class MyRPCServer():
-    def __init__(self, port, protocol, timeout):
+    def __init__(self):
         self.Running = False
         self.RunningThread = 0
-        self.port = port
-        self.protocol = protocol
-        self.time = timeout
+        self.MsgList = []
+        self.WorkerCount = 16
+        for i in range(self.WorkerCount):
+            self.MsgList.append([])
+        self.ProtocolList = {}
+        self.sel = selectors.DefaultSelector()
 
     def RunForever(self):
         if self.RunningThread != 0:
@@ -28,79 +29,110 @@ class MyRPCServer():
         self.Running = False
 
     def Run(self):
-        self.server_conn = socket(AF_INET, SOCK_STREAM)
-        self.server_conn.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.server_conn.bind(('0.0.0.0', self.port))
-        self.server_conn.listen(10)
-        self.server_conn.setblocking(1)  # 设置socket的接口为非阻塞
         self.Running = True
-        # for i in range(cpu_count()*2):
-        for i in range(12):
+        for i in range(1):
             th = threading.Thread(target=self.SubThread)
             th.start()
+        for i in range(self.WorkerCount):
+            th = threading.Thread(target=self.WorkThread, args=(i,))
+            th.start()
+
+    def factory_run(self, factory):
+        factory.listensock = socket(AF_INET, SOCK_STREAM)
+        factory.listensock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        factory.listensock.bind(('0.0.0.0', factory.listen_port))
+        factory.listensock.listen(10)
+        factory.listensock.setblocking(1)  # 设置socket的接口为非阻塞
+
+        factory.hsock = HandSocket()
+        factory.hsock.sock = factory.listensock
+        factory.hsock.nettype = 1
+        factory.hsock.user = factory.protocol
+
+        self.sel.register(factory.listensock, selectors.EVENT_READ, factory.hsock)
 
     def SubThread(self):
         self.RunningThread += 1
-        ThreadData.ProtocolList = {}
-        ThreadData.sel = selectors.DefaultSelector()
-        ThreadData.sel.register(self.server_conn, selectors.EVENT_READ,None)
         while self.Running:
             try:
-                events = ThreadData.sel.select(None)  # 检测所有的fileobj，是否有完成wait data的
+                events = self.sel.select(None)  # 检测所有的fileobj，是否有完成wait data的
             except:
+                print(traceback.format_exc())
                 continue
             for sel_obj, event in events:
-                if sel_obj.fileobj.fileno() == self.server_conn.fileno():
-                    self.accept(sel_obj.fileobj)   # accpet
+                hsock = sel_obj.data
+                if hsock.nettype == 1:
+                    self.accept(sel_obj.fileobj, hsock)   # accpet
                 else:
-                    self.read(sel_obj.fileobj, sel_obj.data, sel_obj.data.user)  # read
+                    self.read(sel_obj.fileobj, hsock, hsock.user)  # read
             self.timeout()
         self.ClearThread()
         self.RunningThread -= 1
 
+    def WorkThread(self, number):
+        msg_list = self.MsgList[number]
+        while True:
+            time.sleep(0.001)
+            if len(msg_list) == 0:
+                continue
+            type, protocol, conn, ip, port, data = msg_list[0]
+            del msg_list[0]
+            if type == 0:
+                protocol.ConnectionMade(conn, ip, port)
+            elif type == 1:
+                protocol.Recv(conn, ip, port, data)
+            elif type == 2:
+                protocol.ConnectionClosed(conn)
+        pass
+
     def ClearThread(self):
-        ThreadData.sel.unregister(self.server_conn)
+        self.sel.unregister(self.server_conn)
         self.server_conn.close()
         while True:
-            count = len(ThreadData.ProtocolList)
+            count = len(self.ProtocolList)
             if count <= 0:
                 break
-            for protocol in ThreadData.ProtocolList.values():
+            for protocol in self.ProtocolList.values():
                 self.close(protocol.conn, protocol)
                 break
 
 
-    def accept(self, server_fileobj):
+    def accept(self, listensock, listenhsock):
         try:
-            conn, addr = server_fileobj.accept()
+            conn, addr = listensock.accept()
             conn.setblocking(1)
         except:
             # print(0, traceback.format_exc())
             return
-        protocol = self.protocol(self)
+        protocol = listenhsock.user(self)
         hsock = HandSocket()
         hsock.sock = conn
+        hsock.nettype = 0
         hsock.type = 1
         hsock.user = protocol
         hsock.ip = addr[0]
         hsock.port = addr[1]
-        ThreadData.ProtocolList[f'{conn.fileno()}'] = protocol
-        ThreadData.sel.register(conn, selectors.EVENT_READ, hsock)
-        protocol.ConnectionMade(conn, addr[0], addr[1])
+        self.ProtocolList[f'{conn.fileno()}'] = protocol
+        self.sel.register(conn, selectors.EVENT_READ, hsock)
+
+        index = hash(protocol) % self.WorkerCount
+        self.MsgList[index].append((0, protocol, conn, addr[0], addr[1], None))
 
     def close(self, conn, protocol):
         if conn is None:
             return
         try:
-            ThreadData.sel.unregister(conn)
+            self.sel.unregister(conn)
         except:
             # print(0, traceback.format_exc())
             return
         try:
-            del ThreadData.ProtocolList[f'{conn.fileno()}']
+            del self.ProtocolList[f'{conn.fileno()}']
         except:
             pass
-        protocol.ConnectionClosed(conn)
+
+        index = hash(protocol) % self.WorkerCount
+        self.MsgList[index].append((2, protocol, conn, None, None, None))
         conn.close()
         pass
 
@@ -114,11 +146,14 @@ class MyRPCServer():
             if not data:
                 self.close(conn, protocol)
                 return
-            protocol.Recv(conn, hsock.ip, hsock.port, data)
+            index = hash(protocol) % self.WorkerCount
+            self.MsgList[index].append((1, protocol, conn, hsock.ip, hsock.port, data))
+
         elif hsock.type == 2:
             try:
                 data, addr = conn.recvfrom(40960)
-                protocol.Recv(conn, addr[0], addr[1], data)
+                index = hash(protocol) % self.WorkerCount
+                self.MsgList[index].append((1, protocol, conn, addr[0], addr[1], data))
             except:
                 self.close(conn, protocol)
 
@@ -136,8 +171,8 @@ class MyRPCServer():
             hsock.user = proto
             hsock.ip = host
             hsock.port = port
-            ThreadData.ProtocolList[f'{conn.fileno()}'] = proto
-            ThreadData.sel.register(conn, selectors.EVENT_READ, hsock)
+            self.ProtocolList[f'{conn.fileno()}'] = proto
+            self.sel.register(conn, selectors.EVENT_READ, hsock)
             # end = time.clock()
             # print(end - start)
             return conn
@@ -155,8 +190,8 @@ class MyRPCServer():
         hsock.sock = conn
         hsock.type = 2
         hsock.user = proto
-        ThreadData.ProtocolList[f'{conn.fileno()}'] = proto
-        ThreadData.sel.register(conn, selectors.EVENT_READ, hsock)
+        self.ProtocolList[f'{conn.fileno()}'] = proto
+        self.sel.register(conn, selectors.EVENT_READ, hsock)
         return conn
 
     def timeout(self):
@@ -166,10 +201,12 @@ class MyRPCServer():
 class HandSocket():
     def __init__(self):
         self.sock = None
+        self.nettype = 0    #0 read  1 accept
         self.type = 0    # 0未知 1TCP 2UDP 3BIND
         self.user = None
         self.ip = ''
         self.port = 0
+
 
 class BaseProtocol():
     def __init__(self, server):
@@ -192,9 +229,20 @@ class BaseProtocol():
         except:
             # print(traceback.format_exc())
             return False
-    pass
+
+
+class BaseFactory():
+    def __init__(self, listen_port, protocol):
+        self.listen_port = listen_port
+        self.protocol = protocol
+        self.hsock = None
+
+    def factory_forever(self):
+        pass
 
 
 if __name__ == '__main__':
-    rpc = MyRPCServer(1080, BaseProtocol, None)
+    fc = BaseFactory(1080, BaseProtocol)
+    rpc = MyRPCServer()
+    rpc.factory_run(fc)
     rpc.RunForever()

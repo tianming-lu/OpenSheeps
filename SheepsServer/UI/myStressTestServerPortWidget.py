@@ -191,7 +191,7 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
                 if index == rowCount:
                     break
             for client in clients.values():
-                if self.proxyClietExiest(client.conn.fileno()) == False:
+                if self.proxyClietExiest(client[0]) == False:
                     self.proxyClients_add_row(client)
 
     def proxyClietExiest(self, id):
@@ -203,9 +203,9 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
 
     def proxyClients_add_row(self, client):
         self.tableWidget_proxyClients.insertRow(self.tableWidget_proxyClients.rowCount())
-        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 0, QTableWidgetItem(f'{client.conn.fileno()}'))
-        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 1, QTableWidgetItem(f'{client.proxyAddr}'))
-        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 2, QTableWidgetItem(f'{client.proxyPort}'))
+        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 0, QTableWidgetItem(f'{client[0]}'))
+        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 1, QTableWidgetItem(f'{client[1]}'))
+        self.tableWidget_proxyClients.setItem(self.tableWidget_proxyClients.rowCount() - 1, 2, QTableWidgetItem(f'{client[2]}'))
 
     def refrushRecords(self):
         recordsList = get_record_message_servers()

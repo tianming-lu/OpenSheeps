@@ -1,7 +1,7 @@
 #
 #   @author:lutianming,create date:2019-05-15, QQ641471957
 #
-from BaseClass.myRPCServer import MyRPCServer,BaseProtocol
+from BaseClass.myRPCServer import MyRPCServer,BaseProtocol,BaseFactory
 from common.mySqlite import *
 import socket,struct,threading,os,traceback,json,time,base64,hashlib
 
@@ -85,7 +85,7 @@ class ServerProtocol(BaseProtocol):
         elif self.ClientType == 2 and self.ServerState == 2:
             #print("ConnectionClosed", conn.fileno())
             if conn == self.conn:
-                if f'{self.conn.fileno()}' in ProxyClients.keys():
+                if f'{self.fd}' in ProxyClients.keys():
                     del ProxyClients[f'{self.fd}']
                 if StressRecord == True:
                     StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 2, ''))
@@ -179,7 +179,7 @@ class ServerProtocol(BaseProtocol):
             loaddr2 = self.remote.getsockname()
             replay += socket.inet_aton(loaddr1[0]) + struct.pack(">H", loaddr2[1])
         self.Send(conn, replay)
-        ProxyClients[f'{self.conn.fileno()}'] = self
+        ProxyClients[f'{self.fd}'] = (self.fd, self.proxyAddr, self.proxyPort)
         self.ServerState = 2
         return True
 
@@ -318,7 +318,9 @@ class ServerProtocol(BaseProtocol):
 
 class StressTestServerPort():
     def __init__(self):
-        self.server = MyRPCServer(1080, ServerProtocol, None)
+        self.factory = BaseFactory(1080, ServerProtocol)
+        self.server = MyRPCServer()
+        self.server.factory_run(self.factory)
 
     def start(self):
         th = threading.Thread(target=self.Go)
