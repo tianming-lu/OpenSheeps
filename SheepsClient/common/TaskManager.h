@@ -23,6 +23,12 @@ enum{
 	TYPE_REINIT = 99
 };
 
+enum {
+	PLAY_NORMAL = 0,
+	PLAY_PAUSE,
+	PLAY_FAST
+};
+
 typedef struct {
 	uint32_t	index;
 	uint64_t	start_record;		//微秒
@@ -112,19 +118,19 @@ public:
 	HTASKCFG	Task = NULL;
 	uint16_t	UserNumber = 0;
 	bool		SelfDead = false;
-	bool		PlayPause = false;
+	uint8_t		PlayState = PLAY_NORMAL;
 	MsgPointer	MsgPointer = { 0x0 };
 
 public:
 	virtual void ProtoInit() = 0;
-	virtual bool ConnectionMade(HSOCKET hsock, const char* ip, int port) = 0;
-	virtual bool ConnectionFailed(HSOCKET, const char* ip, int port) = 0;
-	virtual bool ConnectionClosed(HSOCKET hsock, const char* ip, int port) = 0;
-	virtual int	 Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;
-	virtual int  TimeOut() = 0;
-	virtual int	 Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;
-	virtual int	 ReInit() = 0;
-	virtual int  Destroy() = 0;
+	virtual void ConnectionMade(HSOCKET hsock, const char* ip, int port) = 0;
+	virtual void ConnectionFailed(HSOCKET, const char* ip, int port) = 0;
+	virtual void ConnectionClosed(HSOCKET hsock, const char* ip, int port) = 0;
+	virtual void Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;
+	virtual void Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;
+	virtual void TimeOut() = 0;
+	virtual void ReInit() = 0;
+	virtual void Destroy() = 0;
 };
 
 //受控端逻辑API
@@ -143,6 +149,7 @@ bool			changTask_work_thread(t_task_config* task, uint8_t count);
 bool			insertMessage_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t port, char* content, uint64_t timestamp, uint32_t microsecond);
 bool			dll_init(t_task_config* task, char* rootpath);
 
+t_handle_user* create_new_user(t_task_config* task, int userNumber, BaseFactory* factory, bool& isNew);
 t_handle_user*	get_userAll_front(t_task_config* task, size_t* size);
 bool			add_to_userAll_tail(t_task_config* task, t_handle_user* user);
 t_handle_user*	get_userDes_front(t_task_config* task);
@@ -151,7 +158,7 @@ bool			add_to_userDes_tail(t_task_config* task, t_handle_user* user);
 t_task_error*	get_task_error_front();
 void			delete_task_error(t_task_error* error);
 void			update_user_time_clock(ReplayProtocol* proto);
-HMESSAGE		task_get_next_message(ReplayProtocol* proto);
+HMESSAGE		task_get_next_message(ReplayProtocol* proto, bool fast);
 
 //项目业务逻辑API
 Task_API bool		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);

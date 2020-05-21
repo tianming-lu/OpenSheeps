@@ -38,11 +38,12 @@ t_task_config* getTask_by_taskId(uint8_t taskID)
 	}
 	else
 	{
-		t_task_config* task = (t_task_config*)GlobalAlloc(GPTR, sizeof(t_task_config));
+		t_task_config* task = (t_task_config*)malloc(sizeof(t_task_config));
 		if (task == NULL)
 		{
 			return NULL;
 		}
+		memset(task, 0, sizeof(t_task_config));
 		task->hlog = gHlog;
 		task->workThereaLock = new std::mutex;
 		task->messageList = new std::vector<t_message_data*>;
@@ -106,7 +107,7 @@ void destroyTask()
 			std::vector<t_message_data*>::iterator it;
 			for (it = task->messageList->begin(); it != task->messageList->end(); it++)
 			{
-				GlobalFree(*it);
+				free(*it);
 				*it = NULL;
 			}
 			task->messageList->clear();
@@ -126,7 +127,7 @@ void destroyTask()
 					LOG(clogId, LOG_ERROR," %d 用户连接未完全关闭，导致内存泄漏！\r\n", __LINE__);
 					userClean = false;
 				}
-				GlobalFree(user);
+				free(user);
 			}
 			delete task->userDes;
 			delete task->userDesLock;
@@ -142,7 +143,7 @@ void destroyTask()
 					LOG(clogId, LOG_ERROR, " %d 用户连接未完全关闭，导致内存泄漏！\r\n", __LINE__);
 					userClean = false;
 				}
-				GlobalFree(user);
+				free(user);
 			}
 			delete task->userAll;
 			delete task->userAllLock;
@@ -161,7 +162,7 @@ void destroyTask()
 
 			//userRubbish.insert(pair<time_t, list<t_handle_user*>*>(ctime, task->userPointer));
 
-			GlobalFree(task);
+			free(task);
 			taskDel.erase(iter);
 			iter = taskDel.end();
 		}
@@ -197,11 +198,12 @@ bool insertMessage_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t po
 	if (task->stopMessageCache)
 		return true;
 
-	t_message_data* message = (t_message_data*)GlobalAlloc(GPTR, sizeof(t_message_data));
+	t_message_data* message = (t_message_data*)malloc(sizeof(t_message_data));
 	if (message == NULL)
 	{
 		return false;
 	}
+	memset(message, 0, sizeof(t_message_data));
 	message->type = type;
 	if (ip)
 		message->ip = std::string(ip);
@@ -214,7 +216,7 @@ bool insertMessage_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t po
 
 		Base64_Context temp;
 		temp.len = (str.len) * 6 / 8;
-		temp.data = (u_char*)GlobalAlloc(GPTR, temp.len);
+		temp.data = (u_char*)malloc(temp.len);
 		if (temp.data == NULL)
 		{
 			return 0;
@@ -222,7 +224,7 @@ bool insertMessage_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t po
 		decode_base64(&temp, &str);
 
 		message->content = std::string((char*)temp.data, temp.len);
-		GlobalFree(temp.data);
+		free(temp.data);
 	}
 	message->recordtime = timestamp * 1000000 + microsecond;
 
@@ -253,6 +255,36 @@ bool dll_init(t_task_config* task, char* rootpath)
 
 	task->dll.init(task);
 	return true;
+}
+
+t_handle_user* create_new_user(t_task_config* task, int userNumber, BaseFactory* factory, bool& isNew)
+{
+	t_handle_user* user = get_userDes_front(task);
+	if (user == NULL)
+	{
+		isNew = true;
+		if (task->dll.dllHandle == NULL)
+			return NULL;
+		user = (t_handle_user*)malloc(sizeof(t_handle_user));
+		if (user == NULL)
+			return NULL;
+		memset(user, 0, sizeof(t_handle_user));
+		user->proto = task->dll.create();
+		if (user->proto == NULL)
+		{
+			free(user);
+			return NULL;
+		}
+		user->proto->Task = task;
+		user->proto->UserNumber = userNumber;
+		user->proto->_self = user->proto;
+		user->proto->_factory = factory;
+		user->protolock = user->proto->_protolock;
+
+		/*task->userPointer->push_back(user);
+		user->proto->self = task->userPointer->back()->proto;*/
+	}
+	return user;
 }
 
 t_handle_user* get_userAll_front(t_task_config* task, size_t* usersize)
@@ -333,32 +365,33 @@ void update_user_time_clock(ReplayProtocol* proto)
 	}
 }
 
-HMESSAGE task_get_next_message(ReplayProtocol* proto)
+HMESSAGE task_get_next_message(ReplayProtocol* proto, bool fast)
 {
 	HMsgPointer pointer = &(proto->MsgPointer);
 	t_task_config* task = proto->Task;
 	if (pointer->index < task->messageList->size())
 	{
 		t_message_data* msg = (*(task->messageList))[pointer->index];
-		if (msg->type == TYPE_REINIT)
-		{
-			memset(pointer, 0, sizeof(MsgPointer));
-			if (msg->isloop == FALSE)
-				proto->SelfDead = TRUE;
-			return msg;
-		}
 		UINT64 nowtime = GetSysTimeMicros();
 		if (pointer->start_real == 0)
 		{
 			pointer->start_record = msg->recordtime;
 			pointer->start_real = nowtime;
 		}
-		UINT64 shouldtime = msg->recordtime - pointer->start_record;
-		UINT64 realtime = nowtime - pointer->start_real;
-		if (realtime < shouldtime)
-			return NULL;
+		if (fast)
+		{
+			pointer->last = nowtime;
+			pointer->start_real = nowtime - (msg->recordtime - pointer->start_record);
+		}
+		else
+		{
+			UINT64 shouldtime = msg->recordtime - pointer->start_record;
+			UINT64 realtime = nowtime - pointer->start_real;
+			if (realtime < shouldtime)
+				return NULL;
+			pointer->last = nowtime;
+		}
 		pointer->index += 1;
-		pointer->last = nowtime;
 		return msg;
 	}
 	return NULL;
@@ -380,9 +413,10 @@ bool TaskUserDead(ReplayProtocol* proto, const char* fmt, ...)
 {
 	proto->SelfDead = TRUE;
 
-	t_task_error* err = (t_task_error*)GlobalAlloc(GPTR, sizeof(t_task_error));
+	t_task_error* err = (t_task_error*)malloc(sizeof(t_task_error));
 	if (err == NULL)
 		return false;
+	memset(err, 0, sizeof(t_task_error));
 	t_task_config* task = proto->Task;
 	err->taskID = task->taskID;
 	err->taskErrId = 1;
@@ -416,7 +450,7 @@ t_task_error* get_task_error_front()
 
 void delete_task_error(t_task_error* error)
 {
-	GlobalFree(error);
+	free(error);
 }
 
 void TaskLog(t_task_config* task, uint8_t level, const char* fmt, ...)

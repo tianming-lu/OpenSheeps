@@ -21,14 +21,14 @@ public:
 
 
 public:
-	bool ConnectionMade(HSOCKET sock, const char* ip, int port);
-	bool ConnectionFailed(HSOCKET sock, const char* ip, int port);
-	bool ConnectionClosed(HSOCKET sock, const char* ip, int port);
-	int	 Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len);
+	void ConnectionMade(HSOCKET sock, const char* ip, int port);
+	void ConnectionFailed(HSOCKET sock, const char* ip, int port);
+	void ConnectionClosed(HSOCKET sock, const char* ip, int port);
+	void Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len);
 	int	 Loop();
 	int  Destroy();
 
 	bool ReportError();
-	int  CheckReq(HSOCKET sock, const char* data, int len);
+	void CheckReq(HSOCKET sock, const char* data, int len);
 	int  CheckRequest(HSOCKET sock, const char* data, int len);
 };

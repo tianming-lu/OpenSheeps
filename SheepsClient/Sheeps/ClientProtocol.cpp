@@ -17,7 +17,7 @@ StressProtocol::~StressProtocol()
 
 
 //固有函数，继承自基类
-bool StressProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
+void StressProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 {
 	LOG(clogId, LOG_DEBUG, "stress server connection made：[%s:%d]\r\n", ip, port);
 	StressHsocket = hsock;
@@ -38,27 +38,24 @@ bool StressProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 	//send(sock, buf, len + 8, 0);
 
 	subfactory = this->_factory;
-	return true;
 }
 
-bool StressProtocol::ConnectionFailed(HSOCKET sock, const char* ip, int port)
+void StressProtocol::ConnectionFailed(HSOCKET sock, const char* ip, int port)
 {
 	//UDPLOG("stress server connection failed:[%s:%d]\n", ip, port);
 	//LOG(logId, LOG_DEBUG, "stress server connection failed:[%s:%d]\r\n", ip, port);
 	this->StressHsocket = NULL;
-	return true;
 }
 
-bool StressProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
+void StressProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
 {
 	LOG(clogId, LOG_DEBUG, "stress server connection closed：[%s:%d] socket = %lld\r\n", ip, port, hsock->sock);
 	this->StressHsocket = NULL;
 	/*if (this->SelfDead == TRUE)
 		IOCPDestroyProto(this);*/
-	return true;
 }
 
-int StressProtocol::Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len)
+void StressProtocol::Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len)
 {
 	return this->CheckReq(hsock, data, len);
 }
@@ -109,7 +106,7 @@ bool StressProtocol::ReportError()
 	return true;
 }
 
-int StressProtocol::CheckReq(HSOCKET sock, const char* data, int len)
+void StressProtocol::CheckReq(HSOCKET sock, const char* data, int len)
 {
 	this->recvBuff += std::string(data, len);
 	int clen = 0;
@@ -118,10 +115,8 @@ int StressProtocol::CheckReq(HSOCKET sock, const char* data, int len)
 		clen = this->CheckRequest(sock, this->recvBuff.c_str(), (int)this->recvBuff.size());
 		if (clen > 0)
 			this->recvBuff = this->recvBuff.substr(clen);
-		else if (clen == 0)
-			return RECV;
 		else
-			return CLOSE;
+			return;
 	}
 }
 
@@ -130,13 +125,15 @@ int StressProtocol::CheckRequest(HSOCKET sock, const char* data, int len)
 	if (len < sizeof(t_stress_protocol_head))
 		return 0;
 	t_stress_protocol_head head;
-	::memcpy(&head, data, sizeof(t_stress_protocol_head));
+	memcpy(&head, data, sizeof(t_stress_protocol_head));
 	if (len < head.msgLen)
 		return 0;
-	char* body = (char*)GlobalAlloc(GPTR, head.msgLen - sizeof(t_stress_protocol_head) + 1);
+	int clen = head.msgLen - sizeof(t_stress_protocol_head);
+	char* body = (char*)malloc(clen + 1);
 	if (body == NULL)
 		return -1;
-	::memcpy(body, data + sizeof(t_stress_protocol_head), head.msgLen - sizeof(t_stress_protocol_head));
+	memset(body, 0, clen);
+	memcpy(body, data + sizeof(t_stress_protocol_head), clen);
 	LOG(clogId, LOG_TRACE, "stress client recv [%d %d:%s]\r\n", head.msgLen, head.cmdNo, body);
 
 	cJSON * root = cJSON_Parse(body);
@@ -146,7 +143,7 @@ int StressProtocol::CheckRequest(HSOCKET sock, const char* data, int len)
 		return -1;
 	}
 	do_client_func_by_cmd(sock, head.cmdNo, root);
-	GlobalFree(body);
+	free(body);
 	cJSON_Delete(root);
 	return head.msgLen;
 }

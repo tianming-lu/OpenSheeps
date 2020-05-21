@@ -26,20 +26,17 @@ public:
 
 public:
 	void ProtoInit();
-	bool ConnectionMade(HSOCKET hsock, const char* ip, int port);
-	bool ConnectionFailed(HSOCKET hsock, const char* ip, int port);
-	bool ConnectionClosed(HSOCKET hsock, const char* ip, int port);
-	int  Send(HSOCKET hsock, char* ip, int port, char* data, int len);
-	int  Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len);
-	int  TimeOut();
-	int	 Event(uint8_t event_type, const char* ip, int port, const char* content, int clen);
-	int	 ReInit();
-	int  Destroy();
+	void ConnectionMade(HSOCKET hsock, const char* ip, int port);
+	void ConnectionFailed(HSOCKET hsock, const char* ip, int port);
+	void ConnectionClosed(HSOCKET hsock, const char* ip, int port);
+	void Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len);
+	void TimeOut();
+	void Event(uint8_t event_type, const char* ip, int port, const char* content, int clen);
+	void ReInit();
+	void Destroy();
 
 	HSOCKET* GetScokFromConnection(const char* ip, int port);
 	bool CloseAllConnection();
-	int CheckReq(SOCKET sock, const char* data, int len);
-	int CheckRequest(SOCKET sock, char* data, int len);
 };
 
 #ifdef __cplusplus

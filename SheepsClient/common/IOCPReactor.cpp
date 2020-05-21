@@ -324,10 +324,10 @@ static bool ProcessIO(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 	{
 		if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
 		{
-			int ret = CLOSE;
+			int ret = RECV;
 			IocpSock->userlock->lock();
 			if (IocpSock->sock != INVALID_SOCKET && *(IocpSock->user) != NULL)
-				ret = (*(IocpSock->user))->Recv(IocpSock, IocpSock->IP, IocpSock->PORT, IocpBuff->recv_buffer, IocpBuff->buffer_len);
+				(*(IocpSock->user))->Recved(IocpSock, IocpSock->IP, IocpSock->PORT, IocpBuff->recv_buffer, IocpBuff->buffer_len);
 			IocpSock->userlock->unlock();
 			switch (ret)
 			{
