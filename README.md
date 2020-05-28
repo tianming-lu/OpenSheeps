@@ -55,7 +55,7 @@ public:
 	HTASKCFG	Task = NULL;    /*压测任务句柄*/
 	uint16_t	UserNumber = 0;    /*用户编号，同一个任务中的用户编号唯一，从0递增，一般用于分配用户账号*/
 	bool		SelfDead = false;    /*用户死亡标识，为true时，TaskManager会将该用户移出队列*/
-	bool		PlayPause = false;    /*回放标识，为true时暂停回放，TaskManager不会调用用户成员函数Event*/
+	uint8_t		PlayState = PLAY_NORMAL;    /*回放模式，PLAY_NORMAL正常，PLAY_FAST快进，为PLAY_PAUSE时暂停回放，TaskManager不会调用用户成员函数Event*/
 	MsgPointer	MsgPointer = { 0x0 };    /*回放消息坐标，一般情况下不需要主动修改其中的值*/
 
 public:
@@ -63,7 +63,7 @@ public:
 	virtual bool ConnectionMade(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接成功调用此成员函数*/
 	virtual bool ConnectionFailed(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接失败调用此成员函数*/
 	virtual bool ConnectionClosed(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接关闭调用此成员函数*/
-	virtual int  Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;    /*IOManager通知又连接接收到消息调用此成员函数*/
+	virtual int  Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;    /*IOManager通知有连接接收到消息调用此成员函数*/
 	virtual int  Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;    /*TaskManager调用此成员函数，通知压测用户处理网络事件，分别为打开网络连接，关闭网络连接，发送消息*/ 
         virtual int  TimeOut() = 0;    /*TaskManager无事件通知压测用户时会重复调用此函数*/
 	virtual int  ReInit() = 0;    /*TaskManager重置用户状态调用*/
