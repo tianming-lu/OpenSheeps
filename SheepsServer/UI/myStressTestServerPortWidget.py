@@ -58,6 +58,7 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
         self.tableWidget_recordlists.customContextMenuRequested.connect(self.tableWidget_recordlists_right_clicked)
         self.pushButton_stressClientRun.clicked.connect(self.pushButton_stressClientRun_clicked)
         self.comboBox_loglevel.currentIndexChanged.connect(self.set_client_task_loglevel)
+        self.pushButton_CleanUserReport.clicked.connect(self.pushButton_CleanUserReport_clicked)
 
 
     def init_ui_content(self):
@@ -79,6 +80,9 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
         self.tableWidget_Tasks.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tableWidget_Tasks.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         pass
+
+    def pushButton_CleanUserReport_clicked(self):
+        self.textEdit_UserReport.clear()
 
     def pushButton_stressClientRun_clicked(self):
         if self.pushButton_stressClientRun.text() == '启动本地受控端':
@@ -147,31 +151,11 @@ class Form_StressTestServerPort(QWidget, Ui_Form_StressTestServerPort):
         # pass
 
     def refrushTaskMonitor(self):
-        row = self.tableWidget_Tasks.currentRow()
-        if row < 0:
-            return
-        taskid = self.tableWidget_Tasks.item(row, 0).text()
-        if taskid != self.selectTaskid:
-            self.label_errconnect.setText("0")
-            self.label_timeout.setText("0")
-            self.label_errtotal.setText("0")
-        self.selectTaskid = taskid
-        task = None
-        if f"{taskid}" in StressTasks.keys():
-            task = StressTasks[f"{taskid}"]
-        if task == None:
-            return
-        errtotal = 0
-        for i in task.Err.keys():
-            errobj = task.Err[i]
-            errcount = len(errobj.ErrList)
-            errtotal += errcount
-            if int(i) == 1:
-                self.label_errconnect.setText(f"{errcount}")
-            if int(i) == 2:
-                self.label_timeout.setText(f"{errcount}")
-        self.label_errtotal.setText(f"{errtotal}")
-        pass
+        while len(StressReport) > 0:
+            rtime, taskid, userid, detail = StressReport[0]
+            del StressReport[0]
+            content = f"时间：{rtime} 任务：{taskid} 用户：{userid} 详细：{detail}"
+            self.textEdit_UserReport.append(content)
 
     def refrushProxyClients(self, clients):
         if len(clients) == 0:

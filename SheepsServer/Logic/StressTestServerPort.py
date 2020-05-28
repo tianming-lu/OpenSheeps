@@ -13,6 +13,7 @@ ProxyClients = {}
 StressClients = {}
 StressTaskConfigs = {}
 StressTasks = {}
+StressReport = []
 
 ConfigIdIndex = 1
 class StressTaskConfig():
@@ -48,7 +49,6 @@ class StressTask():
         self.loopModel = config.loopModel
         self.TaskState = 0  # 0未初始化  1初始化完成 2
         self.TaskTempMsg = []
-        self.Err = {}
 
 class ServerProtocol(BaseProtocol):
     def __init__(self, server):
@@ -74,6 +74,19 @@ class ServerProtocol(BaseProtocol):
             self.fd = self.conn.fileno()
             self.PeerAddr = ip
             self.PeerPort = port
+        if self.ClientType == 2:
+            print("proxy conn")
+            if StressRecord == True:
+                StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 0, ''))
+            replay = b'\x05\x00\x00\x01'
+            if self.proxyCmd == 0x01:
+                loaddr = self.conn.getsockname()
+                replay += socket.inet_aton(loaddr[0]) + struct.pack(">H", loaddr[1])
+
+            self.Send(self.conn, replay)
+            ProxyClients[f'{self.fd}'] = (self.fd, self.proxyAddr, self.proxyPort)
+            self.ServerState = 2
+
 
     def ConnectionClosed(self, conn):
         if self.ClientType == 1:
@@ -83,7 +96,6 @@ class ServerProtocol(BaseProtocol):
                 del StressClients[f'{self.fd}']
         #proxy
         elif self.ClientType == 2 and self.ServerState == 2:
-            #print("ConnectionClosed", conn.fileno())
             if conn == self.conn:
                 if f'{self.fd}' in ProxyClients.keys():
                     del ProxyClients[f'{self.fd}']
@@ -97,7 +109,6 @@ class ServerProtocol(BaseProtocol):
                 self.service.close(self.conn, self)
 
     def Recv(self, conn, ip, port, data):
-        #print(ip, port, data)
         if self.ClientType == 0:
             self.auth(conn, data)
         elif self.ClientType == 1:
@@ -106,7 +117,6 @@ class ServerProtocol(BaseProtocol):
             self.ProxyRecv(conn, ip, port, data)
 
     def auth(self, conn, data):
-        # print('登录验证：',data[0])
         if data[0] == 5:
             self.ClientType = 2
             self.Send(conn, b'\x05\x00')
@@ -141,7 +151,6 @@ class ServerProtocol(BaseProtocol):
                     self.remoteproxy.sendto(todata, (self.proxyAddr, self.proxyPort))
                     if StressRecord == True:
                         StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 4, str(base64.standard_b64encode(todata), encoding='utf-8')))
-                    #print(ip, port, todata, toaddr, toport)
             elif conn == self.remoteproxy:
                 #print(ip, port, data)
                 self.remote.sendto(self.remoteproxy_data + data, (self.remoteproxy_addr, self.remoteproxy_port))
@@ -152,8 +161,6 @@ class ServerProtocol(BaseProtocol):
         # print("进行代理设置：")
         self.proxyVer = data[0]
         self.proxyCmd = data[1]
-        #if self.proxyCmd == 0x03:
-        #    print("proxy udp connect", data)
         self.proxyType = data[3]
         if self.proxyType == 0x01:
             self.proxyAddr = socket.inet_ntoa(data[4: len(data) - 2])
@@ -163,12 +170,12 @@ class ServerProtocol(BaseProtocol):
 
         if self.proxyCmd == 0x01:
             self.remote = self.service.TCPConnect(self.proxyAddr, self.proxyPort, self)
+            # return True 异步处理
             if StressRecord == True:
                 StressRecordMsg.append((self.proxyAddr, self.proxyPort, time.time(), 0, ''))
         elif self.proxyCmd == 0x03:
             self.remote = self.service.UDPConnect("0.0.0.0", 0, self)
             self.remoteproxy = self.service.UDPConnect("0.0.0.0", 0, self)
-            #print(self.remote.getsockname())
 
         replay = b'\x05\x00\x00\x01'
         if self.proxyCmd == 0x01:
@@ -209,7 +216,6 @@ class ServerProtocol(BaseProtocol):
         except:
             LOG(1, traceback.format_exc())
             return msglen
-        # print(msglen, cmdNo, body)
         self.StressRequest(conn, cmdNo, body)
         return msglen
 
@@ -243,7 +249,6 @@ class ServerProtocol(BaseProtocol):
                 item = {}
                 filename = os.path.join(root,file)
                 md5hash = self.getfilemd5(filename)
-                # print(filename, os.path.getsize(filename), md5hash)
                 item["File"] = filename
                 # item["file"] = base64.standard_b64encode(str(filename))
                 item["Size"] = os.path.getsize(filename)
@@ -252,7 +257,6 @@ class ServerProtocol(BaseProtocol):
         jsonroot["filelist"] = filelist
         data = bytes(str(jsonroot).replace('\'', '"'), encoding='utf-8')
         byte_msg = struct.pack(f'2I{len(data)}s', len(data) + 8, 9, data)
-        # print(byte_msg)
         self.Send(conn, byte_msg)
 
     def getfilemd5(self, file):
@@ -268,8 +272,6 @@ class ServerProtocol(BaseProtocol):
         offset = body.get("Offset")
         size = body.get("Size")
         self.StressSendFileData(conn, file, offset, size)
-        # th = threading.Thread(target=self.StressSendFileData, args=(file, offset, size))
-        # th.start()
 
     def StressSendFileData(self, conn, file, offset, size):
         file = file.replace('\\\\', '\\')
@@ -304,16 +306,10 @@ class ServerProtocol(BaseProtocol):
 
     def StressRequestCmdNo_13(self, conn, body):
         taskid = body.get("TaskID")
-        errid = body.get("ErrType")
-        task = StressTasks[f"{taskid}"]
-        if f"{errid}" not in  task.Err.keys():
-            task.Err[f"{errid}"] = TaskError(errid)
-        errobj = task.Err[f"{errid}"]
-        errobj.ErrList.append(body)
-        # print(errobj)
-
-    def StressSend(self, cmdNo, data):
-        pass
+        userid = body.get("UserID")
+        rtime = body.get("Timestamp")
+        detail = body.get("detail")
+        StressReport.append((rtime, taskid, userid, detail))
 
 
 class StressTestServerPort():
@@ -567,7 +563,6 @@ class StressTestServerPort():
         pass
 
 if __name__ == '__main__':
-    # del_old_stress_record_table()
     stsp = StressTestServerPort()
     stsp.start()
     stsp.RunInThread(stsp.SressRecordToDb, ())

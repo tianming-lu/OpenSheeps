@@ -89,20 +89,21 @@ bool StressProtocol::ReportError()
 {
 	if (this->StressHsocket == NULL)
 		return false;
-	t_task_error* err = get_task_error_front();
-	if (err == NULL)
-		return true;
-	char data[128] = { 0x0 };
-	int len = snprintf(data, sizeof(data), "{\"TaskID\":%d,\"ErrType\":%d,\"Timestamp\":%d,\"detail\":\"%s\"}", err->taskID, err->taskErrId, err->timestamp, err->errMsg);
-	t_stress_protocol_head head;
-	head.msgLen = sizeof(t_stress_protocol_head) + len;
-	head.cmdNo = 13;
-	char buf[256] = { 0x0 };
-	::memcpy(buf, (char*)& head, sizeof(t_stress_protocol_head));
-	::memcpy(buf + sizeof(t_stress_protocol_head), data, len);
-	IOCPPostSendEx(this->StressHsocket, buf, len+8);
-	//LOG("Report error %d %d", err->taskID, err->taskErrId);
-	delete_task_error(err);
+	t_task_error* err;
+	while (err = get_task_error_front())
+	{
+		char data[1024] = { 0x0 };
+		int len = snprintf(data, sizeof(data), "{\"TaskID\":%d,\"UserID\":%d,\"Timestamp\":%d,\"detail\":\"%s\"}", err->taskID, err->userID, err->timestamp, err->errMsg);
+		t_stress_protocol_head head;
+		head.msgLen = sizeof(t_stress_protocol_head) + len;
+		head.cmdNo = 13;
+		char buf[256] = { 0x0 };
+		::memcpy(buf, (char*)&head, sizeof(t_stress_protocol_head));
+		::memcpy(buf + sizeof(t_stress_protocol_head), data, len);
+		IOCPPostSendEx(this->StressHsocket, buf, len + 8);
+		//LOG("Report error %d %d", err->taskID, err->taskErrId);
+		delete_task_error(err);
+	}
 	return true;
 }
 

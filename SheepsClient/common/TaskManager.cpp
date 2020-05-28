@@ -419,7 +419,7 @@ bool TaskUserDead(ReplayProtocol* proto, const char* fmt, ...)
 	memset(err, 0, sizeof(t_task_error));
 	t_task_config* task = proto->Task;
 	err->taskID = task->taskID;
-	err->taskErrId = 1;
+	err->userID = proto->UserNumber;
 	int l = 0;
 #define REASON_LEN 512
 	char reason[REASON_LEN];

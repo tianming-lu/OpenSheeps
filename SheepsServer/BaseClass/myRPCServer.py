@@ -12,10 +12,9 @@ class MyRPCServer():
         self.Running = False
         self.RunningThread = 0
         self.MsgList = []
-        self.WorkerCount = 16
+        self.WorkerCount = 4
         for i in range(self.WorkerCount):
             self.MsgList.append([])
-        self.ProtocolList = {}
         self.sel = selectors.DefaultSelector()
 
     def RunForever(self):
@@ -42,7 +41,7 @@ class MyRPCServer():
         factory.listensock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         factory.listensock.bind(('0.0.0.0', factory.listen_port))
         factory.listensock.listen(10)
-        factory.listensock.setblocking(1)  # 设置socket的接口为非阻塞
+        factory.listensock.setblocking(1)  # 设置socket为阻塞模式
 
         factory.hsock = HandSocket()
         factory.hsock.sock = factory.listensock
@@ -57,45 +56,34 @@ class MyRPCServer():
             try:
                 events = self.sel.select(None)  # 检测所有的fileobj，是否有完成wait data的
             except:
-                print(traceback.format_exc())
+                # print(traceback.format_exc())
                 continue
             for sel_obj, event in events:
                 hsock = sel_obj.data
-                if hsock.nettype == 1:
-                    self.accept(sel_obj.fileobj, hsock)   # accpet
-                else:
+                # print(hsock.nettype, event, hsock.sock.fileno())
+                if hsock.nettype == 0:
                     self.read(sel_obj.fileobj, hsock, hsock.user)  # read
-            self.timeout()
-        self.ClearThread()
+                elif hsock.nettype == 1:
+                    self.accept(sel_obj.fileobj, hsock)   # accpet
+                elif hsock.nettype == 2:
+                    self.write(sel_obj.fileobj, hsock, hsock.user)
         self.RunningThread -= 1
 
     def WorkThread(self, number):
         msg_list = self.MsgList[number]
-        while True:
+        while self.Running:
             time.sleep(0.001)
             if len(msg_list) == 0:
                 continue
             type, protocol, conn, ip, port, data = msg_list[0]
             del msg_list[0]
-            if type == 0:
-                protocol.ConnectionMade(conn, ip, port)
-            elif type == 1:
+            if type == 1:
                 protocol.Recv(conn, ip, port, data)
+            elif type == 0:
+                protocol.ConnectionMade(conn, ip, port)
             elif type == 2:
                 protocol.ConnectionClosed(conn)
-        pass
-
-    def ClearThread(self):
-        self.sel.unregister(self.server_conn)
-        self.server_conn.close()
-        while True:
-            count = len(self.ProtocolList)
-            if count <= 0:
-                break
-            for protocol in self.ProtocolList.values():
-                self.close(protocol.conn, protocol)
-                break
-
+        msg_list.clear()
 
     def accept(self, listensock, listenhsock):
         try:
@@ -112,7 +100,6 @@ class MyRPCServer():
         hsock.user = protocol
         hsock.ip = addr[0]
         hsock.port = addr[1]
-        self.ProtocolList[f'{conn.fileno()}'] = protocol
         self.sel.register(conn, selectors.EVENT_READ, hsock)
 
         index = hash(protocol) % self.WorkerCount
@@ -126,14 +113,17 @@ class MyRPCServer():
         except:
             # print(0, traceback.format_exc())
             return
-        try:
-            del self.ProtocolList[f'{conn.fileno()}']
-        except:
-            pass
-
         index = hash(protocol) % self.WorkerCount
         self.MsgList[index].append((2, protocol, conn, None, None, None))
         conn.close()
+        pass
+
+    def write(self, conn, hsock, protocol):
+        print("do connex")
+        protocol.ConnectionMade(conn, hsock.ip, hsock.port)
+        hsock.sock.setblocking(1)
+        hsock.nettype = 0
+        self.sel.modify(hsock.sock, selectors.EVENT_READ, hsock)
         pass
 
     def read(self, conn, hsock, protocol):
@@ -160,48 +150,39 @@ class MyRPCServer():
     def TCPConnect(self, host, port, proto):
         conn = socket(AF_INET, SOCK_STREAM)
         conn.setblocking(1)
-        try:
-            # start = time.clock()
-            conn.connect((host, port))
-            #proto.ConnectionMade(conn, host, port)
 
-            hsock = HandSocket()
-            hsock.sock = conn
-            hsock.type = 1
-            hsock.user = proto
-            hsock.ip = host
-            hsock.port = port
-            self.ProtocolList[f'{conn.fileno()}'] = proto
-            self.sel.register(conn, selectors.EVENT_READ, hsock)
-            # end = time.clock()
-            # print(end - start)
-            return conn
+        hsock = HandSocket()
+        hsock.sock = conn
+        # hsock.nettype = 2
+        hsock.type = 1
+        hsock.user = proto
+        hsock.ip = host
+        hsock.port = port
+        try:
+            conn.connect_ex((host, port))
         except:
-            conn.close()
+            print(0, traceback.format_exc())
             return None
+        self.sel.register(conn, selectors.EVENT_READ, hsock)
+        return conn
 
     def UDPConnect(self, host, port, proto):
         conn = socket(AF_INET, SOCK_DGRAM)
         conn.setblocking(1)
         conn.bind((host, port))
-        #proto.ConnectionMade(conn, host, port)
 
         hsock = HandSocket()
         hsock.sock = conn
         hsock.type = 2
         hsock.user = proto
-        self.ProtocolList[f'{conn.fileno()}'] = proto
         self.sel.register(conn, selectors.EVENT_READ, hsock)
         return conn
-
-    def timeout(self):
-        pass
 
 
 class HandSocket():
     def __init__(self):
         self.sock = None
-        self.nettype = 0    #0 read  1 accept
+        self.nettype = 0    #0 read  1 accept 2 connectex
         self.type = 0    # 0未知 1TCP 2UDP 3BIND
         self.user = None
         self.ip = ''

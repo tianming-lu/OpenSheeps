@@ -45,7 +45,7 @@ typedef struct {
 		uint32_t port;
 		uint32_t isloop;
 	};
-	uint64_t	recordtime;		//微秒
+	uint64_t		recordtime;		//微秒
 	std::string		content;
 }t_message_data, *HMESSAGE;
 
@@ -66,10 +66,9 @@ typedef struct dllAPI
 typedef struct
 {
 	uint8_t		taskID;
-	uint8_t		taskErrId;
+	uint32_t	userID;
 	uint32_t	timestamp;
 	char		errMsg[64];
-
 }t_task_error;
 
 typedef struct
@@ -89,22 +88,22 @@ typedef struct {
 	uint16_t	userCount;
 	bool		ignoreErr;
 
-	uint8_t		workThreadCount;  //任务工作线程，所有线程退出后开始销毁任务
+	uint8_t			workThreadCount;  //任务工作线程，所有线程退出后开始销毁任务
 	std::mutex*		workThereaLock;
 
-	std::vector<t_message_data*> *messageList;    //任务消息缓存
-	bool		stopMessageCache;
+	std::vector<t_message_data*>*	messageList;    //任务消息缓存
+	bool							stopMessageCache;
 
 	//list<t_handle_user*>  *userPointer;
-	std::list<t_handle_user*> *userAll;			//运行任务中用户列表
-	std::mutex*		userAllLock;
-	std::list<t_handle_user*> *userDes;			//运行结束用户列表
-	std::mutex*		userDesLock;
+	std::list<t_handle_user*>*	userAll;			//运行任务中用户列表
+	std::mutex*					userAllLock;
+	std::list<t_handle_user*>*	userDes;			//运行结束用户列表
+	std::mutex*					userDesLock;
 
 	t_replay_dll dll;
 
-	std::list<t_task_error*> *taskErr;
-	std::mutex*		taskErrlock;
+	std::list<t_task_error*>*	taskErr;
+	std::mutex*					taskErrlock;
 }t_task_config, *HTASKCFG;
 
 class ReplayProtocol :
