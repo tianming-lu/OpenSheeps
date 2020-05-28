@@ -58,13 +58,13 @@ public:
 	bool		PlayPause = false;    /*回放标识，为true时暂停回放，TaskManager不会调用用户成员函数Event*/
 	MsgPointer	MsgPointer = { 0x0 };    /*回放消息坐标，一般情况下不需要主动修改其中的值*/
 
-public:const
+public:
 	virtual void ProtoInit() = 0;    /*当前压测用户初始化，TaskManager调用*/
 	virtual bool ConnectionMade(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接成功调用此成员函数*/
 	virtual bool ConnectionFailed(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接失败调用此成员函数*/
 	virtual bool ConnectionClosed(HSOCKET hsock, const char* ip, int port) = 0;    /*IOManager通知网络连接关闭调用此成员函数*/
 	virtual int  Recv(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;    /*IOManager通知又连接接收到消息调用此成员函数*/
-	virtual int  Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;    /*TaskManager调用此成员函数，通知压测用户处理网络事件，分别为打开网络连接，关闭网络连接，发送消息*/
+	virtual int  Event(uint8_t event_type, const char* ip, int port, const char* content, int clen) = 0;    /*TaskManager调用此成员函数，通知压测用户处理网络事件，分别为打开网络连接，关闭网络连接，发送消息*/ 
         virtual int  TimeOut() = 0;    /*TaskManager无事件通知压测用户时会重复调用此函数*/
 	virtual int  ReInit() = 0;    /*TaskManager重置用户状态调用*/
 	virtual int  Destroy() = 0;    /*TaskManager从队列中移除当前压测用户时调用*/
