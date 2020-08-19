@@ -53,7 +53,7 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
+    <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -99,6 +99,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WholeProgramOptimization>true</WholeProgramOptimization>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -107,6 +108,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>Sheeps.def</ModuleDefinitionFile>
+      <ShowProgress>NotSet</ShowProgress>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -168,24 +170,37 @@
   <ItemGroup>
     <ClInclude Include="ClientProtocol.h" />
     <ClInclude Include="ClientProtocolSub.h" />
-    <ClInclude Include="framework.h" />
+    <ClInclude Include="IOCPReactor.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="StressFactory.h" />
-    <ClInclude Include="StressMain.h" />
-    <ClInclude Include="StressStruct.h" />
+    <ClInclude Include="ServerConsole.h" />
+    <ClInclude Include="ServerProtocol.h" />
+    <ClInclude Include="ServerStress.h" />
+    <ClInclude Include="ServerProxy.h" />
+    <ClInclude Include="SheepsMemory.h" />
+    <ClInclude Include="SheepsFactory.h" />
+    <ClInclude Include="SheepsMain.h" />
+    <ClInclude Include="SheepsStruct.h" />
+    <ClInclude Include="TaskManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ClientProtocol.cpp" />
     <ClCompile Include="ClientProtocolSub.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="IOCPReactor.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="StressFactory.cpp" />
-    <ClCompile Include="StressMain.cpp" />
+    <ClCompile Include="ServerConsole.cpp" />
+    <ClCompile Include="ServerProtocol.cpp" />
+    <ClCompile Include="ServerStress.cpp" />
+    <ClCompile Include="ServerProxy.cpp" />
+    <ClCompile Include="SheepsFactory.cpp" />
+    <ClCompile Include="SheepsMain.cpp" />
+    <ClCompile Include="SheepsMemory.cpp" />
+    <ClCompile Include="TaskManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Sheeps.def" />

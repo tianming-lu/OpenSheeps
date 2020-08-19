@@ -2,9 +2,7 @@
 #include "io.h"
 #include "direct.h"
 #include "ClientProtocolSub.h"
-#include "./../common/TaskManager.h"
-#include "./../common/log.h"
-#include "./../common/mycrypto.h"
+#include "TaskManager.h"
 
 BaseFactory* subfactory = NULL;
 int clogId = -1;
@@ -14,11 +12,13 @@ std::map<std::string, t_file_info> updatefile, allfile, localfile;
 int ClientLogInit(const char *configfile)
 {
 	char file[128] = { 0x0 };
-	GetPrivateProfileStringA("LOG", "client_file", "./log/client.log", file, sizeof(file), configfile);
+	GetPrivateProfileStringA("LOG", "client_file", "client.log", file, sizeof(file), configfile);
+	char fullpath[256] = { 0x0 };
+	snprintf(fullpath, sizeof(fullpath), "%s\\%s", LogPath, file);
 	int loglevel = GetPrivateProfileIntA("LOG", "client_level", 0, configfile);
 	int maxsize = GetPrivateProfileIntA("LOG", "client_size", 20, configfile);
 	int timesplit = GetPrivateProfileIntA("LOG", "client_time", 3600, configfile);
-	clogId = RegisterLog(file, loglevel, maxsize, timesplit, 2);
+	clogId = RegisterLog(fullpath, loglevel, maxsize, timesplit, 5);
 	return 0;
 }
 
@@ -50,193 +50,32 @@ static int MsgSend(HSOCKET sock, int cmdNo, char* data, int len)
 	return 0;
 }
 
-static void ReInit(ReplayProtocol* proto, bool loop)
-{
-	if (loop)
-		proto->SelfDead = false;
-	else
-		proto->SelfDead = true;
-	proto->PlayState = PLAY_NORMAL;
-	proto->MsgPointer = { 0x0 };
-	proto->ReInit();
-}
-
-static void Loop(ReplayProtocol* proto)
-{
-	if (proto->PlayState == PLAY_PAUSE)		//播放暂停
-	{
-		proto->TimeOut();
-		update_user_time_clock(proto);
-		return;
-	}
-	HMESSAGE message = NULL;
-	if (proto->PlayState == PLAY_FAST)		//快进模式 or 正常播放模式
-		message = task_get_next_message(proto, true);	/*获取下一步用户需要处理的事件消息*/
-	else
-		message = task_get_next_message(proto, false);  
-	if (message == NULL)
-	{
-		proto->TimeOut();
-		return;
-	}
-	switch (message->type)
-	{
-	case TYPE_CONNECT: /*连接事件*/
-	case TYPE_CLOSE:	/*关闭连接事件*/
-	case TYPE_SEND:	/*向连接发送消息事件*/
-		proto->Event(message->type, message->ip.c_str(), message->port, message->content.c_str(), (int)message->content.size());
-		break;
-	case TYPE_REINIT:	/*用户重置事件，关闭所有连接，初始化用户资源*/
-		ReInit(proto, message->isloop);
-		break;
-	default:
-		break;
-	}
-	return;
-}
-
-DWORD WINAPI taskWorkerThread(LPVOID pParam)
-{
-	t_task_config* task = (t_task_config*)pParam;
-	changTask_work_thread(task, 1);
-	if (task->dll.threadinit)
-		task->dll.threadinit(task);
-
-	t_handle_user* user = NULL;
-	ReplayProtocol* proto = NULL;
-	size_t userAllSize = 0;
-	while (task->status < 4)   //任务运行中
-	{
-		for (int i = 0; i < 10; i++)
-		{
-			user = (t_handle_user*)get_userAll_front(task, &userAllSize);
-			if (user == NULL)
-				break;
-			proto = user->proto;
-			if (task->userCount < userAllSize)
-			{
-				user->protolock->lock();
-				proto->Destroy();
-				user->protolock->unlock();
-				add_to_userDes_tail(task, user);
-				continue;
-			}
-			
-			user->protolock->lock();
-			if (proto->SelfDead == TRUE)
-			{
-				if (task->ignoreErr)
-				{
-					ReInit(user->proto, true);
-					user->protolock->unlock();
-					add_to_userAll_tail(task, user);
-				}
-				else
-				{
-					proto->Destroy();
-					user->protolock->unlock();
-					LOG(clogId, LOG_DEBUG, "user destroy\r\n");
-					add_to_userDes_tail(task, user);
-				}
-				continue;
-			}
-			Loop(proto);
-			user->protolock->unlock();
-			add_to_userAll_tail(task, user);
-		}
-		Sleep(1);
-	}
-
-	while (task->status == 4)  //清理资源
-	{
-		user = (t_handle_user*)get_userAll_front(task, &userAllSize);
-		if (user == NULL)
-			break;
-		proto = user->proto;
-		user->protolock->lock();
-
-		proto->Destroy();
-
-		user->protolock->unlock();
-		add_to_userDes_tail(task, user);
-		Sleep(1);
-	}
-
-	if (task->dll.threaduninit)
-		task->dll.threaduninit(task);
-	changTask_work_thread(task, -1);
-	return 0;
-}
-
 int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* projectId = cJSON_GetObjectItem(root, "projectID");
-	cJSON* envid = cJSON_GetObjectItem(root, "EnvID");
+	cJSON* envId = cJSON_GetObjectItem(root, "EnvID");
 	cJSON* userCount = cJSON_GetObjectItem(root, "UserCount");
 	cJSON* machineId = cJSON_GetObjectItem(root, "MachineID");
 	cJSON* ignoreErr = cJSON_GetObjectItem(root, "IgnoreErr");
-	if (taskId == NULL || projectId == NULL ||envid == NULL || userCount == NULL || machineId == NULL ||
-		taskId->type != cJSON_Number || projectId->type != cJSON_Number || envid->type != cJSON_Number||
+	if (taskId == NULL || projectId == NULL ||envId == NULL || userCount == NULL || machineId == NULL ||
+		taskId->type != cJSON_Number || projectId->type != cJSON_Number || envId->type != cJSON_Number||
 		userCount->type != cJSON_Number || machineId->type != cJSON_Number)
 	{
 		MsgResponse(sock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 
-	int realTaskID = taskId->valueint;
-
-	t_task_config* task;
-	task = getTask_by_taskId(realTaskID);
-	if (task == NULL)
-	{
-		MsgResponse(sock, cmdNO, 2, "内存错误");
-		return -2;
-	}
-	
-	task->taskID = realTaskID;
-	task->projectID = projectId->valueint;
-	task->envID = envid->valueint;
-	task->machineID = machineId->valueint;
+	int taskid = taskId->valueint;
+	int projectid = projectId->valueint;
+	int envid = envId->valueint;
+	int machineid = machineId->valueint;
+	bool ignorerr = false;
 	if (ignoreErr != NULL && ignoreErr->type == cJSON_True)
-	task->ignoreErr = true;
+		ignorerr = true;
+	int usercount = userCount->valueint;
 
-	bool ret = dll_init(task, DllPath);
-	if (ret == false)
-	{
-		MsgResponse(sock, cmdNO, 3, "dll初始化错误");
-		LOG(clogId, LOG_DEBUG, "%s:%d project[%d] dll init filed!\r\n", __func__, __LINE__, task->projectID);
-		return -3;
-	}
-
-	uint16_t StartCount = task->userCount;
-	task->userCount += userCount->valueint;
-	t_handle_user* user = NULL;
-	for (int i = 0; i < userCount->valueint; i++)
-	{
-		bool isNew = false;
-		user = create_new_user(task, StartCount + i, sock->factory, isNew);
-		if (isNew)
-			user->proto->ProtoInit();
-		else
-			ReInit(user->proto, true);
-		add_to_userAll_tail(task, user);
-	}
-
-	SYSTEM_INFO sysInfor;
-	GetSystemInfo(&sysInfor);
-	for (unsigned int i = 0; i < sysInfor.dwNumberOfProcessors*2; i++)
-	//for (unsigned int i = 0; i < 1; i++)
-	{
-		HANDLE ThreadHandle;
-		ThreadHandle = CreateThread(NULL, 0, taskWorkerThread, task, 0, NULL);
-		if (NULL == ThreadHandle) {
-			LOG(clogId, LOG_ERROR, "%s-%d create thread failed!", __func__, __LINE__);
-			return false;
-		}
-		CloseHandle(ThreadHandle);
-	}
-	LOG(clogId, LOG_DEBUG, "task init taskid[%d], user[%d]  all[%d]\r\n", task->taskID, userCount->valueint, task->userCount);
+	create_new_task(taskid, projectid, machineid, ignorerr, usercount, sock->factory);
 	return 0;
 }
 
@@ -255,7 +94,7 @@ int client_cmd_3_task_connection_create(HSOCKET sock, int cmdNO, cJSON* root)
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
-	insertMessage_by_taskId(realTaskID, TYPE_CONNECT, ip->valuestring, port->valueint, NULL, timestamp->valueint, microsecond->valueint);
+	insert_message_by_taskId(realTaskID, TYPE_CONNECT, ip->valuestring, port->valueint, NULL, timestamp->valueint, microsecond->valueint, false);
 
 	return 0;
 }
@@ -275,8 +114,14 @@ int client_cmd_4_task_connection_send(HSOCKET sock, int cmdNO, cJSON* root)
 		MsgResponse(sock, cmdNO, 1, "参数错误");
 		return -1;
 	}
+
+	bool isudp = false;
+	cJSON* udp = cJSON_GetObjectItem(root, "Iotype");
+	if (udp != NULL)
+		isudp = true;
+
 	int realTaskID = taskId->valueint;
-	insertMessage_by_taskId(realTaskID, TYPE_SEND, ip->valuestring, port->valueint, content->valuestring, timestamp->valueint, microsecond->valueint);
+	insert_message_by_taskId(realTaskID, TYPE_SEND, ip->valuestring, port->valueint, content->valuestring, timestamp->valueint, microsecond->valueint, isudp);
 
 	return 0;
 }
@@ -296,7 +141,7 @@ int client_cmd_5_task_connection_close(HSOCKET sock, int cmdNO, cJSON* root)
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
-	insertMessage_by_taskId(realTaskID, TYPE_CLOSE, ip->valuestring, port->valueint, NULL, timestamp->valueint, microsecond->valueint);
+	insert_message_by_taskId(realTaskID, TYPE_CLOSE, ip->valuestring, port->valueint, NULL, timestamp->valueint, microsecond->valueint, false);
 
 	return 0;
 }
@@ -310,7 +155,7 @@ int client_cmd_6_task_finish(HSOCKET sock, int cmdNO, cJSON* root)
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
-	stopTask_by_taskId(realTaskID);
+	stop_task_by_id(realTaskID);
 	LOG(clogId, LOG_DEBUG, "task finish taskid[%d]\r\n", realTaskID);
 	return 0;
 }
@@ -325,37 +170,38 @@ int client_cmd_8_task_reinit(HSOCKET sock, int cmdNO, cJSON* root)
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
-	insertMessage_by_taskId(realTaskID, TYPE_REINIT, NULL, loop->valueint, NULL, 0, 0);
+	insert_message_by_taskId(realTaskID, TYPE_REINIT, NULL, loop->valueint, NULL, 0, 0, false);
 	LOG(clogId, LOG_DEBUG, "task reinit task[%d] flag[%d]\r\n", realTaskID, loop->valueint);
 	return 0;
 }
 
-void getFiles(std::string path, std::map<std::string, t_file_info>* files)
+void getFiles(char* path, std::map<std::string, t_file_info>* files)
 {
 	intptr_t hFile = 0;
 	struct _finddata_t fileinfo;
-	std::string p;
-	if ((hFile = _findfirst(p.assign(path).append("\\*").c_str(), &fileinfo)) != -1)
+	
+	char allfile[256] = { 0x0 };
+	snprintf(allfile, sizeof(allfile), "%s\\*", path);
+
+	char fullpath[256] = { 0x0 };
+
+	if ((hFile = _findfirst(allfile, &fileinfo)) != -1)
 	{
 		do
 		{
+			memset(fullpath, 0, sizeof(fullpath));
+			snprintf(fullpath, sizeof(fullpath), "%s\\%s", path, fileinfo.name);
 			if ((fileinfo.attrib & _A_SUBDIR))
 			{
 				if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0)
-					getFiles(p.assign(path).append(fileinfo.name), files);
+					getFiles(fullpath, files);
 			}
 			else
 			{
-				if (std::string(path).compare(std::string(DllPath)) != 0 && path.find("log") == std::string::npos)
-				{
-					std::string fullpath = std::string(path + "\\" + fileinfo.name);
-					char md5[64] = { 0x0 };
-					getfilemd5view(fullpath.c_str(), (unsigned char*)md5, sizeof(md5));
-					t_file_info info;
-					info.fmd5 = std::string(md5);
-					files->insert(std::pair<std::string, t_file_info>(fullpath, info));
-					//LOG(clogId, LOG_DEBUG, "%s \r\n", fullpath.c_str());
-				}
+				t_file_info info = { 0x0 };
+				getfilemd5view(fullpath, (unsigned char*)info.fmd5, sizeof(info.fmd5));
+
+				files->insert(std::pair<std::string, t_file_info>(fullpath, info));
 			}
 		} while (_findnext(hFile, &fileinfo) == 0);
 		_findclose(hFile);
@@ -402,9 +248,11 @@ int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
 	allfile.clear();
 	localfile.clear();
 	
-	getFiles(DllPath, &localfile);
+	getFiles(ProjectPath, &localfile);
 
 	std::map<std::string, t_file_info>::iterator it, iter;
+
+	char fullpath[256] = { 0x0 };
 	int size = cJSON_GetArraySize(files);
 	for (int i = 0; i < size; i++)
 	{
@@ -419,25 +267,24 @@ int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
 			continue;
 		}
 		
-		t_file_info finfo;
+		t_file_info finfo = { 0x0 };
 		memset(&finfo, 0, sizeof(t_file_info));
-		finfo.fmd5 = std::string(fmd5->valuestring);
+		snprintf(finfo.fmd5, sizeof(finfo.fmd5), fmd5->valuestring);
 		finfo.size = size->valueint;
 
 		char* p = strchr(file->valuestring, '\\');
 		if (p == NULL)
 			continue;
-		/*p = strchr(p + 1, '\\');
-		if (p == NULL)
-			continue;*/
-		std::string fullpath = std::string(DllPath) + std::string(p+1);
+		
+		memset(fullpath, 0, sizeof(fullpath));
+		snprintf(fullpath, sizeof(fullpath), "%s%s", DllPath, p + 1);
 
-		allfile.insert(std::pair<std::string, t_file_info>(std::string(fullpath), finfo));
+		allfile.insert(std::pair<std::string, t_file_info>(fullpath, finfo));
 
 		it = localfile.find(fullpath);
 		if (it != localfile.end())
 		{
-			if (it->second.fmd5.compare(std::string(fmd5->valuestring)) == 0)
+			if (strcmp(it->second.fmd5, fmd5->valuestring) == 0)
 			{
 				continue;
 			}
@@ -521,18 +368,14 @@ int client_cmd_10_download_file(HSOCKET sock, int cmdNO, cJSON* root)
 		LOG(clogId, LOG_ERROR, "%s:%d file path error\r\n", __func__, __LINE__);
 		return -1;
 	}
-	/*p = strchr(p + 1, '\\');
-	if (p == NULL)
-	{
-		LOG(clogId, LOG_ERROR, "%s:%d file path error\r\n", __func__, __LINE__);
-		return -1;
-	}*/
-	std::string fullpath = std::string(DllPath) + std::string(p + 1);
+
+	char fullpath[256] = { 0x0 };
+	snprintf(fullpath, sizeof(fullpath), "%s%s", DllPath, p + 1);
 
 	if (itt->second.file == NULL)
 	{
-		CreateFileDirectory(fullpath.c_str());
-		int ret = fopen_s(&itt->second.file, fullpath.c_str(), "wb");
+		CreateFileDirectory(fullpath);
+		int ret = fopen_s(&itt->second.file, fullpath, "wb");
 		if (ret != 0)
 		{
 			LOG(clogId, LOG_ERROR, "%s:%d open file error\r\n", __func__, __LINE__);
@@ -563,42 +406,22 @@ int client_cmd_12_task_change_user_count(HSOCKET sock, int cmdNO, cJSON* root)
 		return -1;
 	}
 
-	t_task_config* task;
-	task = getTask_by_taskId(taskId->valueint);
-	if (task == NULL)
-	{
-		MsgResponse(sock, cmdNO, 2, "内存错误");
-		return -2;
-	}
-
-	uint16_t StartCount = task->userCount;
-	task->userCount += change->valueint;
-	t_handle_user* user = NULL;
-	for (int i = 0; i < change->valueint; i++)
-	{
-		bool isNew = false;
-		user = create_new_user(task, StartCount + i, sock->factory, isNew);
-		if (isNew)
-			user->proto->ProtoInit();
-		else
-			ReInit(user->proto, true);
-		add_to_userAll_tail(task, user);
-	}
+	task_add_user_by_taskid(taskId->valueint, change->valueint, sock->factory);
 	
 	MsgResponse(sock, cmdNO, 0, "OK");
-	LOG(clogId, LOG_DEBUG, "task add taskid[%d], user[%d]  all[%d]\r\n", task->taskID, change->valueint, task->userCount);
 	return 0;
 }
 
 int client_cmd_14_charge_task_loglevel(HSOCKET sock, int cmdNO, cJSON* root)
 {
 	cJSON* loglevel = cJSON_GetObjectItem(root, "LogLevel");
-	if (loglevel == NULL || loglevel->type != cJSON_Number)
+	cJSON* taskid = cJSON_GetObjectItem(root, "TaskID");
+	if (loglevel == NULL || taskid == NULL || loglevel->type != cJSON_Number || taskid->type != cJSON_Number)
 	{
 		MsgResponse(sock, cmdNO, 1, "参数错误");
 		return -1;
 	}
-	set_task_log_level(loglevel->valueint);
+	set_task_log_level(loglevel->valueint, taskid->valueint);
 	MsgResponse(sock, cmdNO, 0, "OK");
 	return 0;
 }

@@ -1,0 +1,508 @@
+<html>
+    <head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>控制台</title>
+        <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    </head>
+    <body bgcolor="#E1FFFF">
+        <header><h1>Sheeps压力测试系统管理后台</h1></header><br>
+        <nav><a class="nav" id="task" href="javascript:void(null);">任务管理</a> | <a class="nav" id="record" href="javascript:void(null);">录制管理</a> | <a class="nav" id="proxy" href="javascript:void(null);">代理列表</a> | <a class="nav" id="agent" href="javascript:void(null);">负载端列表</a></nav><br>
+        <content>
+            <table width="100%">
+                <tr bgcolor="#FFA07A"><td><bhead><!--bhead--></bhead></td></tr>
+                <tr bgcolor="#87CEEB">
+                    <td>
+                        <table id="list"><!--list--></table>
+                    </td>
+                </tr>
+            </table>
+        </content>
+    </body>
+<script>
+$.get_host = function(){if (window.location.href.substring(0,4) == "file"){return "http://127.0.0.1:1080";}return ".";};
+
+$(document).ready(function(){
+  var sData = window.location.search;
+  sData = sData.replace('?', '');
+  nav_click(sData);
+  $(".nav").click(function(){
+    $("bhead").empty();
+    $("#list").empty();
+    nav_id = $(this).attr("id");
+    nav_click(nav_id);
+  });
+  function nav_click(nav_id){
+    if (nav_id == "task"){
+        click_nav_task();
+    }
+    else if (nav_id == "record"){
+        click_nav_record();
+    }
+    else if (nav_id == "proxy"){
+        click_nav_proxy();
+    }
+    else if (nav_id == "agent"){
+        click_nav_agent();
+    }
+    else{
+      click_nav_task();
+    }
+    history.replaceState(null, "",'?'+nav_id);
+  }
+
+  function click_nav_task(){
+    $("bhead").append("此处管理压力测试任务，添加、删除、增减任务人数、开启或停止。</br></br>")
+    $("bhead").append('说明：<input id="des" type="text"></br>')
+    $("bhead").append('项目：<select id="project">\
+      <option value ="0">默认</option>\
+      <option value ="1">召唤之地</option>\
+      <option value ="2">神之猎场</option>\
+      <option value ="3">次元对决</option>\
+    </select></br>');
+    $("bhead").append('人数：<input id="total_user" type="text" style="width:65;height:22">&emsp;');
+    $("bhead").append('单次：<input id="once_user" type="text" style="width:60">&emsp;');
+    $("bhead").append('间隔：<input id="space_time" type="text" style="width:60"></br>');
+    $("bhead").append('循环：<select id="loop">\
+      <option value ="0">是</option>\
+      <option value ="1">否</option>\
+      <option value ="2">实时回放</option>\
+    </select><input id="ignor_err" type="checkbox" value="">忽略错误</br>');
+    $("bhead").append('文件：<select id="db_file"></select></br>');
+    $("bhead").append('回放端口：<table id="replay"></table>');
+    $("bhead").append('</br><a id="add_task" href="javascript:void(null);">添加任务</a>');
+    show_task_select_dbfile_change();
+    show_task_select_dbfile();
+    show_task_add();
+    show_task_flush();
+  }
+
+  function show_task_select_dbfile(){
+    $.ajax({
+      type: "post",
+      url: $.get_host() + "/api/db_list",
+      data: JSON.stringify({}),
+      dataType: "json",
+      success: function(content){
+        array = content.data;
+        if (array.length == 0){
+          return;
+        }
+        for (i = 0; i < array.length; i++){
+          item = array[i];
+          var row = '<option value ="'+ item+'">'+item+'</option>'
+          $("#db_file").append(row);
+        }
+        show_task_select_dbfile_record($("#db_file").val());
+      }
+    });
+  }
+
+  function show_task_select_dbfile_change(){
+    $("#db_file").change(function(){
+      $("#replay").empty();
+      show_task_select_dbfile_record($("#db_file").val());
+    });
+  }
+
+  function show_task_select_dbfile_record(dbfile){
+    $.ajax({
+      type: "post",
+      url: $.get_host() + "/api/record_list",
+      data: JSON.stringify({"db_file":dbfile}),
+      dataType: "json",
+      success: function(content){
+        array = content.data;
+        if (array.length == 0){
+          return;
+        }
+        for (i = 0; i < array.length; i++){
+          item = array[i];
+          var row = '<tr><td><input class="replay_addr" type="checkbox" value="'+i+'"><a id="replay_src'+i+'">'+item.addr+'</a></td><td>-><input id="replay_dst'+i+'" type="text"></td></tr>'
+          $("#replay").append(row);
+        }
+      }
+    });
+  }
+
+  function show_task_add(){
+    $("#add_task").click(function(){
+      var des = $("#des").val();
+      var projectid = Number($("#project").val());
+      var total_user = Number($("#total_user").val());
+      var once_user = Number($("#once_user").val());
+      var space_time = Number($("#space_time").val());
+      var loop = Number($("#loop").val());
+      var ignor_err = Number($("#ignor_err").prop("checked"));
+      var db_file = $("#db_file").val();
+      if (total_user == 0 || isNaN(total_user) || once_user == 0 || isNaN(once_user)||space_time == 0 || isNaN(space_time)){
+        return;
+      }
+      var jsondata = {"des":des,"project_id":projectid,"env_id":0,"total_user":total_user,"once_user":once_user,"space_time":space_time,"loop_mode":loop,"ignor_error":ignor_err,"db_file":db_file};
+      jsondata["replay"] = [];
+      $(".replay_addr:checked").each(function(index, item){
+        var reitem = {"src": $("#replay_src"+$(this).val()).text()};
+        var dst = $("#replay_dst" + $(this).val()).val();
+        dst = dst.replace(/\s*/g, '');
+        if (dst != ""){
+          reitem["dst"] = dst;
+        }
+        jsondata["replay"].push(reitem);
+      });
+      $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/task_create",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
+      show_task_flush();
+    });
+  }
+
+  function show_task_flush(){
+    $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/task_list",
+        data: JSON.stringify({}),
+        dataType: "json",
+        success: show_task_list
+    });
+  }
+
+  function show_task_list(content){
+    $("#list").empty();
+    var head = "<thead><tr><td>编号</td><td>状态</td><td>说明</td></tr></thead>";
+    $("#list").append(head);
+    array = content.data;
+    if (array.length == 0){
+      return;
+    }
+    for (i = 0; i < array.length; i++){
+      item = array[i];
+      var state_text = "未开始";
+      if (item.state == 1){state_text = "运行中";}
+      else if(item.state == 2){state_text = "停止";}
+      var runing = item.state==1?"停止":"开始";
+
+      var row = "<tr><td>"+item.task_id+"</td><td>"+ state_text +"</td><td width=\"300\">"+item.des+"</td>\
+      <td width=\"80\"><a class=\"task_start\" href=\"javascript:void(null);\">"+ runing +"</a></td>\
+      <td width=\"200\"><input type=\"text\" style=\"width:60\"><a class=\"task_user\" href=\"javascript:void(null);\">增减人数</a></td>\
+      <td><a class=\"task_delete\" href=\"javascript:void(null);\">删除</a></td></tr>"
+      $("#list").append(row);
+    }
+    show_task_list_select();
+    show_task_start();
+    show_task_user();
+    show_task_delete();
+  }
+
+  function show_task_list_select(){
+    $("#list td").click(function () {
+      var tdSeq = $(this).parent().find("td").index($(this));
+      console.log(tdSeq);
+      if (tdSeq > 2 ) return;
+      var trSeq = $(this).parent().parent().find("tr").index($(this).parent());
+      var task_id = Number($("#list tr:gt(0):eq("+trSeq+") td:eq(0)").text());
+      var jsondata = {"task_id":task_id};
+      $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/task_info",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: function(content){
+          info = content.data;
+          $("#des").val(info.des);
+          $("#project").val(info.project_id);
+          $("#total_user").val(info.total_user);
+          $("#once_user").val(info.once_user);
+          $("#space_time").val(info.space_time);
+          $("#loop").val(info.loop_mode);
+          $("#ignor_err").prop("checked",info.ignor_error);
+          $("#db_file").val(info.db_file);
+          $("#replay").empty();
+          for (i = 0; i < info.replay.length; i++){
+            item = info.replay[i];
+            var row = '<tr><td><input class="replay_addr" type="checkbox" value="'+i+'" checked><a id="replay_src'+i+'">'+item.src+'</a></td><td>-><input id="replay_dst'+i+'" type="text" value="'+item.dst+'"></td></tr>'
+            $("#replay").append(row);
+        }
+        }
+      });
+    });
+  }
+
+  function show_task_start(){
+    $(".task_start").click(function(){
+      var trSeq = $(this).parent().parent().parent().find("tr").index($(this).parent().parent());
+      var api = "";
+      if ($(this).text() == "开始"){
+        $(this).text("停止");
+        $(this).parent().prev().prev().text("运行中");
+        api = "/api/task_run"
+      }
+      else{
+        $(this).text("开始");
+        $(this).parent().prev().prev().text("停止");
+        api="/api/task_stop";
+      }
+      var task_id = Number($("#list tr:gt(0):eq("+trSeq+") td:eq(0)").text());
+      var jsondata = {"task_id":task_id};
+      $.ajax({
+        type: "post",
+        url: $.get_host() + api,
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
+      
+    });
+  }
+
+  function show_task_user(){
+    $(".task_user").click(function(){
+      var trSeq = $(this).parent().parent().parent().find("tr").index($(this).parent().parent());
+      var task_id = Number($("#list tr:gt(0):eq("+trSeq+") td:eq(0)").text());
+      var user_connt = Number($(this).prev().val());
+      if (user_connt ==0 || isNaN(user_connt)){return;}
+      var jsondata = {"task_id":task_id,"user_count":user_connt};
+      $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/task_user",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
+      show_task_flush();
+    });
+  }
+
+  function show_task_delete(){
+    $(".task_delete").click(function(){
+      var trSeq = $(this).parent().parent().parent().find("tr").index($(this).parent().parent());
+      var task_id = Number($("#list tr:gt(0):eq("+trSeq+") td:eq(0)").text());
+      var jsondata = {"task_id":task_id};
+      $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/task_delete",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
+      show_task_flush();
+    });
+  }
+
+  function click_nav_record(){
+    show_record_bhead();
+    show_record_db_flush();
+  }
+
+  function show_record_bhead(){
+    $("bhead").append("此处管理控制端录制数据包功能，开启或关闭；并且提供简单的录制文件管理。</br></br>")
+    $("bhead").append('录制协议:&nbsp;&nbsp;<a id="record_flag" href="javascript:void(null);">关</a>');
+    show_record_flag({});
+    $("#record_flag").click(function(){
+      var flag = false;
+      if ($("#record_flag").text() == "开启"){
+        flag = true;
+      }
+      show_record_flag({"record":flag});
+    });
+  }
+
+  function show_record_flag(jsondata){
+    $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/record_change",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: function(content){
+          if (content.record == true){
+            $("#record_flag").text("关闭");
+          }
+          else{
+            $("#record_flag").text("开启");
+          }
+        }
+      });
+  }
+
+  function show_record_db_flush(){
+    $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/db_list",
+        data: JSON.stringify({}),
+        dataType: "json",
+        success: show_record_list
+    });
+  }
+
+  function show_record_list(content){
+    $("#list").empty();
+    var head = "<thead><tr><td>编号</td><td>文件名</td></tr></thead>";
+    $("#list").append(head);
+    array = content.data;
+    if (array.length == 0){
+      return;
+    }
+    for (i = 0; i < array.length; i++){
+      item = array[i];
+      var row = "<tr><td>"+i+"</td><td width=\"80\">"+ item +"</td>\
+        <td width=\"500\"><a class=\"table_list\" href=\"javascript:void(null);\">展开数据表</a>&nbsp;&nbsp;&nbsp;&nbsp;\
+          <a class=\"table_delete\" href=\"javascript:void(null);\">删除数据表</a></br>\
+          <table></table></td>\
+        <td width=\"150\"><input type=\"text\" style=\"width:100\"><a class=\"db_rename\" href=\"javascript:void(null);\">更名</a></td>\
+        <td><a class=\"db_delete\" href=\"javascript:void(null);\">删除</a></td></tr>"
+      $("#list").append(row);
+    }
+
+    show_record_table_click();
+    show_record_table_delete();
+    show_record_db_rename();
+    show_record_db_delete();
+  }
+
+  function show_record_table_click(){
+    $(".table_list").click(function(){
+      var obj = $(this).next().next().next();
+      obj.empty();
+      if ($(this).text() == "隐藏数据表"){$(this).text("展开数据表");return;}
+      var trSeq = $(this).parent().parent().parent().find("tr").index($(this).parent().parent());
+      show_record_table_list( $(this),obj, trSeq);
+    });
+  }
+
+  function show_record_table_list(self, obj, trSeq){
+    self.text("隐藏数据表");
+    obj.empty();
+    var db_file = $("#list tr:gt(0):eq("+trSeq+") td:eq(1)").text();
+    var jsondata = {"db_file":db_file};
+    $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/record_list",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: function(content){
+          var array = content.data;
+          if (array.length == 0){
+            return;
+          }
+          for (i = 0; i < array.length; i++){
+            item = array[i];
+            obj.append('<tr><td><input class="check_'+trSeq+'" type="checkbox" value="'+item.addr+'">'+item.addr+'</td></tr>');
+          }
+        }
+      });
+  }
+
+  function show_record_table_delete(){
+    $(".table_delete").click(function(){
+      var obj = $(this).next().next();
+      var trSeq = $(this).parent().parent().parent().find("tr").index($(this).parent().parent());
+      var db_file = $("#list tr:gt(0):eq("+trSeq+") td:eq(1)").text();
+
+      var jsondata = {"db_file":db_file, "addr":[]};
+      $(".check_"+trSeq+":checked").each(function(index, item){
+        jsondata.addr.push($(this).val());
+        $(this).parent().remove();
+      });
+      $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/record_delete",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
+    });
+  }
+
+  function show_record_db_rename(){
+    $(".db_rename").click(function(){
+      var trSeq = $(this).parent().parent().parent().find("tr").index($(this).parent().parent());
+      var db_file = $("#list tr:gt(0):eq("+trSeq+") td:eq(1)").text();
+      var new_name = $(this).prev().val();
+      new_name = new_name.replace(/\s*/g, '');
+      if (new_name==""){return;}
+      var file_type = true;
+      if (new_name.length > 3){
+        var type = new_name.substring(new_name.length-3, new_name.length);
+        if (type == '.db'){file_type = false;}
+      }
+      if (file_type == true){new_name=new_name+".db";}
+      var jsondata = {"db_file":db_file,"new_name":new_name};
+      $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/db_rename",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
+      show_record_db_flush();
+    });
+  }
+
+  function show_record_db_delete(){
+    $(".db_delete").click(function(){
+      var trSeq = $(this).parent().parent().parent().find("tr").index($(this).parent().parent());
+      var db_file = $("#list tr:gt(0):eq("+trSeq+") td:eq(1)").text();
+      var jsondata = {"db_file":db_file};
+      $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/db_delete",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
+      show_record_db_flush();
+    });
+  }
+
+  function click_nav_proxy(){
+    $("bhead").append("此处显示当前SOCKS代理服务器代理的连接列表，代理服务端口号默认为1080");
+    $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/proxy_list",
+        data: JSON.stringify({}),
+        dataType: "json",
+        success: show_proxy_list
+    });
+  }
+
+  function show_proxy_list(content){
+    var head = "<thead><tr><td>编号</td><td>地址</td></tr></thead>";
+    $("#list").append(head);
+    array = content.data;
+    if (array.length == 0){
+      return;
+    }
+    for (i = 0; i < array.length; i++){
+      item = array[i];
+      var row = "<tr id=\"list"+ i + "\"><td>"+i+"</td><td>"+ item.addr +"</td></tr>"
+      $("#list").append(row);
+    }
+  }
+
+  function click_nav_agent(){
+    $("bhead").append("此处显示当前负载端列表，控制端服务端口号默认为1080");
+    $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/client_list",
+        data: JSON.stringify({}),
+        dataType: "json",
+        success:show_agent_list
+    });
+  }
+
+  function show_agent_list(content){
+    var head = "<thead><tr><td>编号</td><td>地址</td><td>核心数</td><td>状态</td></tr></thead>";
+    $("#list").append(head);
+    array = content.data;
+    if (array.length == 0){
+      return;
+    }
+    for (i = 0; i < array.length; i++){
+      item = array[i];
+      var row = "<tr id=\"list"+ i + "\"><td>"+i+"</td><td width=\"200\">"+ item.addr +"</td><td width=\"80\">"+ item.cpu +"</td><td>" + item.ready+"</td></tr>"
+      $("#list").append(row);
+    }
+  }
+});
+</script>
+</html>

@@ -5,8 +5,8 @@
 #include "windows.h"
 
 const char* defaultIP = "127.0.0.1";
-short defaultPort = 1080;
-short defaultlisten = 0;
+short defaultPort = 0;
+short defaultlisten = 1080;
 t_stress_dll strdll;
 
 int main(int argc, char* argv[])
@@ -17,11 +17,13 @@ int main(int argc, char* argv[])
 	if (argc == 2)
 	{
 		listen = atoi(argv[1]);
+		port = 0;
 	}
 	else if (argc == 3)
 	{
 		ip = argv[1];
 		port = atoi(argv[2]);
+		listen = 0;
 	}
 	else if (argc == 4)
 	{
@@ -39,14 +41,15 @@ int main(int argc, char* argv[])
 	strdll.stop = (StressClientStop)GetProcAddress((HMODULE)strdll.dllHandle, "StressClientStop");
 
 	strdll.run(ip, port, listen);
-	int A = 0;
+	char in[4] = { 0x0 };
 	while (true)
 	{
 		system("CLS");
-		printf("\n压力测试负载端运行中......\n\n");
-		printf("操作：\n【Q退出】\n");
-		A = getchar();
-		if (A == 'Q')
+		printf("\nSheeps控制端运行中......\n\n");
+		printf("控  制  端：[0.0.0.0:%d]\nsocks5代理：[0.0.0.0:%d]\n后      台：[http://127.0.0.1:%d]\n", listen, listen, listen);
+		printf("\n选择:【Q退出】\n操作：");
+		gets_s(in, 3);
+		if (in[0] == 'Q')
 			break;
 	}
 	strdll.stop();

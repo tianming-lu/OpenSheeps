@@ -1,34 +1,33 @@
-#pragma once
-#include "StressStruct.h"
-#include "./../common/IOCPReactor.h"
+#ifndef _CLIENT_PROTOCOL_H_
+#define _CLIENT_PROTOCOL_H_
+#include "SheepsStruct.h"
+#include "IOCPReactor.h"
 
-#define INIT_BUFF_SIZE 10240
-
-class StressProtocol :
+class ClientProtocol :
 	public BaseProtocol
 {
 public:
-	std::string recvBuff;
+	ClientProtocol();
+	~ClientProtocol();
 
 public:
-	StressProtocol();
-	~StressProtocol();
-
-public:
-	const char* StressSerIP = NULL;
-	short StressSerPort = 0;
-	HSOCKET	StressHsocket = NULL;
+	char		StressSerIP[16] = { 0x0 };
+	uint16_t	StressSerPort = 0;
+	uint8_t		ProjectID = 0;
+	HSOCKET		StressHsocket = NULL;
 
 
 public:
-	void ConnectionMade(HSOCKET sock, const char* ip, int port);
-	void ConnectionFailed(HSOCKET sock, const char* ip, int port);
-	void ConnectionClosed(HSOCKET sock, const char* ip, int port);
+	void ConnectionMade(HSOCKET hsock, const char* ip, int port);
+	void ConnectionFailed(HSOCKET hsock, const char* ip, int port);
+	void ConnectionClosed(HSOCKET hsock, const char* ip, int port);
 	void Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len);
 	int	 Loop();
 	int  Destroy();
 
 	bool ReportError();
-	void CheckReq(HSOCKET sock, const char* data, int len);
-	int  CheckRequest(HSOCKET sock, const char* data, int len);
+	void CheckReq(HSOCKET hsock, const char* data, int len);
+	int  CheckRequest(HSOCKET hsock, const char* data, int len);
 };
+
+#endif // !_CLIENT_PROTOCOL_H_
