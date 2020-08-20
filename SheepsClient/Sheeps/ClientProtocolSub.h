@@ -3,7 +3,7 @@
 #include "SheepsStruct.h"
 #include "IOCPReactor.h"
 
-typedef int (*client_cmd_cb) (HSOCKET sock, int cmdNO, cJSON* root);
+typedef int (*client_cmd_cb) (HSOCKET hsock, int cmdNO, cJSON* root);
 
 extern BaseFactory* subfactory;
 extern int clogId;

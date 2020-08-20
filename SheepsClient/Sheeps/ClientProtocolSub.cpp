@@ -22,7 +22,7 @@ int ClientLogInit(const char *configfile)
 	return 0;
 }
 
-static int MsgResponse(HSOCKET sock, int cmdNo, int retCode, const char* msg)
+static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 {
 	char buf[128] = { 0x0 };
 	int len = snprintf(buf, sizeof(buf), "{\"retCode\":%d,\"retMsg\":\"%s\"}", retCode, msg);
@@ -33,11 +33,11 @@ static int MsgResponse(HSOCKET sock, int cmdNo, int retCode, const char* msg)
 	char sockbuf[256] = { 0x0 };
 	memcpy(sockbuf, &head, sizeof(t_stress_protocol_head));
 	memcpy(sockbuf + sizeof(t_stress_protocol_head), buf, len);
-	IOCPPostSendEx(sock, sockbuf, head.msgLen);
+	IOCPPostSendEx(hsock, sockbuf, head.msgLen);
 	return 0;
 }
 
-static int MsgSend(HSOCKET sock, int cmdNo, char* data, int len)
+static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 {
 	t_stress_protocol_head head;
 	head.cmdNo = cmdNo;
@@ -46,11 +46,11 @@ static int MsgSend(HSOCKET sock, int cmdNo, char* data, int len)
 	char sockbuf[256] = { 0x0 };
 	memcpy(sockbuf, (char*)&head, sizeof(t_stress_protocol_head));
 	memcpy(sockbuf + sizeof(t_stress_protocol_head), data, len);
-	IOCPPostSendEx(sock, sockbuf, head.msgLen);
+	IOCPPostSendEx(hsock, sockbuf, head.msgLen);
 	return 0;
 }
 
-int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_2_task_init(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* projectId = cJSON_GetObjectItem(root, "projectID");
@@ -62,7 +62,7 @@ int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 		taskId->type != cJSON_Number || projectId->type != cJSON_Number || envId->type != cJSON_Number||
 		userCount->type != cJSON_Number || machineId->type != cJSON_Number)
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 
@@ -75,11 +75,11 @@ int client_cmd_2_task_init(HSOCKET sock, int cmdNO, cJSON* root)
 		ignorerr = true;
 	int usercount = userCount->valueint;
 
-	create_new_task(taskid, projectid, machineid, ignorerr, usercount, sock->factory);
+	create_new_task(taskid, projectid, machineid, ignorerr, usercount, hsock->factory);
 	return 0;
 }
 
-int client_cmd_3_task_connection_create(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_3_task_connection_create(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* ip = cJSON_GetObjectItem(root, "Host");
@@ -90,7 +90,7 @@ int client_cmd_3_task_connection_create(HSOCKET sock, int cmdNO, cJSON* root)
 		taskId->type != cJSON_Number || ip->type != cJSON_String || port->type != cJSON_Number ||
 		timestamp->type != cJSON_Number || microsecond->type != cJSON_Number)
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -99,7 +99,7 @@ int client_cmd_3_task_connection_create(HSOCKET sock, int cmdNO, cJSON* root)
 	return 0;
 }
 
-int client_cmd_4_task_connection_send(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_4_task_connection_send(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* ip = cJSON_GetObjectItem(root, "Host");
@@ -111,7 +111,7 @@ int client_cmd_4_task_connection_send(HSOCKET sock, int cmdNO, cJSON* root)
 		taskId->type != cJSON_Number || ip->type != cJSON_String || port->type != cJSON_Number ||
 		content->type != cJSON_String || timestamp->type != cJSON_Number || microsecond->type != cJSON_Number)
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 
@@ -126,7 +126,7 @@ int client_cmd_4_task_connection_send(HSOCKET sock, int cmdNO, cJSON* root)
 	return 0;
 }
 
-int client_cmd_5_task_connection_close(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_5_task_connection_close(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* ip = cJSON_GetObjectItem(root, "Host");
@@ -137,7 +137,7 @@ int client_cmd_5_task_connection_close(HSOCKET sock, int cmdNO, cJSON* root)
 		taskId->type != cJSON_Number || ip->type != cJSON_String || port->type != cJSON_Number ||
 		timestamp->type != cJSON_Number || microsecond->type != cJSON_Number)
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -146,12 +146,12 @@ int client_cmd_5_task_connection_close(HSOCKET sock, int cmdNO, cJSON* root)
 	return 0;
 }
 
-int client_cmd_6_task_finish(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_6_task_finish(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	if (taskId == NULL || taskId->type != cJSON_Number)
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -160,13 +160,13 @@ int client_cmd_6_task_finish(HSOCKET sock, int cmdNO, cJSON* root)
 	return 0;
 }
 
-int client_cmd_8_task_reinit(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_8_task_reinit(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* loop = cJSON_GetObjectItem(root, "Loop");
 	if (taskId == NULL || loop == NULL || taskId->type != cJSON_Number || (loop->type != cJSON_True && loop->type != cJSON_False))
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -208,11 +208,11 @@ void getFiles(char* path, std::map<std::string, t_file_info>* files)
 	}
 }
 
-int sendUpfileMsg(HSOCKET sock)
+int sendUpfileMsg(HSOCKET hsock)
 {
 	if (updatefile.empty())
 	{
-		MsgResponse(sock, 11, 0, "OK");
+		MsgResponse(hsock, 11, 0, "OK");
 		LOG(clogId, LOG_DEBUG, "%s-%d files sync done!\r\n", __func__, __LINE__);
 		return 1;
 	}
@@ -223,16 +223,16 @@ int sendUpfileMsg(HSOCKET sock)
 	if (itt->second.size - itt->second.offset < size)
 		size = itt->second.size - itt->second.offset;
 	int n = snprintf(buff, sizeof(buff), "{\"File\":\"%s\",\"Offset\":%lld,\"Size\":%lld}", itt->first.c_str(), itt->second.offset, size);
-	MsgSend(sock, 10, buff, n);
+	MsgSend(hsock, 10, buff, n);
 	return 0;
 }
 
-int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_9_sync_files(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* files = cJSON_GetObjectItem(root, "filelist");
 	if (files == NULL || files->type != cJSON_Array)
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 
@@ -240,7 +240,7 @@ int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
 	if (dev == 1)
 	{
 		LOG(clogId, LOG_FAULT, "dev mode, give up file sync!\r\n");
-		sendUpfileMsg(sock);
+		sendUpfileMsg(hsock);
 		return 0;
 	}
 
@@ -299,9 +299,9 @@ int client_cmd_9_sync_files(HSOCKET sock, int cmdNO, cJSON* root)
 			DeleteFileA(it->first.c_str());
 	}
 
-	MsgResponse(sock, cmdNO, 0, "OK");
+	MsgResponse(hsock, cmdNO, 0, "OK");
 	LOG(clogId, LOG_DEBUG, "%s-%d files sync start!\r\n", __func__, __LINE__);
-	sendUpfileMsg(sock);
+	sendUpfileMsg(hsock);
 	return 0;
 }
 
@@ -341,7 +341,7 @@ bool CreateFileDirectory(const char* dir)
 	return 0;//(0 == _mkdir(path) || EEXIST == errno); // EEXIST => errno.h    errmo => stdlib.h
 }
 
-int client_cmd_10_download_file(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_10_download_file(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* file = cJSON_GetObjectItem(root, "File");
 	cJSON* offset = cJSON_GetObjectItem(root, "Offset");
@@ -392,37 +392,37 @@ int client_cmd_10_download_file(HSOCKET sock, int cmdNO, cJSON* root)
 		fclose(itt->second.file);
 		updatefile.erase(itt);
 	}
-	sendUpfileMsg(sock);
+	sendUpfileMsg(hsock);
 	return 0;
 }
 
-int client_cmd_12_task_change_user_count(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_12_task_change_user_count(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* change = cJSON_GetObjectItem(root, "Change");
 	if (taskId == NULL || change == NULL || taskId->type != cJSON_Number || change->type != cJSON_Number )
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 
-	task_add_user_by_taskid(taskId->valueint, change->valueint, sock->factory);
+	task_add_user_by_taskid(taskId->valueint, change->valueint, hsock->factory);
 	
-	MsgResponse(sock, cmdNO, 0, "OK");
+	MsgResponse(hsock, cmdNO, 0, "OK");
 	return 0;
 }
 
-int client_cmd_14_charge_task_loglevel(HSOCKET sock, int cmdNO, cJSON* root)
+int client_cmd_14_charge_task_loglevel(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* loglevel = cJSON_GetObjectItem(root, "LogLevel");
 	cJSON* taskid = cJSON_GetObjectItem(root, "TaskID");
 	if (loglevel == NULL || taskid == NULL || loglevel->type != cJSON_Number || taskid->type != cJSON_Number)
 	{
-		MsgResponse(sock, cmdNO, 1, "参数错误");
+		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
 	}
 	set_task_log_level(loglevel->valueint, taskid->valueint);
-	MsgResponse(sock, cmdNO, 0, "OK");
+	MsgResponse(hsock, cmdNO, 0, "OK");
 	return 0;
 }
 

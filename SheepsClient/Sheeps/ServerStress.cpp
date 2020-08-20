@@ -38,14 +38,14 @@ static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 	return 0;
 }
 
-static int MsgSend(HSOCKET sock, int cmdNo, char* data, int len)
+static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 {
 	t_stress_protocol_head head;
 	head.cmdNo = cmdNo;
 	head.msgLen = len + sizeof(t_stress_protocol_head);
 
-	IOCPPostSendEx(sock, (char*)&head, sizeof(t_stress_protocol_head));
-	IOCPPostSendEx(sock, data, len);
+	IOCPPostSendEx(hsock, (char*)&head, sizeof(t_stress_protocol_head));
+	IOCPPostSendEx(hsock, data, len);
 	LOG(slogid, LOG_DEBUG, "%s:%d [%d %d:%s]\r\n", __func__, __LINE__, len, cmdNo, data);
 	return 0;
 }

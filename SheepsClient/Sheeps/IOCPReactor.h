@@ -37,13 +37,13 @@ typedef struct _IOCP_BUFF
 	uint32_t	offset;
 	uint32_t	size;
 	BYTE		type;
-	SOCKET		sock;
+	SOCKET		fd;
 }IOCP_BUFF;
 
 //完成键
 typedef struct _IOCP_SOCKET
 {
-	SOCKET				sock;
+	SOCKET				fd;
 	char*				recv_buf;
 	CHAR				peer_ip[16];
 	uint16_t			peer_port;
@@ -52,7 +52,7 @@ typedef struct _IOCP_SOCKET
 	BaseFactory*		factory;
 
 	uint8_t				_iotype;
-	BaseProtocol**		_user;
+	BaseProtocol*		_user;
 	IOCP_BUFF*			_IocpBuff;
 }IOCP_SOCKET, *HSOCKET;	//完成端口句柄
 
@@ -74,14 +74,13 @@ public:
 class BaseProtocol
 {
 public:
-	BaseProtocol() { this->_self = this; this->_protolock = new std::mutex; this->_protoType = SERVER_PROTOCOL; };
+	BaseProtocol() {this->_protolock = new std::mutex; this->_protoType = SERVER_PROTOCOL; };
 	virtual ~BaseProtocol() {delete this->_protolock;};
 	void SetFactory(BaseFactory* pfc, PROTOCOL_TPYE prototype) { this->_factory = pfc; this->_protoType = prototype; };
 
 public:
 	BaseFactory*	_factory = NULL;
 	PROTOCOL_TPYE	_protoType = SERVER_PROTOCOL;
-	BaseProtocol*	_self = this;
 	std::mutex*		_protolock = NULL;
 	uint8_t			_sockCount = 0;
 

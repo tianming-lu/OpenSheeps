@@ -546,13 +546,13 @@ void delete_task_error(t_task_error* error)
 
 bool TaskUserSocketClose(HSOCKET hsock)
 {
-	if (hsock == NULL || hsock->sock == INVALID_SOCKET)
+	if (hsock == NULL || hsock->fd == INVALID_SOCKET)
 		return false;
-	SOCKET sock = hsock->sock;
-	hsock->sock = INVALID_SOCKET;
-	(*(hsock->_user))->_sockCount -= 1;
-	CancelIo((HANDLE)sock);
-	closesocket(sock);
+	SOCKET fd = hsock->fd;
+	hsock->fd = INVALID_SOCKET;
+	hsock->_user->_sockCount -= 1;
+	CancelIo((HANDLE)fd);
+	closesocket(fd);
 	return true;
 }
 

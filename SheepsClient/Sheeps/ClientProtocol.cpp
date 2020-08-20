@@ -46,7 +46,7 @@ void ClientProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 
 void ClientProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
 {
-	LOG(clogId, LOG_DEBUG, "stress server connection closed£º[%s:%d] socket = %lld\r\n", ip, port, hsock->sock);
+	LOG(clogId, LOG_DEBUG, "stress server connection closed£º[%s:%d] socket = %lld\r\n", ip, port, hsock->fd);
 	this->StressHsocket = NULL;
 	TaskManagerRuning = false;
 }

@@ -324,9 +324,10 @@ int CheckPoxyRequest(HSOCKET hsock, ServerProtocol* proto, const char* ip, int p
 			memcpy(buf, proto->proxyInfo->tempmsg, 10);
 			memcpy(buf + 10, data, len);
 			
-			proto->proxyInfo->udpClientSock->peer_addr.sin_family = AF_INET;
-			proto->proxyInfo->udpClientSock->peer_addr.sin_port = htons(proto->proxyInfo->clientport);
-			inet_pton(AF_INET, proto->proxyInfo->clientip, &proto->proxyInfo->udpClientSock->peer_addr.sin_addr);
+			/*¶àÓà²Ù×÷*/
+			//proto->proxyInfo->udpClientSock->peer_addr.sin_family = AF_INET;
+			//proto->proxyInfo->udpClientSock->peer_addr.sin_port = htons(proto->proxyInfo->clientport);
+			//inet_pton(AF_INET, proto->proxyInfo->clientip, &proto->proxyInfo->udpClientSock->peer_addr.sin_addr);
 
 			IOCPPostSendEx(proto->proxyInfo->udpClientSock, buf, len + 10);
 			delete[] buf;
@@ -363,14 +364,14 @@ void ProxyConnectionMade(HSOCKET hsock, ServerProtocol* proto, const char* ip, i
 
 		SOCKADDR_IN addr_tcp;
 		int nSize = sizeof(addr_tcp);
-		getsockname(proto->initSock->sock, (SOCKADDR*)&addr_tcp, &nSize);
+		getsockname(proto->initSock->fd, (SOCKADDR*)&addr_tcp, &nSize);
 
 		memcpy(buf + 4, &addr_tcp.sin_addr, sizeof(addr_tcp.sin_addr));
 			
 		if (proto->proxyInfo->proxytype == UDP_CONN)
 		{
 			SOCKADDR_IN addr_udp;
-			getsockname(proto->proxyInfo->udpClientSock->sock, (SOCKADDR*)&addr_udp, &nSize);
+			getsockname(proto->proxyInfo->udpClientSock->fd, (SOCKADDR*)&addr_udp, &nSize);
 			memcpy(buf + 4 + sizeof(in_addr), (char*)&addr_udp.sin_port, 2);
 		}
 		else

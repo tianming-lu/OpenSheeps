@@ -50,13 +50,13 @@ void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 	IOCPCloseHsocket(hsock);
 }
 
-void ServerProtocol::ConnectionFailed(HSOCKET sock, const char* ip, int port)
+void ServerProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 {
 	//LOG(slogid, LOG_DEBUG, "connetion failed: %s:%d  [%d]\r\n", ip, port, this->sockCount);
 	switch (this->peerType)
 	{
 	case PEER_PROXY:
-		ProxyConnectionFailed(sock, this, ip, port);
+		ProxyConnectionFailed(hsock, this, ip, port);
 		return;
 	default:
 		break;

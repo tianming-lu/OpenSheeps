@@ -42,7 +42,7 @@ void UserProtocol::Init()
 
 void UserProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 {	/*当用户连接目标ip端口成功后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
-	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, ip, port, hsock->sock);
+	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, ip, port, hsock->fd);
 	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	t_connection_info info = { 0x0 };
 	info.hsock = hsock;
@@ -70,7 +70,7 @@ void UserProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 
 void UserProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)   //类销毁后，可能导致野指针
 {	/*当用户连接关闭后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
-	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, ip, port, hsock->sock);
+	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, ip, port, hsock->fd);
 	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
 	if (it != this->Connection.end())
 	{
