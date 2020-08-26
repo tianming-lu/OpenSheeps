@@ -351,7 +351,7 @@ DWORD WINAPI serverWorkerThread(LPVOID pParam)
 DWORD WINAPI mainIOCPServer(LPVOID pParam)
 {
 	Reactor* reactor = (Reactor*)pParam;
-	for (unsigned int i = 0; i < reactor->CPU_COUNT; i++)
+	for (unsigned int i = 0; i < reactor->CPU_COUNT*2; i++)
 	//for (unsigned int i = 0; i < 1; i++)
 	{
 		HANDLE ThreadHandle;

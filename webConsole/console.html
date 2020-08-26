@@ -296,7 +296,7 @@ $(document).ready(function(){
 
   function show_record_bhead(){
     $("bhead").append("此处管理控制端录制数据包功能，开启或关闭；并且提供简单的录制文件管理。</br></br>")
-    $("bhead").append('录制协议:&nbsp;&nbsp;<a id="record_flag" href="javascript:void(null);">关</a>');
+    $("bhead").append('录制协议:&nbsp;&nbsp;<a id="record_flag" href="javascript:void(null);">关闭</a>(剩余：<a id="record_left">0</a>)');
     show_record_flag({});
     $("#record_flag").click(function(){
       var flag = false;
@@ -320,6 +320,7 @@ $(document).ready(function(){
           else{
             $("#record_flag").text("开启");
           }
+          $("#record_left").text(content.left);
         }
       });
   }

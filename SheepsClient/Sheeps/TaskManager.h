@@ -74,12 +74,6 @@ typedef struct
 	char		errMsg[64];
 }t_task_error;
 
-typedef struct
-{
-	std::mutex*		protolock;
-	ReplayProtocol*	proto;
-}t_handle_user, *HUSER;
-
 typedef struct {
 	int			logfd;
 	uint8_t		status;    //0 未开始 1初始化中 2初始化完成 3任务运行中 4任务中止清理资源过程中
@@ -97,9 +91,11 @@ typedef struct {
 	std::vector<t_cache_message*>*	messageList;    //任务消息缓存
 	bool							stopMessageCache;
 
-	std::list<HUSER>*	userAll;			//运行任务中用户列表
+	uint16_t	aliveCount;
+	uint16_t	userNumber;
+	std::list<ReplayProtocol*>*	userAll;			//运行任务中用户列表
 	std::mutex*			userAllLock;
-	std::list<HUSER>*	userDes;			//运行结束用户列表
+	std::list<ReplayProtocol*>*	userDes;			//运行结束用户列表
 	std::mutex*			userDesLock;
 
 	std::list<t_task_error*>*	taskErr;

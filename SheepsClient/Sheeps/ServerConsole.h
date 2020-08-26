@@ -26,8 +26,8 @@ typedef struct {
 	uint8_t		projectID;
 	char		projectName[20];
 	uint8_t		envID;
-	uint16_t	totalUser;
-	uint16_t	onceUser;
+	int32_t		totalUser;
+	int32_t		onceUser;
 	uint16_t	spaceTime;
 	uint8_t		loopMode; //0循环 1不循环 2实时回放
 	bool		ignoreErr;

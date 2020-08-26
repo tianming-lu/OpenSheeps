@@ -103,10 +103,10 @@ public:
 	uint16_t		ServerPort = 0;
 	SOCKET			sListen = NULL;
 	virtual bool	FactoryInit() = 0;
-	virtual bool	FactoryLoop() = 0;
-	virtual bool	FactoryClose() = 0;
+	virtual void	FactoryLoop() = 0;
+	virtual void	FactoryClose() = 0;
 	virtual BaseProtocol* CreateProtocol() = 0;
-	virtual bool	DeleteProtocol(BaseProtocol* proto) = 0;
+	virtual void	DeleteProtocol(BaseProtocol* proto) = 0;
 };
 
 #ifdef __cplusplus

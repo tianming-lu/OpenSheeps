@@ -166,6 +166,11 @@ static void task_push_add_once_user(HTASKRUN runtask, HTASKCONFIG taskcfg)
 			user_count++;
 			b--;
 		}
+		if (b < 0)
+		{
+			user_count--;
+			b++;
+		}
 		memset(buf, 0, sizeof(buf));
 		int n = snprintf(buf + 8, sizeof(buf) - 8, "{\"TaskID\":%d,\"Change\":%d}", taskcfg->taskID, user_count);
 		*(int*)buf = n + 8;
@@ -625,6 +630,8 @@ static void do_console_task_user(HSOCKET hsock, cJSON* root, char* uri)
 	{
 		HTASKCONFIG taskcfg = iter->second;
 		taskcfg->totalUser += count->valueint;
+		if (taskcfg->totalUser < 0)
+			taskcfg->totalUser = 0;
 	}
 	cJSON_AddStringToObject(res, "ret", "OK");
 	send_console_msg(hsock, res);

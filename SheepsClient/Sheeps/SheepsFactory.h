@@ -24,10 +24,10 @@ public:
 	bool	ClientLoop();
 	bool	ClientRunOrStop(const char* ip, int port);
 
-	bool	FactoryLoop();
-	bool	FactoryClose();
+	void	FactoryLoop();
+	void	FactoryClose();
 	BaseProtocol* CreateProtocol();
-	bool	DeleteProtocol(BaseProtocol* proto);
+	void	DeleteProtocol(BaseProtocol* proto);
 };
 
 extern Reactor* rec;

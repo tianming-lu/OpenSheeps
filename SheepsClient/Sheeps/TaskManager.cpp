@@ -50,62 +50,79 @@ static void update_user_time_clock(ReplayProtocol* proto)
 	}
 }
 
-static HUSER get_userAll_front(HTASKCFG task, size_t* usersize)
+static void get_userAll_splice(HTASKCFG task, std::list<ReplayProtocol*> &dst, int count, int &cut_count)
 {
-	HUSER user = NULL;
+	std::list<ReplayProtocol*>* src = task->userAll;
 	task->userAllLock->lock();
-	if (task->userAll->empty())
+
+	if (src->empty())
 	{
-		user = NULL;
+		task->userAllLock->unlock();
+		return;
 	}
-	else
+	int usize = (int)src->size();
+	count = count > usize ? usize : count;
+	std::list<ReplayProtocol*>::iterator it = src->begin();
+	advance(it, count);
+	
+	dst.splice(dst.end(), *src, src->begin(), it);
+	if (task->userCount < task->aliveCount)
 	{
-		*usersize = task->userAll->size();
-		user = task->userAll->front();
-		task->userAll->pop_front();
+		int temp = task->aliveCount - task->userCount;
+		cut_count = temp > count ? count : temp;
+		task->aliveCount -= cut_count;
 	}
+	//printf("%s:%d  alive[%d] size[%d] cut[%d]\n", __func__, __LINE__, task->aliveCount, usize, cut_count);
 	task->userAllLock->unlock();
-	return user;
+	
 }
 
-static bool add_to_userAll_tail(HTASKCFG task, HUSER user)
+static void add_to_userAll(HTASKCFG task, std::list<ReplayProtocol*> &src, int cut_count)
 {
+	std::list<ReplayProtocol*>* dst = task->userAll;
+	uint16_t src_size = (uint16_t)src.size();
 	task->userAllLock->lock();
-	task->userAll->push_back(user);
+	if (src_size)
+		dst->splice(dst->end(), src);
+	if (cut_count < 0)
+	{
+		task->aliveCount += src_size;
+	}
+	else 
+	{
+		task->aliveCount -= cut_count;
+	}
 	task->userAllLock->unlock();
-	return true;
 }
 
-static HUSER get_userDes_front(HTASKCFG task)
+static ReplayProtocol* get_userDes_splice(HTASKCFG task, std::list<ReplayProtocol*>* dst)
 {
-	HUSER user = NULL;
+	std::list<ReplayProtocol*>* src = task->userDes;
+	std::list<ReplayProtocol*>::iterator iter;
+	ReplayProtocol* user;
+	if (src->empty()) return NULL;
 	task->userDesLock->lock();
-	if (task->userDes->empty())
-	{
-		user = NULL;
-	}
-	else
-	{
-		user = task->userDes->front();
-		task->userDes->pop_front();
-	}
+	iter = src->begin();
+	user = *iter;
+	dst->splice(dst->end(), *src, iter);
 	task->userDesLock->unlock();
 	return user;
 }
 
-static bool add_to_userDes_tail(HTASKCFG task, HUSER user)
+static void add_to_userDes(HTASKCFG task, std::list<ReplayProtocol*> &src)
 {
+	if (src.empty()) return;
+	std::list<ReplayProtocol*>* dst = task->userDes;
 	task->userDesLock->lock();
-	task->userDes->push_back(user);
+	dst->splice(dst->end(), src);
 	task->userDesLock->unlock();
-	return true;
 }
 
 static void destroy_task(HTASKCFG task)
 {
 	if (task->workThreadCount == 0)
 	{
-		LOG(clogId, LOG_DEBUG, "%s:%d Clean Task !", __func__, __LINE__);
+		LOG(clogId, LOG_DEBUG, "%s:%d Clean Task !\r\n", __func__, __LINE__);
 		std::vector<t_cache_message*>::iterator it;
 		for (it = task->messageList->begin(); it != task->messageList->end(); it++)
 		{
@@ -118,44 +135,63 @@ static void destroy_task(HTASKCFG task)
 		task->messageList->clear();
 		delete task->messageList;
 
-		HUSER user = NULL;
-		size_t userAllSize = 0;
+		ReplayProtocol* user = NULL;
+		std::list<ReplayProtocol*> userlist;
+		std::list<ReplayProtocol*>::iterator iter;
+		int cut_count = 0;
+		
 		bool userClean = true;
-		while (user = get_userDes_front(task))
+		while (true)
 		{
-			if (user->proto->_sockCount == 0)
+			get_userDes_splice(task, &userlist);
+			if (userlist.empty()) break;
+			
+			iter = userlist.begin();
+			for (; iter != userlist.end();)
 			{
-				default_api.destory(user->proto);		//若连接未关闭，可能导致崩溃
+				user = *iter;
+				if (user->_sockCount == 0 && default_api.destory)
+				{
+					default_api.destory(user);		//若连接未关闭，可能导致崩溃
+				}
+				else
+				{
+					LOG(clogId, LOG_ERROR, " %d 用户连接未完全关闭，导致内存泄漏！\r\n", __LINE__);
+					userClean = false;
+				}
+				userlist.erase(iter++);
 			}
-			else
-			{
-				LOG(clogId, LOG_ERROR, " %d 用户连接未完全关闭，导致内存泄漏！\r\n", __LINE__);
-				userClean = false;
-			}
-			sheeps_free(user);
 		}
 		delete task->userDes;
 		delete task->userDesLock;
 
-		while (user = get_userAll_front(task, &userAllSize))
+		while (true)
 		{
-			if (user->proto->_sockCount == 0)
+			get_userAll_splice(task, userlist, 10, cut_count);
+			if (userlist.empty())
+				break;
+			iter = userlist.begin();
+			for (; iter != userlist.end();)
 			{
-				default_api.destory(user->proto);		//若连接未关闭，可能导致崩溃
+				user = *iter;
+				if (user->_sockCount == 0 && default_api.destory)
+				{
+					default_api.destory(user);		//若连接未关闭，可能导致崩溃
+				}
+				else
+				{
+					LOG(clogId, LOG_ERROR, " %d 用户连接未完全关闭，导致内存泄漏！\r\n", __LINE__);
+					userClean = false;
+				}
+				userlist.erase(iter++);
 			}
-			else
-			{
-				LOG(clogId, LOG_ERROR, " %d 用户连接未完全关闭，导致内存泄漏！\r\n", __LINE__);
-				userClean = false;
-			}
-			sheeps_free(user);
 		}
 		delete task->userAll;
 		delete task->userAllLock;
 
 		delete task->workThereaLock;
 
-		if (userClean == true)
+		if (userClean == true && default_api.uninit)
 		{
 			default_api.uninit(task);
 		}
@@ -251,62 +287,79 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 	t_task_config* task = (t_task_config*)pParam;
 	changTask_work_thread(task, 1);
 
-	t_handle_user* user = NULL;
-	ReplayProtocol* proto = NULL;
-	size_t userAllSize = 0;
+	ReplayProtocol* user = NULL;
+	int cut_count;  //上报和下发需要剪切的用户数量
+	std::list<ReplayProtocol*> userlist;
+	std::list<ReplayProtocol*> dellist;
+	std::list<ReplayProtocol*>::iterator iter;
 	while (task->status < 4)   //任务运行中
 	{
-		for (int i = 0; i < 10; i++)
+		Sleep(1);
+		cut_count = 0;
+		get_userAll_splice(task, userlist, 10, cut_count);
+		if (userlist.empty()) {continue; }
+		//printf("%s:%d curuser[%zd] cut[%d]\n", __func__, __LINE__, userlist.size(), cut_count);
+		iter = userlist.begin();
+		for ( ; iter != userlist.end();)
 		{
-			user = (t_handle_user*)get_userAll_front(task, &userAllSize);
-			if (user == NULL)
-				break;
-			proto = user->proto;
-			if (task->userCount < userAllSize)
+			//printf("%s:%d curuser[%zd] cut[%d]\n", __func__, __LINE__, userlist.size(), cut_count);
+			user = *iter;
+			if (cut_count > 0)
 			{
-				user->protolock->lock();
-				proto->Destroy();
-				user->protolock->unlock();
-				add_to_userDes_tail(task, user);
+				user->_protolock->lock();
+				user->Destroy();
+				user->_protolock->unlock();
+
+				dellist.splice(dellist.end(), userlist, iter++);
+				cut_count--;
 				continue;
 			}
 
-			user->protolock->lock();
-			if (proto->SelfDead == TRUE)
+			user->_protolock->lock();
+			if (user->SelfDead == TRUE)
 			{
 				if (task->ignoreErr)
 				{
-					ReInit(user->proto, true);
-					user->protolock->unlock();
-					add_to_userAll_tail(task, user);
+					ReInit(user, true);
+					user->_protolock->unlock();
 				}
 				else
 				{
-					proto->Destroy();
-					user->protolock->unlock();
+					user->Destroy();
+					user->_protolock->unlock();
 					LOG(clogId, LOG_DEBUG, "user destroy\r\n");
-					add_to_userDes_tail(task, user);
+
+					dellist.splice(dellist.end(), userlist, iter++);
+					cut_count++;
 				}
 				continue;
 			}
-			Loop(proto);
-			user->protolock->unlock();
-			add_to_userAll_tail(task, user);
+			Loop(user);
+			user->_protolock->unlock();
+			++iter;
 		}
-		Sleep(1);
+		add_to_userAll(task, userlist, cut_count);
+		add_to_userDes(task, dellist);
 	}
 
 	while (task->status == 4)  //清理资源
 	{
-		user = (t_handle_user*)get_userAll_front(task, &userAllSize);
-		if (user == NULL)
+		get_userAll_splice(task, userlist, 10, cut_count);
+		if (userlist.empty())
 			break;
-		proto = user->proto;
-		user->protolock->lock();
-		proto->Destroy();
-		user->protolock->unlock();
+		iter = userlist.begin();
+		for (; iter != userlist.end();)
+		{
+			user = *iter;
+			if (user == NULL)
+				break;
+			user->_protolock->lock();
+			user->Destroy();
+			user->_protolock->unlock();
 
-		add_to_userDes_tail(task, user);
+			dellist.splice(dellist.end(), userlist, iter++);
+		}
+		add_to_userDes(task, dellist);
 		Sleep(1);
 	}
 
@@ -319,8 +372,8 @@ static bool run_task_thread(HTASKCFG task)
 {
 	SYSTEM_INFO sysInfor;
 	GetSystemInfo(&sysInfor);
-	for (unsigned int i = 0; i < sysInfor.dwNumberOfProcessors * 2; i++)
-		//for (unsigned int i = 0; i < 1; i++)
+	for (unsigned int i = 0; i < sysInfor.dwNumberOfProcessors; i++)
+	//for (unsigned int i = 0; i < 1; i++)
 	{
 		HANDLE ThreadHandle;
 		ThreadHandle = CreateThread(NULL, 0, taskWorkerThread, task, 0, NULL);
@@ -355,9 +408,9 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 		task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
 		task->workThereaLock = new std::mutex;
 		task->messageList = new std::vector<t_cache_message*>;
-		task->userAll = new std::list<HUSER>;
+		task->userAll = new std::list<ReplayProtocol*>;
 		task->userAllLock = new std::mutex;
-		task->userDes = new std::list<HUSER>;
+		task->userDes = new std::list<ReplayProtocol*>;
 		task->userDesLock = new std::mutex;
 		task->taskErr = &taskError;
 		task->taskErrlock = &taskErrLock;
@@ -366,45 +419,46 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 	}
 }
 
-static HUSER create_new_user(HTASKCFG task, int userNumber, BaseFactory* factory)
-{
-	bool isNew = false;
-	HUSER user = get_userDes_front(task);
-	if (user == NULL)
-	{
-		isNew = true;
-		user = (HUSER)sheeps_malloc(sizeof(t_handle_user));
-		if (user == NULL)
-			return NULL;
-		user->proto = default_api.create();
-		if (user->proto == NULL)
-		{
-			sheeps_free(user);
-			return NULL;
-		}
-		user->proto->SetFactory(factory, CLIENT_PROTOCOL);
-		user->proto->Task = task;
-		user->proto->UserNumber = userNumber;
-		user->protolock = user->proto->_protolock;
-	}
-	if (isNew)
-		user->proto->Init();
-	else
-		ReInit(user->proto, true);
-	return user;
-}
-
 static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 {
-	uint16_t StartCount = task->userCount;
-	task->userCount += userCount;
-	t_handle_user* user = NULL;
+	if (userCount <= 0)
+	{
+		task->userCount += userCount;
+		if (task->userCount < 0)
+			task->userCount = 0;
+		return 0;
+	}
+
+	std::list<ReplayProtocol*> userlist;
+	ReplayProtocol* user = NULL;
+	bool isNew = false;
 	for (int i = 0; i < userCount; i++)
 	{
-		user = create_new_user(task, StartCount + i, factory);
+		isNew = false;
+		user = get_userDes_splice(task, &userlist);
+		if (user == NULL && default_api.create)
+		{
+			isNew = true;
+			user = default_api.create();
+			if (user == NULL)
+			{
+				break;
+			}
+			user->SetFactory(factory, CLIENT_PROTOCOL);
+			user->Task = task;
+			user->UserNumber = task->userNumber++;
+			userlist.push_back(user);
+		}
 		if (user)
-			add_to_userAll_tail(task, user);
+		{
+			if (isNew)
+				user->Init();
+			else
+				ReInit(user, true);
+		}
 	}
+	task->userCount += (uint16_t)userlist.size();
+	add_to_userAll(task, userlist, -1);
 	return 0;
 }
 
@@ -420,8 +474,9 @@ int create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool i
 	task->envID = 0;
 	task->machineID = machineid;
 	task->ignoreErr = ignorerr;
-
-	default_api.init(task);
+	
+	if (default_api.init)
+		default_api.init(task);
 
 	task_add_user(task, userconut, factory);
 	run_task_thread(task);

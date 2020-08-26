@@ -73,16 +73,15 @@ bool SheepsFactory::ClientRunOrStop(const char* ip, int port)
 	return true;
 }
 
-bool SheepsFactory::FactoryLoop()
+void SheepsFactory::FactoryLoop()
 {
 	this->ClientInit();
 	this->ClientLoop();
 	LogLoop();
 	insert_msg_recodr_db();
-	return true;
 }
 
-bool SheepsFactory::FactoryClose()
+void SheepsFactory::FactoryClose()
 {
 	if (this->ClientProto != NULL)
 	{
@@ -92,18 +91,16 @@ bool SheepsFactory::FactoryClose()
 	{
 		ServerUnInit();
 	}
-	return true;
 }
 
 BaseProtocol* SheepsFactory::CreateProtocol()
 {
-	BaseProtocol* proto = new ServerProtocol();
+	BaseProtocol* proto = new(std::nothrow) ServerProtocol();
 	return proto;
 }
 
-bool SheepsFactory::DeleteProtocol(BaseProtocol* proto)
+void SheepsFactory::DeleteProtocol(BaseProtocol* proto)
 {
 	ServerProtocol* user = (ServerProtocol*)proto;
 	delete user;
-	return true;
 }
