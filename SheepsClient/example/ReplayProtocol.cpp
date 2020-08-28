@@ -1,15 +1,15 @@
 #include "ReplayProtocol.h"
 
 
-int Init(HTASKCFG task)
-{	/*任务初始化，task为任务结构指针*/
-	TaskLog(task, LOG_DEBUG, "%s:%d project[%d] env[%d]", __func__, __LINE__, task->projectID, task->envID);
+int TaskStart(HTASKCFG task)
+{	/*任务开始，task为任务结构指针*/
+	TaskLog(task, LOG_DEBUG, "%s:%d taskid[%d] project[%d] machineid[%d]", __func__, __LINE__, task->taskID, task->projectID, task->machineID);
 	return 0;
 }
 
-int UnInit(HTASKCFG task)
-{	/*反任务初始化*/
-	TaskLog(task, LOG_DEBUG, "%s:%d project[%d] env[%d]", __func__, __LINE__, task->projectID, task->envID);
+int TaskStop(HTASKCFG task)
+{	/*任务结束*/
+	TaskLog(task, LOG_DEBUG, "%s:%d taskid[%d] project[%d] machineid[%d]", __func__, __LINE__, task->taskID, task->projectID, task->machineID);
 	return 0;
 }
 

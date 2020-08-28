@@ -39,8 +39,8 @@ extern "C" {
 
 ReplayProtocol* CreateUser(void);
 void	DestoryUser(ReplayProtocol* hdl);
-int		Init(HTASKCFG task);
-int		UnInit(HTASKCFG task);
+int		TaskStart(HTASKCFG task);
+int		TaskStop(HTASKCFG task);
 
 #ifdef __cplusplus
 }

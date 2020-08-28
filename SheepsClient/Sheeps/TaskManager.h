@@ -80,7 +80,6 @@ typedef struct {
 
 	uint8_t		taskID;
 	uint8_t		projectID;
-	uint8_t		envID;
 	uint8_t		machineID;
 	uint16_t	userCount;
 	bool		ignoreErr;
@@ -110,8 +109,8 @@ typedef struct dllAPI
 {
 	CREATEAPI   create;
 	DESTORYAPI  destory;
-	INIT		init;
-	INIT		uninit;
+	INIT		taskstart;
+	INIT		taskstop;
 	INIT		unpack;
 }t_replay_dll;
 
@@ -159,7 +158,7 @@ void			delete_task_error(t_task_error* error);
 
 
 //项目业务逻辑API
-Task_API void		TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT init, INIT uninit);
+Task_API void		TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop);
 Task_API bool		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
 Task_API bool		TaskUserSocketClose(HSOCKET hsock);
 Task_API void		TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);

@@ -191,9 +191,9 @@ static void destroy_task(HTASKCFG task)
 
 		delete task->workThereaLock;
 
-		if (userClean == true && default_api.uninit)
+		if (userClean == true && default_api.taskstop)
 		{
-			default_api.uninit(task);
+			default_api.taskstop(task);
 		}
 		else
 		{
@@ -471,12 +471,11 @@ int create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool i
 
 	task->taskID = taskid;
 	task->projectID = projectid;
-	task->envID = 0;
 	task->machineID = machineid;
 	task->ignoreErr = ignorerr;
 	
-	if (default_api.init)
-		default_api.init(task);
+	if (default_api.taskstart)
+		default_api.taskstart(task);
 
 	task_add_user(task, userconut, factory);
 	run_task_thread(task);
@@ -708,12 +707,12 @@ static void TaskManagerForever(int projectid)
 	}
 }
 
-void TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT init, INIT uninit)
+void TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop)
 {
 	default_api.create = create;
 	default_api.destory = destory;
-	default_api.init = init;
-	default_api.uninit = uninit;
+	default_api.taskstart = taskstart;
+	default_api.taskstop = taskstop;
 
 	char ip[32] = { 0x0 };
 	GetPrivateProfileStringA("agent", "srv_ip", "127.0.0.1", ip, sizeof(ip), ConfigFile);
