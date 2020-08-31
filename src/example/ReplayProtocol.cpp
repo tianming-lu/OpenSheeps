@@ -169,7 +169,7 @@ HSOCKET* UserProtocol::GetScokFromConnection(const char* ip, int port)
 bool UserProtocol::CloseAllConnection()
 {
 	std::map<int, t_connection_info>::iterator iter;
-	for (iter = this->Connection.begin(); iter != this->Connection.end(); iter++)
+	for (iter = this->Connection.begin(); iter != this->Connection.end(); ++iter)
 	{
 		if (iter->second.hsock != NULL)
 		{

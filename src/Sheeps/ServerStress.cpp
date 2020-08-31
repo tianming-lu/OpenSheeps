@@ -99,7 +99,7 @@ static int sync_files(HSOCKET hsock)
 	cJSON* array = cJSON_CreateArray();
 	cJSON_AddItemToObject(root, "filelist", array);
 	std::map<std::string, t_file_update>::iterator iter;
-	for (iter = updatefile.begin(); iter != updatefile.end(); iter++)
+	for (iter = updatefile.begin(); iter != updatefile.end(); ++iter)
 	{
 		cJSON* item = cJSON_CreateObject();
 		cJSON_AddStringToObject(item, "File", iter->first.c_str());

@@ -292,7 +292,7 @@ int client_cmd_9_sync_files(HSOCKET hsock, int cmdNO, cJSON* root)
 		updatefile.insert(std::pair<std::string, t_file_info>(std::string(file->valuestring), finfo));
 	}
 	
-	for (it = localfile.begin(); it != localfile.end(); it++)
+	for (it = localfile.begin(); it != localfile.end(); ++it)
 	{
 		iter = allfile.find(it->first.c_str());
 		if (iter == allfile.end())

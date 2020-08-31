@@ -124,7 +124,7 @@ static void destroy_task(HTASKCFG task)
 	{
 		LOG(clogId, LOG_DEBUG, "%s:%d Clean Task !\r\n", __func__, __LINE__);
 		std::vector<t_cache_message*>::iterator it;
-		for (it = task->messageList->begin(); it != task->messageList->end(); it++)
+		for (it = task->messageList->begin(); it != task->messageList->end(); ++it)
 		{
 			t_cache_message* data = *it;
 			if (data->content)

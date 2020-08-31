@@ -55,7 +55,7 @@ static int task_init_record_sql(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	char temp[256] = { 0x0 };
 	char table[64] = { 0x0 };
 	std::list<Readdr>::iterator iter = taskcfg->replayAddr->begin();
-	for (; iter != taskcfg->replayAddr->end(); iter++)
+	for (; iter != taskcfg->replayAddr->end(); ++iter)
 	{
 		memset(table, 0, sizeof(table));
 		int offset = snprintf(table, sizeof(table), "record_%s", iter->srcAddr);
