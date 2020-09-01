@@ -54,12 +54,12 @@ Task_API void		TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...);
 
 以上是完成项目接入所必须了解的API函数，头文件 TaskManager.h；
 
-TaskManagerRun：启动负载端必须调用，需要传入项目id及四个回调函数，分别为创建用户(ReplayProtocol对象)、销毁用户、任务开始、任务结束；
-TaskUserDead：用于向Task Manager报告用户自毁，Task Manager会将其从队列中移除；
+TaskManagerRun：启动负载端必须调用，需要传入项目id及四个回调函数，分别为创建用户(ReplayProtocol对象)、销毁用户、任务开始、任务结束；  
+TaskUserDead：用于向Task Manager报告用户自毁，Task Manager会将其从队列中移除；  
 TaskUserSocketConnet，TaskUserSocketSend，TaskUserSocketClose：分别用于用户发起连接、发送消息、关闭连接等网络操作，其中连接为异步连接，
-IO Manger在连接成功或者失败后会通知用户，IO Manager会调用用户成员函数ConnectionMade或者ConnectionFailed；但是通过调用TaskUserSocketClose关闭连接时，网络连接会立即关闭，IO Manager不会再通知连接关闭事件
-TaskUserSocketSkipBuf：需要从socket缓冲区中跳过的消息长度，用户已经处理过得网络消息需要调用此函数
-TaskUserLog，TaskLog：均用于输出日志，不同的是一个传递参数用户类指针，一个传递任务结构指针，TaskUserLog输出时会携带用户序号，用于区分不同用户的日志流
+IO Manger在连接成功或者失败后会通知用户，IO Manager会调用用户成员函数ConnectionMade或者ConnectionFailed；但是通过调用TaskUserSocketClose关闭连接时，网络连接会立即关闭，IO Manager不会再通知连接关闭事件  
+TaskUserSocketSkipBuf：需要从socket缓冲区中跳过的消息长度，用户已经处理过得网络消息需要调用此函数  
+TaskUserLog，TaskLog：均用于输出日志，不同的是一个传递参数用户类指针，一个传递任务结构指针，TaskUserLog输出时会携带用户序号，用于区分不同用户的日志流  
 
 
 
