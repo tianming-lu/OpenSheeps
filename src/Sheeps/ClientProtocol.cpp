@@ -1,4 +1,4 @@
-#include "pch.h"
+ï»¿#include "pch.h"
 #include "ClientProtocol.h"
 #include "ClientProtocolSub.h"
 #include "TaskManager.h"
@@ -14,16 +14,14 @@ ClientProtocol::~ClientProtocol()
 }
 
 
-//¹ÌÓÐº¯Êý£¬¼Ì³Ð×Ô»ùÀà
+//å›ºæœ‰å‡½æ•°ï¼Œç»§æ‰¿è‡ªåŸºç±»
 void ClientProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 {
-	LOG(clogId, LOG_DEBUG, "stress server connection made£º[%s:%d]\r\n", ip, port);
+	LOG(clogId, LOG_DEBUG, "stress server connection madeï¼š[%s:%d]\r\n", ip, port);
 	StressHsocket = hsock;
 
-	SYSTEM_INFO sysInfor;
-	GetSystemInfo(&sysInfor);
 	char data[64] = {0x0};
-	snprintf(data, sizeof(data), "{\"CPU\":%d, \"ProjectID\":%d}", sysInfor.dwNumberOfProcessors, this->ProjectID);
+	snprintf(data, sizeof(data), "{\"CPU\":%d, \"ProjectID\":%d}", GetCpuCount(), this->ProjectID);
 
 	int len = int(strlen(data));
 	t_stress_protocol_head head;
@@ -32,9 +30,8 @@ void ClientProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 	char buf[128] = { 0x0 };
 	memcpy(buf, (char*)&head, sizeof(t_stress_protocol_head));
 	memcpy(buf + sizeof(t_stress_protocol_head), data, len);
-	IOCPPostSendEx(hsock, buf, len + 8);
+	HsocketSend(hsock, buf, len + 8);
 
-	subfactory = this->_factory;
 	TaskManagerRuning = true;
 }
 
@@ -46,7 +43,7 @@ void ClientProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 
 void ClientProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
 {
-	LOG(clogId, LOG_DEBUG, "stress server connection closed£º[%s:%d] socket = %lld\r\n", ip, port, hsock->fd);
+	LOG(clogId, LOG_DEBUG, "stress server connection closedï¼š[%s:%d] socket = %lld\r\n", ip, port, hsock->fd);
 	this->StressHsocket = NULL;
 	TaskManagerRuning = false;
 }
@@ -62,7 +59,7 @@ int ClientProtocol::Loop()
 	{
 		char ip[20] = { 0x0 };
 		GetHostByName((char*)this->StressSerIP, ip, sizeof(ip));
-		this->StressHsocket = IOCPConnectEx(this, ip, this->StressSerPort, TCP_CONN);
+		this->StressHsocket = HsocketConnect(this, ip, this->StressSerPort, TCP_CONN);
 	}
 
 	this->ReportError();
@@ -73,19 +70,19 @@ int ClientProtocol::Destroy()
 {
 	if (this->StressHsocket != NULL)
 	{
-		IOCPCloseHsocket(this->StressHsocket);
+		HsocketClose(this->StressHsocket);
 	}
 	return  0;
 }
 
 
-//×Ô¶¨ÒåÀà³ÉÔ±º¯Êý
+//è‡ªå®šä¹‰ç±»æˆå‘˜å‡½æ•°
 bool ClientProtocol::ReportError()
 {
 	if (this->StressHsocket == NULL)
 		return false;
 	t_task_error* err;
-	while (err = get_task_error_front())
+	while ( (err = get_task_error_front()) )
 	{
 		char data[1024] = { 0x0 };
 		int len = snprintf(data, sizeof(data), "{\"TaskID\":%d,\"UserID\":%d,\"Timestamp\":%lld,\"detail\":\"%s\"}", err->taskID, err->userID, err->timeStamp, err->errMsg);
@@ -95,7 +92,7 @@ bool ClientProtocol::ReportError()
 		char buf[256] = { 0x0 };
 		memcpy(buf, (char*)&head, sizeof(t_stress_protocol_head));
 		memcpy(buf + sizeof(t_stress_protocol_head), data, len);
-		IOCPPostSendEx(this->StressHsocket, buf, len + 8);
+		HsocketSend(this->StressHsocket, buf, len + 8);
 		//LOG("Report error %d %d", err->taskID, err->taskErrId);
 		delete_task_error(err);
 	}
@@ -110,10 +107,10 @@ void ClientProtocol::CheckReq(HSOCKET hsock, const char* data, int len)
 		packlen = this->CheckRequest(hsock, data, len);
 		if (packlen > 0)
 		{
-			len = IOCPSkipHsocketBuf(hsock, packlen);
+			len = HsocketSkipBuf(hsock, packlen);
 		}
 		else if (packlen < 0)
-			IOCPCloseHsocket(hsock);
+			HsocketClose(hsock);
 		else
 			break;
 	}
@@ -121,7 +118,7 @@ void ClientProtocol::CheckReq(HSOCKET hsock, const char* data, int len)
 
 int ClientProtocol::CheckRequest(HSOCKET hsock, const char* data, int len)
 {
-	if (len < sizeof(t_stress_protocol_head))
+	if (len < (int)sizeof(t_stress_protocol_head))
 		return 0;
 	t_stress_protocol_head head;
 	memcpy(&head, data, sizeof(t_stress_protocol_head));

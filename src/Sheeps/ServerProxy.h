@@ -1,4 +1,4 @@
-#ifndef _SERVER_PROXY_H_
+﻿#ifndef _SERVER_PROXY_H_
 #define _SERVER_PROXY_H_
 #include "ServerProtocol.h"
 
@@ -9,7 +9,7 @@ extern std::map<HSOCKET, HPROXYINFO>* ProxyMap;
 extern std::mutex* ProxyMapLock;
 
 typedef struct {
-	time_t	time;  //΢��
+	long long	time;  //微秒
 	char	ip[16];
 	int		port;
 	int		type;

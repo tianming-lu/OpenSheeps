@@ -39,9 +39,6 @@
     <ClInclude Include="TaskManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="IOCPReactor.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="SheepsFactory.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -52,6 +49,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="SheepsMemory.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Reactor.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

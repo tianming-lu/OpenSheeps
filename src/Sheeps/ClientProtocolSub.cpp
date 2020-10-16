@@ -1,23 +1,24 @@
-#include "pch.h"
-#include "io.h"
-#include "direct.h"
+Ôªø#include "pch.h"
 #include "ClientProtocolSub.h"
 #include "TaskManager.h"
+#ifdef __WINDOWS__
+#include "io.h"
+#include "direct.h"
+#endif // __WINDOWS__
 
-BaseFactory* subfactory = NULL;
+
 int clogId = -1;
 
-std::map<std::string, t_file_info> updatefile, allfile, localfile;
+static std::map<std::string, t_file_info> updatefile, allfile, localfile;
 
 int ClientLogInit(const char *configfile)
 {
-	char file[128] = { 0x0 };
-	GetPrivateProfileStringA("LOG", "client_file", "client.log", file, sizeof(file), configfile);
+	const char* file = config_get_string_value("LOG", "client_file", "client.log");
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s\\%s", LogPath, file);
-	int loglevel = GetPrivateProfileIntA("LOG", "client_level", 0, configfile);
-	int maxsize = GetPrivateProfileIntA("LOG", "client_size", 20, configfile);
-	int timesplit = GetPrivateProfileIntA("LOG", "client_time", 3600, configfile);
+	snprintf(fullpath, sizeof(fullpath), "%s%s", LogPath, file);
+	int loglevel = config_get_int_value("LOG", "client_level", 0);
+	int maxsize = config_get_int_value("LOG", "client_size", 20);
+	int timesplit = config_get_int_value("LOG", "client_time", 3600);
 	clogId = RegisterLog(fullpath, loglevel, maxsize, timesplit, 5);
 	return 0;
 }
@@ -33,7 +34,7 @@ static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 	char sockbuf[256] = { 0x0 };
 	memcpy(sockbuf, &head, sizeof(t_stress_protocol_head));
 	memcpy(sockbuf + sizeof(t_stress_protocol_head), buf, len);
-	IOCPPostSendEx(hsock, sockbuf, head.msgLen);
+	HsocketSend(hsock, sockbuf, head.msgLen);
 	return 0;
 }
 
@@ -46,7 +47,7 @@ static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 	char sockbuf[256] = { 0x0 };
 	memcpy(sockbuf, (char*)&head, sizeof(t_stress_protocol_head));
 	memcpy(sockbuf + sizeof(t_stress_protocol_head), data, len);
-	IOCPPostSendEx(hsock, sockbuf, head.msgLen);
+	HsocketSend(hsock, sockbuf, head.msgLen);
 	return 0;
 }
 
@@ -54,21 +55,20 @@ int client_cmd_2_task_init(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* projectId = cJSON_GetObjectItem(root, "projectID");
-	cJSON* envId = cJSON_GetObjectItem(root, "EnvID");
+	//cJSON* envId = cJSON_GetObjectItem(root, "EnvID");   //Â∫üÂºÉÂ≠óÊÆµ
 	cJSON* userCount = cJSON_GetObjectItem(root, "UserCount");
 	cJSON* machineId = cJSON_GetObjectItem(root, "MachineID");
 	cJSON* ignoreErr = cJSON_GetObjectItem(root, "IgnoreErr");
-	if (taskId == NULL || projectId == NULL ||envId == NULL || userCount == NULL || machineId == NULL ||
-		taskId->type != cJSON_Number || projectId->type != cJSON_Number || envId->type != cJSON_Number||
+	if (taskId == NULL || projectId == NULL || userCount == NULL || machineId == NULL ||
+		taskId->type != cJSON_Number || projectId->type != cJSON_Number ||
 		userCount->type != cJSON_Number || machineId->type != cJSON_Number)
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 
 	int taskid = taskId->valueint;
 	int projectid = projectId->valueint;
-	int envid = envId->valueint;
 	int machineid = machineId->valueint;
 	bool ignorerr = false;
 	if (ignoreErr != NULL && ignoreErr->type == cJSON_True)
@@ -90,7 +90,7 @@ int client_cmd_3_task_connection_create(HSOCKET hsock, int cmdNO, cJSON* root)
 		taskId->type != cJSON_Number || ip->type != cJSON_String || port->type != cJSON_Number ||
 		timestamp->type != cJSON_Number || microsecond->type != cJSON_Number)
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -111,7 +111,7 @@ int client_cmd_4_task_connection_send(HSOCKET hsock, int cmdNO, cJSON* root)
 		taskId->type != cJSON_Number || ip->type != cJSON_String || port->type != cJSON_Number ||
 		content->type != cJSON_String || timestamp->type != cJSON_Number || microsecond->type != cJSON_Number)
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 
@@ -137,7 +137,7 @@ int client_cmd_5_task_connection_close(HSOCKET hsock, int cmdNO, cJSON* root)
 		taskId->type != cJSON_Number || ip->type != cJSON_String || port->type != cJSON_Number ||
 		timestamp->type != cJSON_Number || microsecond->type != cJSON_Number)
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -151,7 +151,7 @@ int client_cmd_6_task_finish(HSOCKET hsock, int cmdNO, cJSON* root)
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	if (taskId == NULL || taskId->type != cJSON_Number)
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -166,7 +166,7 @@ int client_cmd_8_task_reinit(HSOCKET hsock, int cmdNO, cJSON* root)
 	cJSON* loop = cJSON_GetObjectItem(root, "Loop");
 	if (taskId == NULL || loop == NULL || taskId->type != cJSON_Number || (loop->type != cJSON_True && loop->type != cJSON_False))
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 	int realTaskID = taskId->valueint;
@@ -175,6 +175,7 @@ int client_cmd_8_task_reinit(HSOCKET hsock, int cmdNO, cJSON* root)
 	return 0;
 }
 
+#ifdef __WINDOWS__
 void getFiles(char* path, std::map<std::string, t_file_info>* files)
 {
 	intptr_t hFile = 0;
@@ -199,7 +200,7 @@ void getFiles(char* path, std::map<std::string, t_file_info>* files)
 			else
 			{
 				t_file_info info = { 0x0 };
-				getfilemd5view(fullpath, (unsigned char*)info.fmd5, sizeof(info.fmd5));
+				getfilemd5view(fullpath, info.fmd5, sizeof(info.fmd5));
 
 				files->insert(std::pair<std::string, t_file_info>(fullpath, info));
 			}
@@ -207,6 +208,7 @@ void getFiles(char* path, std::map<std::string, t_file_info>* files)
 		_findclose(hFile);
 	}
 }
+#endif
 
 int sendUpfileMsg(HSOCKET hsock)
 {
@@ -222,7 +224,7 @@ int sendUpfileMsg(HSOCKET hsock)
 	size_t size = 5120;
 	if (itt->second.size - itt->second.offset < size)
 		size = itt->second.size - itt->second.offset;
-	int n = snprintf(buff, sizeof(buff), "{\"File\":\"%s\",\"Offset\":%lld,\"Size\":%lld}", itt->first.c_str(), itt->second.offset, size);
+	int n = snprintf(buff, sizeof(buff), "{\"File\":\"%s\",\"Offset\":%zd,\"Size\":%zd}", itt->first.c_str(), itt->second.offset, size);
 	MsgSend(hsock, 10, buff, n);
 	return 0;
 }
@@ -232,11 +234,11 @@ int client_cmd_9_sync_files(HSOCKET hsock, int cmdNO, cJSON* root)
 	cJSON* files = cJSON_GetObjectItem(root, "filelist");
 	if (files == NULL || files->type != cJSON_Array)
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 
-	int dev = GetPrivateProfileIntA("mode", "dev", 0, ConfigFile);
+	int dev = config_get_int_value("mode", "dev", 0);
 	if (dev == 1)
 	{
 		LOG(clogId, LOG_FAULT, "dev mode, give up file sync!\r\n");
@@ -247,7 +249,7 @@ int client_cmd_9_sync_files(HSOCKET hsock, int cmdNO, cJSON* root)
 	updatefile.clear();
 	allfile.clear();
 	localfile.clear();
-	
+#ifdef __WINDOWS__
 	getFiles(ProjectPath, &localfile);
 
 	std::map<std::string, t_file_info>::iterator it, iter;
@@ -298,14 +300,14 @@ int client_cmd_9_sync_files(HSOCKET hsock, int cmdNO, cJSON* root)
 		if (iter == allfile.end())
 			DeleteFileA(it->first.c_str());
 	}
-
+#endif // __WINDOWS__
 	MsgResponse(hsock, cmdNO, 0, "OK");
 	LOG(clogId, LOG_DEBUG, "%s-%d files sync start!\r\n", __func__, __LINE__);
 	sendUpfileMsg(hsock);
 	return 0;
 }
 
-
+#ifdef __WINDOWS__
 bool IsDirExist(const char* pszDir)
 {
 	if (pszDir == NULL)
@@ -340,6 +342,7 @@ bool CreateFileDirectory(const char* dir)
 
 	return 0;//(0 == _mkdir(path) || EEXIST == errno); // EEXIST => errno.h    errmo => stdlib.h
 }
+#endif // __WINDOWS__
 
 int client_cmd_10_download_file(HSOCKET hsock, int cmdNO, cJSON* root)
 {
@@ -372,6 +375,7 @@ int client_cmd_10_download_file(HSOCKET hsock, int cmdNO, cJSON* root)
 	char fullpath[256] = { 0x0 };
 	snprintf(fullpath, sizeof(fullpath), "%s%s", DllPath, p + 1);
 
+#ifdef __WINDOWS__
 	if (itt->second.file == NULL)
 	{
 		CreateFileDirectory(fullpath);
@@ -392,6 +396,7 @@ int client_cmd_10_download_file(HSOCKET hsock, int cmdNO, cJSON* root)
 		fclose(itt->second.file);
 		updatefile.erase(itt);
 	}
+#endif // __WINDOWS__
 	sendUpfileMsg(hsock);
 	return 0;
 }
@@ -402,7 +407,7 @@ int client_cmd_12_task_change_user_count(HSOCKET hsock, int cmdNO, cJSON* root)
 	cJSON* change = cJSON_GetObjectItem(root, "Change");
 	if (taskId == NULL || change == NULL || taskId->type != cJSON_Number || change->type != cJSON_Number )
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 
@@ -418,7 +423,7 @@ int client_cmd_14_charge_task_loglevel(HSOCKET hsock, int cmdNO, cJSON* root)
 	cJSON* taskid = cJSON_GetObjectItem(root, "TaskID");
 	if (loglevel == NULL || taskid == NULL || loglevel->type != cJSON_Number || taskid->type != cJSON_Number)
 	{
-		MsgResponse(hsock, cmdNO, 1, "≤Œ ˝¥ÌŒÛ");
+		MsgResponse(hsock, cmdNO, 1, "ÂèÇÊï∞ÈîôËØØ");
 		return -1;
 	}
 	set_task_log_level(loglevel->valueint, taskid->valueint);

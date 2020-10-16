@@ -261,10 +261,14 @@ void GetStringSHA1(char *input, unsigned long length, char *output)
 //sha1
 
 //md5
-int getfilemd5(const char* filename, unsigned char* md5) 
+static int getfilemd5(const char* filename, unsigned char* md5) 
 {
 	FILE* file = NULL;
-	fopen_s(&file, filename, "rb");
+#ifdef __WINDOWS__
+    fopen_s(&file, filename, "rb");
+#else
+    file = fopen(filename, "rb");
+#endif // __WINDOWS__
 	if (!file)
 		return -1;
 	MD5_Context ctx;
@@ -294,22 +298,20 @@ int getfilemd5(const char* filename, unsigned char* md5)
 	return 0;
 }
 
-int getfilemd5view(const char* filename, unsigned char* md5, size_t size)
+int getfilemd5view(const char* filename, char* md5, size_t size)
 {
 	unsigned char omd5[16] = { 0x0 };
-	unsigned char smd5[36] = { 0x0 };
 
 	if (getfilemd5(filename, omd5))
 		return -1;
 
-	char* s = (char*)smd5;
+	char* s = md5;
 	int l = 0;
 	int i = 0;
 	for (i = 0; i < 16; i++)
 	{
-		l += snprintf(s + l, sizeof(smd5) - l, "%02x", omd5[i]);
+		l += snprintf(s + l, size - l, "%02x", omd5[i]);
 	}
-	strcpy_s((char*)md5,  size, (char*)smd5);
 	return 0;
 }
 //md5

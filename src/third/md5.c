@@ -160,7 +160,7 @@ void MD5Final(unsigned char digest[16], LPMD5_Context ctx)
 
     MD5Transform(ctx->stat, (uint32_t *) ctx->buf);
     memcpy(digest, ctx->stat, 16);
-    memset(ctx, 0, sizeof(ctx));
+    memset(ctx, 0, sizeof(MD5_Context));
 }
 
 void MD5Digest( const unsigned char *message, int len, unsigned char *digest) {

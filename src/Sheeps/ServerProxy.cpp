@@ -1,8 +1,11 @@
-#include "pch.h"
+ï»¿#include "pch.h"
 #include "ServerProxy.h"
-#include "ws2tcpip.h"
 #include <algorithm>
 #include <string>
+#ifdef __WINDOWS__
+#include "ws2tcpip.h"
+#endif // __WINDOWS__
+
 
 bool Proxy_record = false;
 sqlite3* mysql;
@@ -17,6 +20,7 @@ std::list<t_recode_info*>* newrecordList = NULL;
 
 int my_sqlite3_open(char* inDbName, sqlite3** ppdb)
 {
+#ifdef __WINDOWS__
 	int codepage = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
 
 	int nlen = MultiByteToWideChar(codepage, 0, inDbName, -1, NULL, 0);
@@ -26,6 +30,9 @@ int my_sqlite3_open(char* inDbName, sqlite3** ppdb)
 	nlen = WideCharToMultiByte(CP_UTF8, 0, wBuf, -1, 0, 0, 0, 0);
 	WideCharToMultiByte(CP_UTF8, 0, wBuf, -1, pBuf, nlen, 0, 0);
 	return sqlite3_open(pBuf, ppdb);
+#else
+	return sqlite3_open(inDbName, ppdb);
+#endif // __WINDOWS__
 }
 
 void ProxyServerInit()
@@ -38,7 +45,7 @@ void ProxyServerInit()
 	newrecordList = new std::list<t_recode_info*>;
 
 	char dbfile[256] = { 0x0 };
-	snprintf(dbfile, sizeof(dbfile), "%s\\%s", RecordPath, record_database);
+	snprintf(dbfile, sizeof(dbfile), "%s%s", RecordPath, record_database);
 	my_sqlite3_open(dbfile, &mysql);
 	sqlite3_exec(mysql, "PRAGMA synchronous = OFF; ", 0, 0, 0);
 }
@@ -50,8 +57,8 @@ bool ChangeDatabaseName(const char* new_name)
 
 	char oldfile[256] = { 0x0 };
 	char newfile[256] = { 0x0 };
-	snprintf(oldfile, sizeof(oldfile), "%s\\%s", RecordPath, record_database);
-	snprintf(newfile, sizeof(newfile), "%s\\%s", RecordPath, new_name);
+	snprintf(oldfile, sizeof(oldfile), "%s%s", RecordPath, record_database);
+	snprintf(newfile, sizeof(newfile), "%s%s", RecordPath, new_name);
 
 	sqlite3_close(mysql);
 
@@ -66,21 +73,6 @@ bool ChangeDatabaseName(const char* new_name)
 	my_sqlite3_open(oldfile, &mysql);
 	sqlite3_exec(mysql, "PRAGMA synchronous = OFF; ", 0, 0, 0);
 	return true;
-}
-
-static int64_t GetSysTimeMicros()
-{
-	// ´Ó1601Äê1ÔÂ1ÈÕ0:0:0:000µ½1970Äê1ÔÂ1ÈÕ0:0:0:000µÄÊ±¼ä(µ¥Î»100ns)
-#define EPOCHFILETIME   (116444736000000000UL)
-	FILETIME ft;
-	LARGE_INTEGER li;
-	int64_t tt = 0;
-	GetSystemTimeAsFileTime(&ft);
-	li.LowPart = ft.dwLowDateTime;
-	li.HighPart = ft.dwHighDateTime;
-	// ´Ó1970Äê1ÔÂ1ÈÕ0:0:0:000µ½ÏÖÔÚµÄÎ¢ÃëÊý(UTCÊ±¼ä)
-	tt = (li.QuadPart - EPOCHFILETIME) / 10;
-	return tt;
 }
 
 static void insert_msg_to_record_list(const char* ip, int port, int type, const char* msg, int len)
@@ -221,7 +213,7 @@ void insert_msg_recodr_db()
 
 static int ProxyRemoteRequest(HSOCKET hsock, ServerProtocol* proto, const char* data, int len)
 {
-	IOCPPostSendEx(proto->proxyInfo->proxySock, data, len);
+	HsocketSend(proto->proxyInfo->proxySock, data, len);
 	if (Proxy_record == true)
 	{
 		insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 1, data, len);
@@ -233,7 +225,7 @@ static int ProxyConnectRequest(HSOCKET hsock, ServerProtocol* proto, const char*
 {
 	if (len < 10)
 		return 0;
-	uint8_t ver = *data;
+	//uint8_t ver = *data;
 	uint8_t cmd = *(data + 1);
 	uint8_t type = *(data + 3);
 
@@ -263,15 +255,15 @@ static int ProxyConnectRequest(HSOCKET hsock, ServerProtocol* proto, const char*
 	proto->proxyInfo->proxyStat = PROXY_CONNECTING;
 	if (proto->proxyInfo->proxytype == TCP_CONN)
 	{
-		proto->proxyInfo->proxySock = IOCPConnectEx(proto, ip, port, TCP_CONN);
+		proto->proxyInfo->proxySock = HsocketConnect(proto, ip, port, TCP_CONN);
 		if (proto->proxyInfo->proxySock == NULL)
 		{
-			IOCPCloseHsocket(proto->initSock);
+			HsocketClose(proto->initSock);
 		}
 	}
 	else if (proto->proxyInfo->proxytype == UDP_CONN)
 	{
-		proto->proxyInfo->udpClientSock = IOCPConnectEx(proto, "0.0.0.0", 0, UDP_CONN);
+		proto->proxyInfo->udpClientSock = HsocketConnect(proto, "0.0.0.0", 0, UDP_CONN);
 		ProxyConnectionMade(proto->proxyInfo->udpClientSock, proto, ip, port);
 	}
 	return len;
@@ -286,7 +278,7 @@ static int ProxyAuthRequest(HSOCKET hsock, ServerProtocol* proto, const char* da
 	buf[0] = 0x5;
 	buf[1] = 0x0;
 	proto->proxyInfo->proxyStat = PROXY_AUTHED;
-	IOCPPostSendEx(hsock, buf, 2);
+	HsocketSend(hsock, buf, 2);
 	return clen + 2;
 }
 
@@ -314,7 +306,7 @@ int CheckPoxyRequest(HSOCKET hsock, ServerProtocol* proto, const char* ip, int p
 	{
 		if (proto->proxyInfo->proxytype == TCP_CONN)
 		{
-			IOCPPostSendEx(proto->initSock, data, len);
+			HsocketSend(proto->initSock, data, len);
 			if (Proxy_record)
 				insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 3, data, len);
 		}
@@ -324,12 +316,12 @@ int CheckPoxyRequest(HSOCKET hsock, ServerProtocol* proto, const char* ip, int p
 			memcpy(buf, proto->proxyInfo->tempmsg, 10);
 			memcpy(buf + 10, data, len);
 			
-			/*¶àÓà²Ù×÷*/
+			/*å¤šä½™æ“ä½œ*/
 			//proto->proxyInfo->udpClientSock->peer_addr.sin_family = AF_INET;
 			//proto->proxyInfo->udpClientSock->peer_addr.sin_port = htons(proto->proxyInfo->clientport);
 			//inet_pton(AF_INET, proto->proxyInfo->clientip, &proto->proxyInfo->udpClientSock->peer_addr.sin_addr);
 
-			IOCPPostSendEx(proto->proxyInfo->udpClientSock, buf, len + 10);
+			HsocketSend(proto->proxyInfo->udpClientSock, buf, len + 10);
 			delete[] buf;
 			if (Proxy_record)
 				insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 5, data, len);
@@ -345,8 +337,8 @@ int CheckPoxyRequest(HSOCKET hsock, ServerProtocol* proto, const char* ip, int p
 		proto->proxyInfo->serverport = ntohs(*(u_short*)(data + 8));
 	
 		if (proto->proxyInfo->proxySock == NULL)
-			proto->proxyInfo->proxySock = IOCPConnectEx(proto, proto->proxyInfo->serverip, proto->proxyInfo->serverport, UDP_CONN);
-		IOCPPostSendEx(proto->proxyInfo->proxySock, data + 10, len - 10);
+			proto->proxyInfo->proxySock = HsocketConnect(proto, proto->proxyInfo->serverip, proto->proxyInfo->serverport, UDP_CONN);
+		HsocketSend(proto->proxyInfo->proxySock, data + 10, len - 10);
 		if (Proxy_record)
 			insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 4, data + 10, len - 10);
 	}
@@ -360,24 +352,23 @@ void ProxyConnectionMade(HSOCKET hsock, ServerProtocol* proto, const char* ip, i
 		char buf[64] = { 0x0 };
 		buf[0] = 0x5;
 		buf[3] = 0x1;
-		char temp[32] = { 0x0 };
 
-		SOCKADDR_IN addr_tcp;
+		struct sockaddr_in addr_tcp;
 		int nSize = sizeof(addr_tcp);
-		getsockname(proto->initSock->fd, (SOCKADDR*)&addr_tcp, &nSize);
+		GetSockName(proto->initSock->fd, (struct sockaddr*)&addr_tcp, &nSize);
 
 		memcpy(buf + 4, &addr_tcp.sin_addr, sizeof(addr_tcp.sin_addr));
 			
 		if (proto->proxyInfo->proxytype == UDP_CONN)
 		{
-			SOCKADDR_IN addr_udp;
-			getsockname(proto->proxyInfo->udpClientSock->fd, (SOCKADDR*)&addr_udp, &nSize);
+			struct sockaddr_in addr_udp;
+			GetSockName(proto->proxyInfo->udpClientSock->fd, (struct sockaddr*)&addr_udp, &nSize);
 			memcpy(buf + 4 + sizeof(in_addr), (char*)&addr_udp.sin_port, 2);
 		}
 		else
 			memcpy(buf + 4 + sizeof(in_addr), (char*)&addr_tcp.sin_port, 2);
 		proto->proxyInfo->proxyStat = PROXY_CONNECTED;
-		IOCPPostSendEx(proto->initSock, buf, 4 + sizeof(in_addr) + 2);
+		HsocketSend(proto->initSock, buf, 4 + sizeof(in_addr) + 2);
 
 		snprintf(proto->proxyInfo->serverip, sizeof(proto->proxyInfo->serverip), "%s", ip);
 		proto->proxyInfo->serverport = port;
@@ -387,7 +378,7 @@ void ProxyConnectionMade(HSOCKET hsock, ServerProtocol* proto, const char* ip, i
 
 		if (Proxy_record == true && proto->proxyInfo->proxytype == TCP_CONN)
 		{
-			insert_msg_to_record_list(ip, port, 0, NULL, NULL);
+			insert_msg_to_record_list(ip, port, 0, NULL, 0);
 		}
 
 		//LOG(slogid, LOG_DEBUG, "new proxy connetion made: %s:%d\r\n", ip, port);
@@ -400,16 +391,16 @@ void ProxyConnectionFailed(HSOCKET hsock, ServerProtocol* proto, const char* ip,
 	if (proto->proxyInfo->proxyStat == PROXY_CONNECTING && proto->proxyInfo->retry > 0 && proto->initSock != NULL)
 	{
 		proto->proxyInfo->retry -= 1;
-		proto->proxyInfo->proxySock = IOCPConnectEx(proto, ip, port, TCP_CONN);
+		proto->proxyInfo->proxySock = HsocketConnect(proto, ip, port, TCP_CONN);
 		if (proto->proxyInfo->proxySock == NULL)
 		{
-			IOCPCloseHsocket(proto->initSock);
+			HsocketClose(proto->initSock);
 		}
 	}
 	else
 	{
 		proto->proxyInfo->proxySock = NULL;
-		IOCPCloseHsocket(proto->initSock);
+		HsocketClose(proto->initSock);
 	}
 }
 
@@ -418,8 +409,8 @@ void ProxyConnectionClosed(HSOCKET hsock, ServerProtocol* proto, const char* ip,
 	if (hsock == proto->proxyInfo->proxySock)
 	{
 		proto->proxyInfo->proxySock = NULL;
-		IOCPCloseHsocket(proto->initSock);
-		IOCPCloseHsocket(proto->proxyInfo->udpClientSock);
+		HsocketClose(proto->initSock);
+		HsocketClose(proto->proxyInfo->udpClientSock);
 	}
 	else if (hsock == proto->initSock)
 	{
@@ -428,21 +419,21 @@ void ProxyConnectionClosed(HSOCKET hsock, ServerProtocol* proto, const char* ip,
 		ProxyMapLock->unlock();
 		proto->initSock = NULL;
 		if (proto->proxyInfo->proxyStat >= PROXY_CONNECTING)
-			IOCPCloseHsocket(proto->proxyInfo->proxySock);
-		IOCPCloseHsocket(proto->proxyInfo->udpClientSock);
+			HsocketClose(proto->proxyInfo->proxySock);
+		HsocketClose(proto->proxyInfo->udpClientSock);
 		proto->proxyInfo->proxyStat = PROXY_INIT;
 	}
 	else if (hsock == proto->proxyInfo->udpClientSock)
 	{
 		proto->proxyInfo->udpClientSock = NULL;
-		IOCPCloseHsocket(proto->initSock);
-		IOCPCloseHsocket(proto->proxyInfo->proxySock);
+		HsocketClose(proto->initSock);
+		HsocketClose(proto->proxyInfo->proxySock);
 	}
 	if (proto->proxyInfo->proxySock == NULL && proto->initSock == NULL && proto->proxyInfo->udpClientSock == NULL)
 	{
 		if (Proxy_record == true && proto->proxyInfo->proxyStat == PROXY_CONNECTED && proto->proxyInfo->proxytype == TCP_CONN)
 		{
-			insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 2, NULL, NULL);
+			insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 2, NULL, 0);
 		}
 	}
 }

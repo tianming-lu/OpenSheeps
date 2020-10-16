@@ -1,8 +1,8 @@
-#include "pch.h"
+ï»¿#include "pch.h"
 #include "TaskManager.h"
 #include "SheepsMemory.h"
 #include "SheepsMain.h"
-#include "cstdio"
+#include <thread>
 
 bool TaskManagerRuning = false;
 
@@ -23,28 +23,13 @@ static int changTask_work_thread(HTASKCFG task, uint8_t count)
 	return left;
 }
 
-static int64_t GetSysTimeMicros()
-{
-	// ´Ó1601Äê1ÔÂ1ÈÕ0:0:0:000µ½1970Äê1ÔÂ1ÈÕ0:0:0:000µÄÊ±¼ä(µ¥Î»100ns)
-#define EPOCHFILETIME   (116444736000000000UL)
-	FILETIME ft;
-	LARGE_INTEGER li;
-	int64_t tt = 0;
-	GetSystemTimeAsFileTime(&ft);
-	li.LowPart = ft.dwLowDateTime;
-	li.HighPart = ft.dwHighDateTime;
-	// ´Ó1970Äê1ÔÂ1ÈÕ0:0:0:000µ½ÏÖÔÚµÄÎ¢ÃëÊı(UTCÊ±¼ä)
-	tt = (li.QuadPart - EPOCHFILETIME) / 10;
-	return tt;
-}
-
 static void update_user_time_clock(ReplayProtocol* proto)
 {
 	HMSGPOINTER pointer = &proto->MsgPointer;
 
 	if (pointer->last > 0)
 	{
-		UINT64 nowtime = GetSysTimeMicros();
+		uint64_t nowtime = GetSysTimeMicros();
 		proto->MsgPointer.start_real += nowtime - proto->MsgPointer.last;
 		proto->MsgPointer.last = nowtime;
 	}
@@ -150,13 +135,13 @@ static void destroy_task(HTASKCFG task)
 			for (; iter != userlist.end();)
 			{
 				user = *iter;
-				if (user->_sockCount == 0 && default_api.destory)
+				if (user->sockCount == 0 && default_api.destory)
 				{
-					default_api.destory(user);		//ÈôÁ¬½ÓÎ´¹Ø±Õ£¬¿ÉÄÜµ¼ÖÂ±ÀÀ£
+					default_api.destory(user);		//è‹¥è¿æ¥æœªå…³é—­ï¼Œå¯èƒ½å¯¼è‡´å´©æºƒ
 				}
 				else
 				{
-					LOG(clogId, LOG_ERROR, " %d ÓÃ»§Á¬½ÓÎ´ÍêÈ«¹Ø±Õ£¬µ¼ÖÂÄÚ´æĞ¹Â©£¡\r\n", __LINE__);
+					LOG(clogId, LOG_ERROR, " %d ç”¨æˆ·è¿æ¥æœªå®Œå…¨å…³é—­ï¼Œå¯¼è‡´å†…å­˜æ³„æ¼ï¼\r\n", __LINE__);
 					userClean = false;
 				}
 				userlist.erase(iter++);
@@ -174,13 +159,13 @@ static void destroy_task(HTASKCFG task)
 			for (; iter != userlist.end();)
 			{
 				user = *iter;
-				if (user->_sockCount == 0 && default_api.destory)
+				if (user->sockCount == 0 && default_api.destory)
 				{
-					default_api.destory(user);		//ÈôÁ¬½ÓÎ´¹Ø±Õ£¬¿ÉÄÜµ¼ÖÂ±ÀÀ£
+					default_api.destory(user);		//è‹¥è¿æ¥æœªå…³é—­ï¼Œå¯èƒ½å¯¼è‡´å´©æºƒ
 				}
 				else
 				{
-					LOG(clogId, LOG_ERROR, " %d ÓÃ»§Á¬½ÓÎ´ÍêÈ«¹Ø±Õ£¬µ¼ÖÂÄÚ´æĞ¹Â©£¡\r\n", __LINE__);
+					LOG(clogId, LOG_ERROR, " %d ç”¨æˆ·è¿æ¥æœªå®Œå…¨å…³é—­ï¼Œå¯¼è‡´å†…å­˜æ³„æ¼ï¼\r\n", __LINE__);
 					userClean = false;
 				}
 				userlist.erase(iter++);
@@ -197,7 +182,7 @@ static void destroy_task(HTASKCFG task)
 		}
 		else
 		{
-			LOG(clogId, LOG_ERROR, " %d ÓÃ»§Á¬½ÓÎ´ÍêÈ«¹Ø±Õ£¬µ¼ÖÂÄÚ´æĞ¹Â©£¡\r\n", __LINE__);
+			LOG(clogId, LOG_ERROR, " %d ç”¨æˆ·è¿æ¥æœªå®Œå…¨å…³é—­ï¼Œå¯¼è‡´å†…å­˜æ³„æ¼ï¼\r\n", __LINE__);
 		}
 		CloseLog(task->logfd);
 		sheeps_free(task);
@@ -223,7 +208,7 @@ static HMESSAGE task_get_next_message(ReplayProtocol* proto, bool fast)
 	if (pointer->index < task->messageList->size())
 	{
 		t_cache_message* msg = (*(task->messageList))[pointer->index];
-		UINT64 nowtime = GetSysTimeMicros();
+		uint64_t nowtime = GetSysTimeMicros();
 		if (pointer->start_real == 0)
 		{
 			pointer->start_record = msg->recordtime;
@@ -236,8 +221,8 @@ static HMESSAGE task_get_next_message(ReplayProtocol* proto, bool fast)
 		}
 		else
 		{
-			INT64 shouldtime = msg->recordtime - pointer->start_record;
-			INT64 realtime = nowtime - pointer->start_real;
+			int64_t shouldtime = msg->recordtime - pointer->start_record;
+			int64_t realtime = nowtime - pointer->start_real;
 			if (realtime < shouldtime)
 				return NULL;
 			pointer->last = nowtime;
@@ -250,15 +235,15 @@ static HMESSAGE task_get_next_message(ReplayProtocol* proto, bool fast)
 
 static void Loop(ReplayProtocol* proto)
 {
-	if (proto->PlayState == PLAY_PAUSE)		//²¥·ÅÔİÍ£
+	if (proto->PlayState == PLAY_PAUSE)		//æ’­æ”¾æš‚åœ
 	{
 		proto->TimeOut();
 		update_user_time_clock(proto);
 		return;
 	}
 	HMESSAGE message = NULL;
-	if (proto->PlayState == PLAY_FAST)		//¿ì½øÄ£Ê½ or Õı³£²¥·ÅÄ£Ê½
-		message = task_get_next_message(proto, true);	/*»ñÈ¡ÏÂÒ»²½ÓÃ»§ĞèÒª´¦ÀíµÄÊÂ¼şÏûÏ¢*/
+	if (proto->PlayState == PLAY_FAST)		//å¿«è¿›æ¨¡å¼ or æ­£å¸¸æ’­æ”¾æ¨¡å¼
+		message = task_get_next_message(proto, true);	/*è·å–ä¸‹ä¸€æ­¥ç”¨æˆ·éœ€è¦å¤„ç†çš„äº‹ä»¶æ¶ˆæ¯*/
 	else
 		message = task_get_next_message(proto, false);
 	if (message == NULL)
@@ -268,12 +253,12 @@ static void Loop(ReplayProtocol* proto)
 	}
 	switch (message->type)
 	{
-	case TYPE_CONNECT: /*Á¬½ÓÊÂ¼ş*/
-	case TYPE_CLOSE:	/*¹Ø±ÕÁ¬½ÓÊÂ¼ş*/
-	case TYPE_SEND:	/*ÏòÁ¬½Ó·¢ËÍÏûÏ¢ÊÂ¼ş*/
+	case TYPE_CONNECT: /*è¿æ¥äº‹ä»¶*/
+	case TYPE_CLOSE:	/*å…³é—­è¿æ¥äº‹ä»¶*/
+	case TYPE_SEND:	/*å‘è¿æ¥å‘é€æ¶ˆæ¯äº‹ä»¶*/
 		proto->Event(message->type, message->ip, message->port, message->content, (int)message->contentlen, message->udp);
 		break;
-	case TYPE_REINIT:	/*ÓÃ»§ÖØÖÃÊÂ¼ş£¬¹Ø±ÕËùÓĞÁ¬½Ó£¬³õÊ¼»¯ÓÃ»§×ÊÔ´*/
+	case TYPE_REINIT:	/*ç”¨æˆ·é‡ç½®äº‹ä»¶ï¼Œå…³é—­æ‰€æœ‰è¿æ¥ï¼Œåˆå§‹åŒ–ç”¨æˆ·èµ„æº*/
 		ReInit(proto, message->isloop);
 		break;
 	default:
@@ -282,19 +267,23 @@ static void Loop(ReplayProtocol* proto)
 	return;
 }
 
+#ifdef __WINDOWS__
 DWORD WINAPI taskWorkerThread(LPVOID pParam)
+#else
+int taskWorkerThread(void* pParam)
+#endif // __WINDOWS__
 {
 	t_task_config* task = (t_task_config*)pParam;
 	changTask_work_thread(task, 1);
 
 	ReplayProtocol* user = NULL;
-	int cut_count;  //ÉÏ±¨ºÍÏÂ·¢ĞèÒª¼ôÇĞµÄÓÃ»§ÊıÁ¿
+	int cut_count;  //ä¸ŠæŠ¥å’Œä¸‹å‘éœ€è¦å‰ªåˆ‡çš„ç”¨æˆ·æ•°é‡
 	std::list<ReplayProtocol*> userlist;
 	std::list<ReplayProtocol*> dellist;
 	std::list<ReplayProtocol*>::iterator iter;
-	while (task->status < 4)   //ÈÎÎñÔËĞĞÖĞ
+	while (task->status < 4)   //ä»»åŠ¡è¿è¡Œä¸­
 	{
-		Sleep(1);
+		TimeSleep(1);
 		cut_count = 0;
 		get_userAll_splice(task, userlist, 10, cut_count);
 		if (userlist.empty()) {continue; }
@@ -306,27 +295,27 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 			user = *iter;
 			if (cut_count > 0)
 			{
-				user->_protolock->lock();
+				user->protolock->lock();
 				user->Destroy();
-				user->_protolock->unlock();
+				user->protolock->unlock();
 
 				dellist.splice(dellist.end(), userlist, iter++);
 				cut_count--;
 				continue;
 			}
 
-			user->_protolock->lock();
-			if (user->SelfDead == TRUE)
+			user->protolock->lock();
+			if (user->SelfDead == true)
 			{
 				if (task->ignoreErr)
 				{
 					ReInit(user, true);
-					user->_protolock->unlock();
+					user->protolock->unlock();
 				}
 				else
 				{
 					user->Destroy();
-					user->_protolock->unlock();
+					user->protolock->unlock();
 					LOG(clogId, LOG_DEBUG, "user destroy\r\n");
 
 					dellist.splice(dellist.end(), userlist, iter++);
@@ -335,14 +324,14 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 				continue;
 			}
 			Loop(user);
-			user->_protolock->unlock();
+			user->protolock->unlock();
 			++iter;
 		}
 		add_to_userAll(task, userlist, cut_count);
 		add_to_userDes(task, dellist);
 	}
 
-	while (task->status == 4)  //ÇåÀí×ÊÔ´
+	while (task->status == 4)  //æ¸…ç†èµ„æº
 	{
 		get_userAll_splice(task, userlist, 10, cut_count);
 		if (userlist.empty())
@@ -353,14 +342,14 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 			user = *iter;
 			if (user == NULL)
 				break;
-			user->_protolock->lock();
+			user->protolock->lock();
 			user->Destroy();
-			user->_protolock->unlock();
+			user->protolock->unlock();
 
 			dellist.splice(dellist.end(), userlist, iter++);
 		}
 		add_to_userDes(task, dellist);
-		Sleep(1);
+		TimeSleep(1);
 	}
 
 	if (changTask_work_thread(task, -1) == 0)
@@ -370,18 +359,10 @@ DWORD WINAPI taskWorkerThread(LPVOID pParam)
 
 static bool run_task_thread(HTASKCFG task)
 {
-	SYSTEM_INFO sysInfor;
-	GetSystemInfo(&sysInfor);
-	for (unsigned int i = 0; i < sysInfor.dwNumberOfProcessors; i++)
-	//for (unsigned int i = 0; i < 1; i++)
+	for (int i = 0; i < GetCpuCount(); i++)
 	{
-		HANDLE ThreadHandle;
-		ThreadHandle = CreateThread(NULL, 0, taskWorkerThread, task, 0, NULL);
-		if (NULL == ThreadHandle) {
-			LOG(clogId, LOG_ERROR, "%s-%d create thread failed!", __func__, __LINE__);
-			return false;
-		}
-		CloseHandle(ThreadHandle);
+		std::thread th(taskWorkerThread, task);
+		th.detach();
 	}
 	return true;
 }
@@ -404,7 +385,7 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 			return NULL;
 		}
 		char path[256] = { 0x0 };
-		snprintf(path, sizeof(path), "%s\\task%03d.log", LogPath, taskID);
+		snprintf(path, sizeof(path), "%stask%03d.log", LogPath, taskID);
 		task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
 		task->workThereaLock = new std::mutex;
 		task->messageList = new std::vector<t_cache_message*>;
@@ -598,23 +579,34 @@ void delete_task_error(t_task_error* error)
 	sheeps_free(error);
 }
 
-bool TaskUserSocketClose(HSOCKET hsock)
+bool TaskUserSocketClose(HSOCKET &hsock)
 {
+#ifdef __WINDOWS__
 	if (hsock == NULL || hsock->fd == INVALID_SOCKET)
 		return false;
 	SOCKET fd = hsock->fd;
 	hsock->fd = INVALID_SOCKET;
-	hsock->_user->_sockCount -= 1;
+	//hsock->_user->sockCount -= 1;
+	InterlockedDecrement(&hsock->_user->sockCount);
 	CancelIo((HANDLE)fd);
 	closesocket(fd);
+	hsock = NULL;
+#else
+	if (hsock == NULL || hsock->_is_close == 1)
+		return false;
+	hsock->_is_close = 1;
+	__sync_sub_and_fetch(&hsock->_user->sockCount, 1);
+	shutdown(hsock->fd, SHUT_RD);
+	hsock = NULL;
+#endif // __WINDOWS__
 	return true;
 }
 
 bool TaskUserDead(ReplayProtocol* proto, const char* fmt, ...)
 {
-	proto->SelfDead = TRUE;
+	proto->SelfDead = true;
 
-	t_task_error* err = (t_task_error*)sheeps_malloc(sizeof(t_task_error));
+	/*t_task_error* err = (t_task_error*)sheeps_malloc(sizeof(t_task_error));
 	if (err == NULL)
 		return false;
 	t_task_config* task = proto->Task;
@@ -629,10 +621,10 @@ bool TaskUserDead(ReplayProtocol* proto, const char* fmt, ...)
 	l += vsnprintf(reason + l, (size_t)REASON_LEN - l - 1, fmt, ap);
 	va_end(ap);
 
-	memcpy(err->errMsg, reason, (l < sizeof(err->errMsg)) ? l : sizeof(err->errMsg));
+	memcpy(err->errMsg, reason, (l < (int)sizeof(err->errMsg)) ? l : sizeof(err->errMsg));
 	task->taskErrlock->lock();
 	task->taskErr->push_back(err);
-	task->taskErrlock->unlock();
+	task->taskErrlock->unlock();*/
 	return true;
 }
 
@@ -646,9 +638,13 @@ void TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...)
 	char buf[MAX_LOG_LEN];
 	struct tm tmm;
 	time_t now = time(NULL);
+#ifdef __WINDOWS__
 	localtime_s(&tmm, &now);
+#else
+	localtime_r(&now, &tmm);
+#endif // __WINDOWS__
 	char* slog = GetLogStr(level);
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, GetCurrentThreadId(), tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
@@ -656,8 +652,12 @@ void TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...)
 	va_end(ap);
 	l += snprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, "\r\n");
 
+#ifdef __WINDOWS__
 	DWORD written;
 	WriteFile(GetLogFileHandle(logfd), buf, l, &written, NULL);
+#else
+	write(GetLogFileHandle(logfd), buf, l);
+#endif // __WINDOWS__
 }
 
 void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
@@ -670,9 +670,13 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 	char buf[MAX_LOG_LEN];
 	struct tm tmm;
 	time_t now = time(NULL);
+#ifdef __WINDOWS__
 	localtime_s(&tmm, &now);
+#else
+	localtime_r(&now, &tmm);
+#endif // __WINDOWS__
 	char* slog = GetLogStr(level);
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[NO.%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, GetCurrentThreadId(), proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[NO.%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (long)THREAD_ID, proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
@@ -680,28 +684,37 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 	va_end(ap);
 	l += snprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, "\r\n");
 
+#ifdef __WINDOWS__
 	DWORD written;
 	WriteFile(GetLogFileHandle(logfd), buf, l, &written, NULL);
+#else
+	write(GetLogFileHandle(logfd), buf, l);
+#endif // __WINDOWS__
 }
 
 static void TaskManagerForever(int projectid) 
 {
-	printf("ÕıÔÚÆô¶¯...");
-	Sleep(1000);
+	printf("æ­£åœ¨å¯åŠ¨...");
+	TimeSleep(1000);
 	printf("...");
-	Sleep(1000);
+	TimeSleep(1000);
 	printf("...");
 	char in[4] = { 0x0 };
+#ifdef __WINDOWS__
+#define clear_screen "CLS"
+#else
+#define clear_screen "clear"
+#endif
 	while (true)
 	{
-		system("CLS");
-		printf("\nSheeps¸ºÔØ¶ËÕıÔÚÔËĞĞ£¬ÏîÄ¿ID[%d]:\n\n", projectid);
+		system(clear_screen);
+		printf("\nSheepsè´Ÿè½½ç«¯æ­£åœ¨è¿è¡Œï¼Œé¡¹ç›®ID[%d]:\n\n", projectid);
 		if (TaskManagerRuning)
-			printf("×´Ì¬£ºÁ¬½Ó³É¹¦\n");
+			printf("çŠ¶æ€ï¼šè¿æ¥æˆåŠŸ\n");
 		else
-			printf("×´Ì¬£ºÎ´Á¬½Ó\n");
-		printf("\nÑ¡Ôñ:¡¾QÍË³ö¡¿\n²Ù×÷£º");
-		gets_s(in, 3);
+			printf("çŠ¶æ€ï¼šæœªè¿æ¥\n");
+		printf("\né€‰æ‹©:ã€Qé€€å‡ºã€‘\næ“ä½œï¼š");
+		fgets(in, 3, stdin);
 		if (in[0] == 'Q')
 			break;
 	}
@@ -709,14 +722,14 @@ static void TaskManagerForever(int projectid)
 
 void TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop)
 {
+	config_init(ConfigFile);
 	default_api.create = create;
 	default_api.destory = destory;
 	default_api.taskstart = taskstart;
 	default_api.taskstop = taskstop;
 
-	char ip[32] = { 0x0 };
-	GetPrivateProfileStringA("agent", "srv_ip", "127.0.0.1", ip, sizeof(ip), ConfigFile);
-	int port = GetPrivateProfileIntA("agent", "srv_port", 1080, ConfigFile);
+	const char* ip = config_get_string_value("agent", "srv_ip", "127.0.0.1");
+	int port = config_get_int_value("agent", "srv_port", 1080);
 	SheepsClientRun(ip, port, projectid);
 	TaskManagerForever(projectid);
 }

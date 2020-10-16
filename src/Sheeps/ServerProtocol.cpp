@@ -1,5 +1,4 @@
-#include "pch.h"
-#include "ws2tcpip.h"
+ï»¿#include "pch.h"
 #include "ServerProtocol.h"
 #include "ServerProxy.h"
 #include "ServerConsole.h"
@@ -9,13 +8,12 @@ int slogid = -1;
 
 void ServerInit(char* configfile)
 {
-	char file[128] = { 0x0 };
-	GetPrivateProfileStringA("LOG", "server_file", "server.log", file, sizeof(file), configfile);
+	const char* file = config_get_string_value("LOG", "server_file", "server.log");
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s\\%s", LogPath, file);
-	int loglevel = GetPrivateProfileIntA("LOG", "server_level", 0, configfile);
-	int maxsize = GetPrivateProfileIntA("LOG", "serveer_size", 20, configfile);
-	int timesplit = GetPrivateProfileIntA("LOG", "server_time", 3600, configfile);
+	snprintf(fullpath, sizeof(fullpath), "%s%s", LogPath, file);
+	int loglevel = config_get_int_value("LOG", "server_level", 0);
+	int maxsize = config_get_int_value("LOG", "serveer_size", 20);
+	int timesplit = config_get_int_value("LOG", "server_time", 3600);
 	slogid = RegisterLog(fullpath, loglevel, maxsize, timesplit, 5);
 }
 
@@ -31,7 +29,7 @@ ServerProtocol::~ServerProtocol()
 }
 
 
-//¹ÌÓÐº¯Êý£¬¼Ì³Ð×Ô»ùÀà
+//å›ºæœ‰å‡½æ•°ï¼Œç»§æ‰¿è‡ªåŸºç±»
 void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 {
 	//LOG(slogid, LOG_DEBUG, "%s:%d %s:%d\r\n", __func__, __LINE__, ip, port);
@@ -47,7 +45,7 @@ void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 		break;
 	}
 	//LOG(slogid, LOG_DEBUG, "new unnkown connetion made: %s:%d\r\n", ip, port);
-	IOCPCloseHsocket(hsock);
+	HsocketClose(hsock);
 }
 
 void ServerProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
@@ -61,7 +59,7 @@ void ServerProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 	default:
 		break;
 	}
-	IOCPCloseHsocket(this->initSock);
+	HsocketClose(this->initSock);
 }
 
 void ServerProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
@@ -86,7 +84,7 @@ void ServerProtocol::Recved(HSOCKET hsock, const char* ip, int port, const char*
 	return this->CheckReq(hsock, ip, port, data, len);
 }
 
-//×Ô¶¨ÒåÀà³ÉÔ±º¯Êý
+//è‡ªå®šä¹‰ç±»æˆå‘˜å‡½æ•°
 
 void ServerProtocol::CheckReq(HSOCKET hsock, const char* ip, int port, const char* data, int len)
 {
@@ -98,10 +96,10 @@ void ServerProtocol::CheckReq(HSOCKET hsock, const char* ip, int port, const cha
 			clen = this->CheckRequest(hsock, ip, port, data, len);
 			if (clen > 0)
 			{
-				len = IOCPSkipHsocketBuf(hsock, clen);
+				len = HsocketSkipBuf(hsock, clen);
 			}
 			else if (clen < 0)
-				IOCPCloseHsocket(hsock);
+				HsocketClose(hsock);
 			else
 				break;
 		}
@@ -115,12 +113,12 @@ void ServerProtocol::CheckReq(HSOCKET hsock, const char* ip, int port, const cha
 		default:
 			break;
 		}
-		IOCPSkipHsocketBuf(hsock, len);
+		HsocketSkipBuf(hsock, len);
 	}
 	return;
 }
 
-#ifdef _MSC_VER
+#ifdef __WINDOWS__
 static int strncasecmp(const char* input_buffer, const char* s2, int n)
 {
 	return _strnicmp(input_buffer, s2, n);

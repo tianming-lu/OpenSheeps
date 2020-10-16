@@ -1,4 +1,4 @@
-#ifndef _SERVER_CONSOLE_H_
+ï»¿#ifndef _SERVER_CONSOLE_H_
 #define _SERVER_CONSOLE_H_
 #include "ServerProtocol.h"
 #include <map>
@@ -29,7 +29,7 @@ typedef struct {
 	int32_t		totalUser;
 	int32_t		onceUser;
 	uint16_t	spaceTime;
-	uint8_t		loopMode; //0Ñ­»· 1²»Ñ­»· 2ÊµÊ±»Ø·Å
+	uint8_t		loopMode; //0å¾ªç¯ 1ä¸å¾ªç¯ 2å®æ—¶å›æ”¾
 	bool		ignoreErr;
 	uint8_t		taskState;
 	char		taskDes[64];
@@ -39,7 +39,7 @@ typedef struct {
 }TaskConfig, * HTASKCONFIG;
 
 typedef struct {
-	time_t		recordTime;
+	long long	recordTime;
 	uint8_t		recordType;
 	char		ip[16];
 	int			port;
@@ -57,7 +57,7 @@ typedef struct {
 	std::list<RecordMsg> *tempMsg;
 	time_t startRecord;
 	time_t startReal;
-	uint32_t startRow;
+	int32_t startRow;
 	bool stopPushRecord;
 	sqlite3* dbConn;
 	char* dbsql;

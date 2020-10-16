@@ -2,7 +2,6 @@
 //
 #include "Starter.h"
 #include <iostream>
-#include "windows.h"
 
 const char* defaultIP = "127.0.0.1";
 short defaultPort = 0;
@@ -31,6 +30,7 @@ int main(int argc, char* argv[])
 		port = atoi(argv[2]);
 		listen = atoi(argv[3]);
 	}
+#ifdef __WINDOWS__
 	strdll.dllHandle = LoadLibraryA("Sheeps.dll");
 	if (strdll.dllHandle == NULL)
 	{
@@ -39,16 +39,31 @@ int main(int argc, char* argv[])
 	}
 	strdll.run = (StressClientRun)GetProcAddress((HMODULE)strdll.dllHandle, "StressClientRun");
 	strdll.stop = (StressClientStop)GetProcAddress((HMODULE)strdll.dllHandle, "StressClientStop");
+#else
+	strdll.dllHandle = dlopen("./libsheeps.so", RTLD_NOW);
+	if (strdll.dllHandle == NULL)
+	{
+		printf("dll load failed: %s\n", dlerror());
+		return -1;
+	}
+	strdll.run = (StressClientRun)dlsym(strdll.dllHandle, "StressClientRun");
+	strdll.stop = (StressClientStop)dlsym(strdll.dllHandle, "StressClientStop");
+#endif
 
 	strdll.run(ip, port, listen);
 	char in[4] = { 0x0 };
+#ifdef __WINDOWS__
+#define clear_screen "CLS"
+#else
+#define clear_screen "clear"
+#endif
 	while (true)
 	{
-		system("CLS");
+		system(clear_screen);
 		printf("\nSheeps控制端运行中......\n\n");
 		printf("控  制  端：[0.0.0.0:%d]\nsocks5代理：[0.0.0.0:%d]\n后      台：[http://127.0.0.1:%d]\n", listen, listen, listen);
 		printf("\n选择:【Q退出】\n操作：");
-		gets_s(in, 3);
+		fgets(in, 3, stdin);
 		if (in[0] == 'Q')
 			break;
 	}

@@ -6,6 +6,7 @@
 #include "SheepsMemory.h"
 #include <iostream>
 
+#ifdef __WINDOWS__
 #ifdef _DEBUG
 #ifndef _WIN64
 #pragma comment(lib,".\\..\\Debug\\third.lib")
@@ -20,9 +21,11 @@
 #pragma comment(lib, ".\\..\\X64\\release\\third.lib")
 #endif // _WIN32
 #endif
+#endif // __WINDOWS__
 
 int StressClientRun(char *stressIp, short stressPort, short listenPort)
 {
+	config_init(ConfigFile);
 	cJSON_Hooks jsonhook = { 0x0 };
 	jsonhook.malloc_fn = sheeps_malloc;
 	jsonhook.free_fn = sheeps_free;
@@ -31,7 +34,7 @@ int StressClientRun(char *stressIp, short stressPort, short listenPort)
 	if (rec == NULL)
 	{
 		rec = new Reactor();
-		IOCPServerStart(rec);
+		ReactorStart(rec);
 	}
 	if (NULL == stressfc)
 	{
@@ -42,11 +45,11 @@ int StressClientRun(char *stressIp, short stressPort, short listenPort)
 	stressfc->StressServerPort = stressPort;
 	if (stressPort > 0)
 		stressfc->ClientRun = true;
-	IOCPFactoryRun(stressfc);
+	FactoryRun(stressfc);
 	return 0;
 }
 
-int SheepsClientRun(char* stressIp, short stressPort, int projectid)
+int SheepsClientRun(const char* stressIp, short stressPort, int projectid)
 {
 	cJSON_Hooks jsonhook = { 0x0 };
 	jsonhook.malloc_fn = sheeps_malloc;
@@ -56,7 +59,7 @@ int SheepsClientRun(char* stressIp, short stressPort, int projectid)
 	if (rec == NULL)
 	{
 		rec = new Reactor();
-		IOCPServerStart(rec);
+		ReactorStart(rec);
 	}
 	if (NULL == stressfc)
 	{
@@ -68,14 +71,14 @@ int SheepsClientRun(char* stressIp, short stressPort, int projectid)
 	stressfc->projectid = projectid;
 	if (stressPort > 0)
 		stressfc->ClientRun = true;
-	IOCPFactoryRun(stressfc);
+	FactoryRun(stressfc);
 	return 0;
 }
 
 int StressClientStop()
 {
-	IOCPFactoryStop(stressfc);
-	//IOCPServerStop(stressfc);
+	FactoryStop(stressfc);
+	//ReactorStop(stressfc);
 	//delete stressfc;
 	return 0;
 }

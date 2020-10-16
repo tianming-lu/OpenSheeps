@@ -1,16 +1,24 @@
-#ifndef _TASK_MANAGER_H_
+ï»¿#ifndef _TASK_MANAGER_H_
 #define _TASK_MANAGER_H_
 #include <vector>
 #include <list>
 #include <map>
 #include <mutex>
-#include "IOCPReactor.h"
+#include "Reactor.h"
 
+#if !defined(__WINDOWS__) && (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))
+#define __WINDOWS__
+#endif
+
+#ifdef __WINDOWS__
 #if defined STRESS_EXPORTS
 #define Task_API __declspec(dllexport)
 #else
 #define Task_API __declspec(dllimport)
 #endif
+#else
+#define Task_API
+#endif // __WINDOWS__
 
 extern int clogId;
 extern bool TaskManagerRuning;
@@ -19,12 +27,12 @@ enum loglevel { LOG_TRACE = 0, LOG_DEBUG, LOG_NORMAL, LOG_ERROR, LOG_FAULT, LOG_
 #endif
 
 enum {
-	//·¢ËÍÂ¼ÖÆĞ­ÒéÊ±·µ»ØÈ·ÈÏ·¢ËÍÊı¾İ°ü»òÕß¶ªÆúÊı¾İ°ü£¬Ä¬ÈÏÊÇDOSEND
+	//å‘é€å½•åˆ¶åè®®æ—¶è¿”å›ç¡®è®¤å‘é€æ•°æ®åŒ…æˆ–è€…ä¸¢å¼ƒæ•°æ®åŒ…ï¼Œé»˜è®¤æ˜¯DOSEND
 	DOSEND = 0x01,
 	GIVEUP = 0x02,
-	//¸´ºÏ¶¯×÷,ÑÓ³ÙÏûÏ¢²¢ÔİÍ£
+	//å¤åˆåŠ¨ä½œ,å»¶è¿Ÿæ¶ˆæ¯å¹¶æš‚åœ
 	DELAY = 0x04,
-	//È·¶¨ÓÃ»§²¥·Å×´Ì¬
+	//ç¡®å®šç”¨æˆ·æ’­æ”¾çŠ¶æ€
 	NOTHING = 0x10,
 	NORMAL = 0x20,
 	PAUSE = 0x40,
@@ -46,8 +54,8 @@ enum {
 
 typedef struct {
 	uint32_t	index;
-	uint64_t	start_record;		//Î¢Ãë
-	uint64_t	start_real;			//Î¢Ãë
+	uint64_t	start_record;		//å¾®ç§’
+	uint64_t	start_real;			//å¾®ç§’
 	uint64_t	last;
 }MSGPointer, *HMSGPOINTER;
 
@@ -60,7 +68,7 @@ typedef struct {
 		uint16_t port;
 		uint16_t isloop;
 	};
-	uint64_t	recordtime;		//Î¢Ãë
+	uint64_t	recordtime;		//å¾®ç§’
 	char*		content;
 	uint32_t	contentlen;
 	bool		udp;
@@ -69,14 +77,14 @@ typedef struct {
 typedef struct
 {
 	uint8_t		taskID;
-	uint32_t	userID;
-	time_t		timeStamp;
+	int32_t		userID;
+	long long	timeStamp;
 	char		errMsg[64];
 }t_task_error;
 
 typedef struct {
 	int			logfd;
-	uint8_t		status;    //0 Î´¿ªÊ¼ 1³õÊ¼»¯ÖĞ 2³õÊ¼»¯Íê³É 3ÈÎÎñÔËĞĞÖĞ 4ÈÎÎñÖĞÖ¹ÇåÀí×ÊÔ´¹ı³ÌÖĞ
+	uint8_t		status;    //0 æœªå¼€å§‹ 1åˆå§‹åŒ–ä¸­ 2åˆå§‹åŒ–å®Œæˆ 3ä»»åŠ¡è¿è¡Œä¸­ 4ä»»åŠ¡ä¸­æ­¢æ¸…ç†èµ„æºè¿‡ç¨‹ä¸­
 
 	uint8_t		taskID;
 	uint8_t		projectID;
@@ -84,17 +92,17 @@ typedef struct {
 	uint16_t	userCount;
 	bool		ignoreErr;
 
-	uint8_t			workThreadCount;  //ÈÎÎñ¹¤×÷Ïß³Ì£¬ËùÓĞÏß³ÌÍË³öºó¿ªÊ¼Ïú»ÙÈÎÎñ
+	uint8_t			workThreadCount;  //ä»»åŠ¡å·¥ä½œçº¿ç¨‹ï¼Œæ‰€æœ‰çº¿ç¨‹é€€å‡ºåå¼€å§‹é”€æ¯ä»»åŠ¡
 	std::mutex*		workThereaLock;
 
-	std::vector<t_cache_message*>*	messageList;    //ÈÎÎñÏûÏ¢»º´æ
+	std::vector<t_cache_message*>*	messageList;    //ä»»åŠ¡æ¶ˆæ¯ç¼“å­˜
 	bool							stopMessageCache;
 
 	uint16_t	aliveCount;
 	uint16_t	userNumber;
-	std::list<ReplayProtocol*>*	userAll;			//ÔËĞĞÈÎÎñÖĞÓÃ»§ÁĞ±í
+	std::list<ReplayProtocol*>*	userAll;			//è¿è¡Œä»»åŠ¡ä¸­ç”¨æˆ·åˆ—è¡¨
 	std::mutex*			userAllLock;
-	std::list<ReplayProtocol*>*	userDes;			//ÔËĞĞ½áÊøÓÃ»§ÁĞ±í
+	std::list<ReplayProtocol*>*	userDes;			//è¿è¡Œç»“æŸç”¨æˆ·åˆ—è¡¨
 	std::mutex*			userDesLock;
 
 	std::list<t_task_error*>*	taskErr;
@@ -140,7 +148,7 @@ public:
 	virtual void Destroy() = 0;
 };
 
-//ÊÜ¿Ø¶ËÂß¼­API
+//å—æ§ç«¯é€»è¾‘API
 
 #ifdef __cplusplus
 extern "C"
@@ -157,15 +165,15 @@ t_task_error*	get_task_error_front();
 void			delete_task_error(t_task_error* error);
 
 
-//ÏîÄ¿ÒµÎñÂß¼­API
+//é¡¹ç›®ä¸šåŠ¡é€»è¾‘API
 Task_API void		TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop);
 Task_API bool		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
-Task_API bool		TaskUserSocketClose(HSOCKET hsock);
+Task_API bool		TaskUserSocketClose(HSOCKET &hsock);
 Task_API void		TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);
 Task_API void		TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...);
-#define		TaskUserSocketConnet(ip, port, proto, iotype)	IOCPConnectEx(ip, port, proto, iotype)
-#define		TaskUserSocketSend(hsock, data, len)			IOCPPostSendEx(hsock, data, len)
-#define		TaskUserSocketSkipBuf(hsock, len)				IOCPSkipHsocketBuf(hsock, len)
+#define		TaskUserSocketConnet(ip, port, proto, iotype)	HsocketConnect(ip, port, proto, iotype)
+#define		TaskUserSocketSend(hsock, data, len)			HsocketSend(hsock, data, len)
+#define		TaskUserSocketSkipBuf(hsock, len)				HsocketSkipBuf(hsock, len)
 
 #ifdef __cplusplus
 }

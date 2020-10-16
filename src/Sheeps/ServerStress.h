@@ -1,7 +1,7 @@
 #ifndef _SERVER_STRESS_H_
 #define _SERVER_STRESS_H_
 #include "SheepsStruct.h"
-#include "IOCPReactor.h"
+#include "Reactor.h"
 #include "ServerProtocol.h"
 #include <list>
 

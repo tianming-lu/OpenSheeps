@@ -3,7 +3,7 @@
 
 void* sheeps_malloc(size_t size)
 {
-#ifdef _MSC_VER
+#ifdef __WINDOWS__
 	return GlobalAlloc(GPTR, size);
 #else
 	void* ptr = malloc(size);
@@ -15,7 +15,7 @@ void* sheeps_malloc(size_t size)
 
 void* sheeps_realloc(void* ptr, size_t size)
 {
-#ifdef _MSC_VER
+#ifdef __WINDOWS__
 	return GlobalReAlloc(ptr, size, GMEM_MOVEABLE);
 #else
 	return realloc(ptr, size);
@@ -24,7 +24,7 @@ void* sheeps_realloc(void* ptr, size_t size)
 
 void sheeps_free(void* ptr)
 {
-#ifdef _MSC_VER
+#ifdef __WINDOWS__
 	GlobalFree(ptr);
 #else
 	free(ptr);

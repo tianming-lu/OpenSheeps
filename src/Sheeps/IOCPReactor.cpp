@@ -1,8 +1,8 @@
 ﻿#include "pch.h"
-#include "IOCPReactor.h"
-#include "SheepsMemory.h"
+#include "Reactor.h"
 #include <Ws2tcpip.h>
 #include <map>
+#include <thread>
 
 #pragma comment(lib, "Ws2_32.lib")	
 
@@ -12,24 +12,39 @@
 #define ACCEPT	2
 #define CONNECT 3
 
+static inline void* pst_malloc(size_t size)
+{
+	return GlobalAlloc(GPTR, size);
+}
+
+static inline void* pst_realloc(void* ptr, size_t size)
+{
+	return GlobalReAlloc(ptr, size, GMEM_MOVEABLE);
+}
+
+static inline void pst_free(void* ptr)
+{
+	GlobalFree(ptr);
+}
+
 static IOCP_SOCKET* NewIOCP_Socket()
 {
-	return (IOCP_SOCKET*)sheeps_malloc(sizeof(IOCP_SOCKET));
+	return (IOCP_SOCKET*)pst_malloc(sizeof(IOCP_SOCKET));
 }
 
 static void ReleaseIOCP_Socket(IOCP_SOCKET* IocpSock)
 {
-	sheeps_free(IocpSock);
+	pst_free(IocpSock);
 }
 
 static IOCP_BUFF* NewIOCP_Buff()
 {
-	return (IOCP_BUFF*)sheeps_malloc(sizeof(IOCP_BUFF));
+	return (IOCP_BUFF*)pst_malloc(sizeof(IOCP_BUFF));
 }
 
 static void ReleaseIOCP_Buff(IOCP_BUFF* IocpBuff)
 {
-	sheeps_free(IocpBuff);
+	pst_free(IocpBuff);
 }
 
 static SOCKET GetListenSock(int port)
@@ -62,7 +77,7 @@ static bool PostAcceptClient(BaseFactory* fc)
 	{
 		return false;
 	}
-	IocpBuff->databuf.buf = (char*)sheeps_malloc(DATA_BUFSIZE);
+	IocpBuff->databuf.buf = (char*)pst_malloc(DATA_BUFSIZE);
 	if (IocpBuff->databuf.buf == NULL)
 	{
 		ReleaseIOCP_Buff(IocpBuff);
@@ -79,7 +94,7 @@ static bool PostAcceptClient(BaseFactory* fc)
 	}
 
 	/*调用AcceptEx函数，地址长度需要在原有的上面加上16个字节向服务线程投递一个接收连接的的请求*/
-	bool rc = fc->reactor->lpfnAcceptEx(fc->sListen, IocpBuff->fd,
+	bool rc = fc->reactor->lpfnAcceptEx(fc->Listenfd, IocpBuff->fd,
 		IocpBuff->databuf.buf, 0,
 		sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16,
 		&IocpBuff->databuf.len, &(IocpBuff->overlapped));
@@ -101,13 +116,13 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 	{
 	case ACCEPT:
 		if (IocpBuff->databuf.buf)
-			sheeps_free(IocpBuff->databuf.buf);
+			pst_free(IocpBuff->databuf.buf);
 		ReleaseIOCP_Buff(IocpBuff);
 		PostAcceptClient(IocpSock->factory);
 		return;
 	case WRITE:
 		if (IocpBuff->databuf.buf != NULL)
-			sheeps_free(IocpBuff->databuf.buf);
+			pst_free(IocpBuff->databuf.buf);
 		ReleaseIOCP_Buff(IocpBuff);
 		return;
 	default:
@@ -117,18 +132,30 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 	int left_count = 99;
 	if (IocpSock->fd != INVALID_SOCKET)
 	{
-		proto->_protolock->lock();
-		if (IocpSock->fd != INVALID_SOCKET)
+		if (proto->protolock)
 		{
-			left_count = proto->_sockCount -= 1;
+			proto->protolock->lock();
+			if (IocpSock->fd != INVALID_SOCKET)
+			{
+				//left_count = proto->sockCount -= 1;
+				left_count = InterlockedDecrement(&proto->sockCount);
+				if (CONNECT == IocpBuff->type)
+					proto->ConnectionFailed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+				else
+					proto->ConnectionClosed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+			}
+			proto->protolock->unlock();
+		}
+		else
+		{
+			left_count = InterlockedDecrement(&proto->sockCount);
 			if (CONNECT == IocpBuff->type)
 				proto->ConnectionFailed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
 			else
 				proto->ConnectionClosed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
 		}
-		proto->_protolock->unlock();
 	}
-	if (left_count == 0 && proto != NULL && proto->_protoType == SERVER_PROTOCOL)
+	if (left_count == 0 && proto != NULL && proto->protoType == SERVER_PROTOCOL)
 		IocpSock->factory->DeleteProtocol(proto);
 
 	if (IocpSock->fd != INVALID_SOCKET && IocpSock->fd != NULL)
@@ -140,7 +167,7 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 
 	}
 	if (IocpSock->recv_buf)
-		sheeps_free(IocpSock->recv_buf);
+		pst_free(IocpSock->recv_buf);
 	ReleaseIOCP_Buff(IocpBuff);
 	ReleaseIOCP_Socket(IocpSock);
 	MemoryBarrier();
@@ -158,7 +185,7 @@ static bool ResetIocp_Buff(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 		}
 		else
 		{
-			IocpSock->recv_buf = (char*)sheeps_malloc(DATA_BUFSIZE);
+			IocpSock->recv_buf = (char*)pst_malloc(DATA_BUFSIZE);
 			if (IocpSock->recv_buf == NULL)
 				return false;
 			IocpBuff->size = DATA_BUFSIZE;
@@ -168,7 +195,7 @@ static bool ResetIocp_Buff(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 	if (IocpBuff->databuf.len == 0)
 	{
 		IocpBuff->size += DATA_BUFSIZE;
-		IocpSock->recv_buf = (char*)sheeps_realloc(IocpSock->recv_buf, IocpBuff->size);
+		IocpSock->recv_buf = (char*)pst_realloc(IocpSock->recv_buf, IocpBuff->size);
 		if (IocpSock->recv_buf == NULL)
 			return false;
 		IocpBuff->databuf.len = IocpBuff->size - IocpBuff->offset;
@@ -240,7 +267,8 @@ static bool AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 		Close(IocpListenSock, IocpBuff);
 		return false;
 	}
-	proto->SetFactory(fc, SERVER_PROTOCOL);
+	if (proto->factory == NULL)
+		proto->SetFactory(fc, SERVER_PROTOCOL);
 	IocpSock->factory = fc;
 	IocpSock->_user = proto;	//用户指针
 	IocpSock->_IocpBuff = IocpBuff;
@@ -249,11 +277,19 @@ static bool AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 	getpeername(IocpSock->fd, (SOCKADDR*)&IocpSock->peer_addr, &nSize);
 	inet_ntop(AF_INET, &IocpSock->peer_addr.sin_addr, IocpSock->peer_ip, sizeof(IocpSock->peer_ip));
 	IocpSock->peer_port = ntohs(IocpSock->peer_addr.sin_port);
-	proto->_sockCount += 1;
+	//proto->sockCount += 1;
+	InterlockedIncrement(&proto->sockCount);
 	CreateIoCompletionPort((HANDLE)IocpSock->fd, reactor->ComPort, (ULONG_PTR)IocpSock, 0);	//将监听到的套接字关联到完成端口
-	proto->_protolock->lock();
-	proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
-	proto->_protolock->unlock();
+	if (proto->protolock)
+	{
+		proto->protolock->lock();
+		proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+		proto->protolock->unlock();
+	}
+	else
+	{
+		proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+	}
 
 	PostRecv(IocpSock, IocpBuff, proto);
 	PostAcceptClient(IocpListenSock->factory);
@@ -269,16 +305,23 @@ static bool ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 		proto = IocpSock->_user;
 		if (IocpSock->fd != INVALID_SOCKET)
 		{
-			if (IocpSock->_iotype == UDP_CONN)
+			if (IocpSock->_iotype == UDP_CONN && IocpSock->peer_port == 0)
 			{
 				inet_ntop(AF_INET, &IocpSock->peer_addr.sin_addr, IocpSock->peer_ip, sizeof(IocpSock->peer_ip));
 				IocpSock->peer_port = ntohs(IocpSock->peer_addr.sin_port);
 			}
-
-			proto->_protolock->lock();
-			if (IocpSock->fd != INVALID_SOCKET)
+			if (proto->protolock)
+			{
+				proto->protolock->lock();
+				if (IocpSock->fd != INVALID_SOCKET)
+					proto->Recved(IocpSock, IocpSock->peer_ip, IocpSock->peer_port, IocpSock->recv_buf, IocpBuff->offset);
+				proto->protolock->unlock();
+			}
+			else
+			{
 				proto->Recved(IocpSock, IocpSock->peer_ip, IocpSock->peer_port, IocpSock->recv_buf, IocpBuff->offset);
-			proto->_protolock->unlock();
+			}
+				
 
 			PostRecv(IocpSock, IocpBuff, proto);
 		}
@@ -293,10 +336,17 @@ static bool ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 		proto = IocpSock->_user;
 		if (IocpSock->fd != INVALID_SOCKET)
 		{
-			proto->_protolock->lock();
-			if (IocpSock->fd != INVALID_SOCKET)
+			if (proto->protolock)
+			{
+				proto->protolock->lock();
+				if (IocpSock->fd != INVALID_SOCKET)
+					proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+				proto->protolock->unlock();
+			}
+			else
+			{
 				proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
-			proto->_protolock->unlock();
+			}
 			PostRecv(IocpSock, IocpBuff, proto);
 		}
 		else
@@ -329,7 +379,7 @@ DWORD WINAPI serverWorkerThread(LPVOID pParam)
 		bRet = GetQueuedCompletionStatus(reactor->ComPort, &dwIoSize, (PULONG_PTR)&IocpSock, (LPOVERLAPPED*)&IocpBuff, INFINITE);
 		if (bRet == false)
 		{
-			if (WAIT_TIMEOUT == GetLastError())
+			if (IocpBuff == NULL || WAIT_TIMEOUT == GetLastError())
 				continue;
 			Close(IocpSock, IocpBuff);
 			continue;
@@ -351,15 +401,11 @@ DWORD WINAPI serverWorkerThread(LPVOID pParam)
 DWORD WINAPI mainIOCPServer(LPVOID pParam)
 {
 	Reactor* reactor = (Reactor*)pParam;
-	for (unsigned int i = 0; i < reactor->CPU_COUNT*2; i++)
+	for (int i = 0; i < reactor->CPU_COUNT*2; i++)
 	//for (unsigned int i = 0; i < 1; i++)
 	{
-		HANDLE ThreadHandle;
-		ThreadHandle = CreateThread(NULL, 0, serverWorkerThread, pParam, 0, NULL);
-		if (NULL == ThreadHandle) {
-			return -4;
-		}
-		CloseHandle(ThreadHandle);
+		std::thread th(serverWorkerThread, pParam);
+		th.detach();
 	}
 	while (reactor->Run)
 	{
@@ -373,7 +419,7 @@ DWORD WINAPI mainIOCPServer(LPVOID pParam)
 	return 0;
 }
 
-int IOCPServerStart(Reactor* reactor)
+int ReactorStart(Reactor* reactor)
 {
 	WSADATA wsData;
 	if (0 != WSAStartup(0x0202, &wsData))
@@ -404,48 +450,45 @@ int IOCPServerStart(Reactor* reactor)
 	}
 	closesocket(tempSock);
 
-	HANDLE ThreadHandle = CreateThread(NULL, 0, mainIOCPServer, reactor, 0, NULL);
-	if (NULL == ThreadHandle) {
-		return -4;
-	}
-	CloseHandle(ThreadHandle);
+	std::thread th(mainIOCPServer, reactor);
+	th.detach();
 	return 0;
 }
 
-void IOCPServerStop(Reactor* reactor)
+void ReactorStop(Reactor* reactor)
 {
 	reactor->Run = false;
 }
 
-int IOCPFactoryRun(BaseFactory* fc)
+int FactoryRun(BaseFactory* fc)
 {	
 	fc->FactoryInit();
 
 	if (fc->ServerPort != 0)
 	{
-		fc->sListen = GetListenSock(fc->ServerPort);
-		if (fc->sListen == SOCKET_ERROR)
+		fc->Listenfd = GetListenSock(fc->ServerPort);
+		if (fc->Listenfd == SOCKET_ERROR)
 			return -1;
 
 		IOCP_SOCKET* IcpSock = NewIOCP_Socket();
 		if (IcpSock == NULL)
 		{
-			closesocket(fc->sListen);
+			closesocket(fc->Listenfd);
 			return -2;
 		}
 		IcpSock->factory = fc;
-		IcpSock->fd = fc->sListen;
+		IcpSock->fd = fc->Listenfd;
 
-		CreateIoCompletionPort((HANDLE)fc->sListen, fc->reactor->ComPort, (ULONG_PTR)IcpSock, 0);
-		for (DWORD i = 0; i < fc->reactor->CPU_COUNT; i++)
+		CreateIoCompletionPort((HANDLE)fc->Listenfd, fc->reactor->ComPort, (ULONG_PTR)IcpSock, 0);
+		for (int i = 0; i < fc->reactor->CPU_COUNT; i++)
 			PostAcceptClient(fc);
 	}
 	
-	fc->reactor->FactoryAll.insert(std::pair<short, BaseFactory*>(fc->ServerPort, fc));
+	fc->reactor->FactoryAll.insert(std::pair<uint16_t, BaseFactory*>(fc->ServerPort, fc));
 	return 0;
 }
 
-int IOCPFactoryStop(BaseFactory* fc)
+int FactoryStop(BaseFactory* fc)
 {
 	std::map<uint16_t, BaseFactory*>::iterator iter;
 	iter = fc->reactor->FactoryAll.find(fc->ServerPort);
@@ -497,7 +540,7 @@ static bool IOCPConnectTCP(BaseFactory* fc, IOCP_SOCKET* IocpSock, IOCP_BUFF* Io
 	if (IocpSock->fd == INVALID_SOCKET)
 		return false;
 
-	setsockopt(IocpSock->fd, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&(fc->sListen), sizeof(fc->sListen));
+	setsockopt(IocpSock->fd, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&(fc->Listenfd), sizeof(fc->Listenfd));
 
 	sockaddr_in local_addr;
 	memset(&local_addr, 0, sizeof(sockaddr_in));
@@ -541,11 +584,11 @@ static bool IOCPConnectTCP(BaseFactory* fc, IOCP_SOCKET* IocpSock, IOCP_BUFF* Io
 	return true;
 }
 
-HSOCKET IOCPConnectEx(BaseProtocol* proto, const char* ip, int port, CONN_TYPE iotype)
+HSOCKET HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE iotype)
 {
-	if (proto == NULL || (proto->_sockCount == 0 && proto->_protoType == SERVER_PROTOCOL))
+	if (proto == NULL || (proto->sockCount == 0 && proto->protoType == SERVER_PROTOCOL && proto->protolock != NULL))
 		return NULL;
-	BaseFactory* fc = proto->_factory;
+	BaseFactory* fc = proto->factory;
 	IOCP_SOCKET* IocpSock = NewIOCP_Socket();
 	if (IocpSock == NULL)
 	{
@@ -581,7 +624,8 @@ HSOCKET IOCPConnectEx(BaseProtocol* proto, const char* ip, int port, CONN_TYPE i
 		ReleaseIOCP_Socket(IocpSock);
 		return NULL;
 	}
-	proto->_sockCount += 1;
+	//proto->sockCount += 1;
+	InterlockedIncrement(&proto->sockCount);
 	return IocpSock;
 }
 
@@ -607,7 +651,7 @@ static bool IOCPPostSendTCPEx(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 	return true;
 }
 
-bool IOCPPostSendEx(IOCP_SOCKET* IocpSock, const char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
+bool HsocketSend(IOCP_SOCKET* IocpSock, const char* data, int len)    //注意此方法存在内存泄漏风险，如果此投递未返回时socket被关闭
 {
 	if (IocpSock == NULL)
 		return false;
@@ -616,7 +660,7 @@ bool IOCPPostSendEx(IOCP_SOCKET* IocpSock, const char* data, int len)    //注�
 	if (IocpBuff == NULL)
 		return false;
 
-	IocpBuff->databuf.buf = (char*)sheeps_malloc(len);
+	IocpBuff->databuf.buf = (char*)pst_malloc(len);
 	if (IocpBuff->databuf.buf == NULL)
 	{
 		ReleaseIOCP_Buff(IocpBuff);
@@ -635,7 +679,7 @@ bool IOCPPostSendEx(IOCP_SOCKET* IocpSock, const char* data, int len)    //注�
 	
 	if (ret == false)
 	{
-		sheeps_free(IocpBuff->databuf.buf);
+		pst_free(IocpBuff->databuf.buf);
 		ReleaseIOCP_Buff(IocpBuff);
 		return false;
 	}
@@ -643,7 +687,7 @@ bool IOCPPostSendEx(IOCP_SOCKET* IocpSock, const char* data, int len)    //注�
 	return true;
 }
 
-bool IOCPCloseHsocket(IOCP_SOCKET*  IocpSock)
+bool HsocketClose(IOCP_SOCKET*  IocpSock)
 {
 	if (IocpSock == NULL ||IocpSock->fd == INVALID_SOCKET)
 		return false;
@@ -651,7 +695,7 @@ bool IOCPCloseHsocket(IOCP_SOCKET*  IocpSock)
 	return true;
 }
 
-int IOCPSkipHsocketBuf(IOCP_SOCKET* IocpSock, int len)
+int HsocketSkipBuf(IOCP_SOCKET* IocpSock, int len)
 {
 	IocpSock->_IocpBuff->offset -= len;
 	memmove(IocpSock->recv_buf, IocpSock->recv_buf + len, IocpSock->_IocpBuff->offset);

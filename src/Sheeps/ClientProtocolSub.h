@@ -1,11 +1,10 @@
 #ifndef _CLIENT_PROTOCOL_SUB_H_
 #define _CLIENT_PROTOCOL_SUB_H_
 #include "SheepsStruct.h"
-#include "IOCPReactor.h"
+#include "Reactor.h"
 
 typedef int (*client_cmd_cb) (HSOCKET hsock, int cmdNO, cJSON* root);
 
-extern BaseFactory* subfactory;
 extern int clogId;
 
 typedef struct

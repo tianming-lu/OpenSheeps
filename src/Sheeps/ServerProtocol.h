@@ -1,7 +1,7 @@
 #ifndef _SERVER_PROTOCOL_H_
 #define _SERVER_PROTOCOL_H_
 #include "SheepsStruct.h"
-#include "IOCPReactor.h"
+#include "Reactor.h"
 #include "SheepsMemory.h"
 #include <list>
 

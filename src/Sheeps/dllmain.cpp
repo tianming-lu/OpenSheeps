@@ -24,9 +24,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			}
 		}
 		snprintf(ConfigFile, MAX_PATH, "%ssheeps.ini", DllPath);
-		snprintf(ProjectPath, MAX_PATH, "%sproject", DllPath);
-		snprintf(RecordPath, MAX_PATH, "%srecord", DllPath);
-		snprintf(LogPath, MAX_PATH, "%slog", DllPath);
+		snprintf(ProjectPath, MAX_PATH, "%sproject\\", DllPath);
+		snprintf(RecordPath, MAX_PATH, "%srecord\\", DllPath);
+		snprintf(LogPath, MAX_PATH, "%slog\\", DllPath);
 		_mkdir(ProjectPath);
 		_mkdir(RecordPath);
 		_mkdir(LogPath);

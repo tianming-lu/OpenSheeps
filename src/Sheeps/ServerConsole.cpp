@@ -4,8 +4,18 @@
 #include "ServerStress.h"
 #include "SheepsFactory.h"
 #include <algorithm>
+#include <stdio.h>
+#include <thread>
+#ifdef __WINDOWS__
 #include "io.h"
 #include "direct.h"
+#else
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <unistd.h>
+#endif // !__WINDOWS__
 
 #define SQL_SIZE 1024
 
@@ -19,27 +29,15 @@ std::map<uint8_t, HTASKRUN>		TaskRun;
 std::mutex* TaskCfgLock = new std::mutex;
 std::mutex* TaskRunLock = new std::mutex;
 
+char*	home_page = NULL;
+int		page_len = 0;
+
 static int task_add_once_user(HTASKRUN runtask, HTASKCONFIG taskcfg)
 {
 	int left_user = taskcfg->totalUser - runtask->userCount;
 	int count = left_user > taskcfg->onceUser ? taskcfg->onceUser : left_user;
 	runtask->userCount += count;
 	return count;
-}
-
-static int64_t GetSysTimeMicros()
-{
-	// 从1601年1月1日0:0:0:000到1970年1月1日0:0:0:000的时间(单位100ns)
-#define EPOCHFILETIME   (116444736000000000UL)
-	FILETIME ft;
-	LARGE_INTEGER li;
-	int64_t tt = 0;
-	GetSystemTimeAsFileTime(&ft);
-	li.LowPart = ft.dwLowDateTime;
-	li.HighPart = ft.dwHighDateTime;
-	// 从1970年1月1日0:0:0:000到现在的微秒数(UTC时间)
-	tt = (li.QuadPart - EPOCHFILETIME) / 10;
-	return tt;
 }
 
 static int task_init_record_sql(HTASKRUN runtask, HTASKCONFIG taskcfg)
@@ -65,7 +63,7 @@ static int task_init_record_sql(HTASKRUN runtask, HTASKCONFIG taskcfg)
 		memset(temp, 0, sizeof(temp));
 		snprintf(temp, sizeof(temp), "select recordtime, recordtype, ip, port, content from %s where recordtype < 3 or recordtype = 4", table);
 		if (runtask->sqllen == 0)
-			runtask->sqllen += snprintf(runtask->dbsql, SQL_SIZE, temp);
+			runtask->sqllen += snprintf(runtask->dbsql, SQL_SIZE, "%s", temp);
 		else
 			runtask->sqllen += snprintf(runtask->dbsql + runtask->sqllen, size_t(SQL_SIZE) - runtask->sqllen, " union  %s", temp);
 	}
@@ -124,7 +122,7 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 		int n = snprintf(buf + 8 , sizeof(buf) - 8, "%s\"MachineID\":%d,\"UserCount\":%d}", tem, machine_id++, user_count);
 		*(int*)buf = n + 8;
 		*(int*)(buf + 4) = 2;
-		IOCPPostSendEx(iter->first, buf, n + 8);
+		HsocketSend(iter->first, buf, n + 8);
 	}
 	StressClientMapLock->unlock();
 
@@ -133,7 +131,7 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	runtask->tempMsg = new std::list<RecordMsg>;
 	taskcfg->taskState = STATE_RUNING;
 	char fullname[256] = { 0x0 };
-	snprintf(fullname, sizeof(fullname), "%s\\%s", RecordPath, taskcfg->dbName);
+	snprintf(fullname, sizeof(fullname), "%s%s", RecordPath, taskcfg->dbName);
 	my_sqlite3_open(fullname, &runtask->dbConn);
 	task_init_record_sql(runtask, taskcfg);
 }
@@ -175,7 +173,7 @@ static void task_push_add_once_user(HTASKRUN runtask, HTASKCONFIG taskcfg)
 		int n = snprintf(buf + 8, sizeof(buf) - 8, "{\"TaskID\":%d,\"Change\":%d}", taskcfg->taskID, user_count);
 		*(int*)buf = n + 8;
 		*(int*)(buf + 4) = 12;
-		IOCPPostSendEx(iter->first, buf, n + 8);
+		HsocketSend(iter->first, buf, n + 8);
 	}
 	StressClientMapLock->unlock();
 	runtask->lastChangUserTime = time(NULL);
@@ -203,7 +201,7 @@ static void task_stop_push_msg(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	{
 		if (iter->second->projectid != taskcfg->projectID)
 			continue;
-		IOCPPostSendEx(iter->first, buf, n + 8);
+		HsocketSend(iter->first, buf, n + 8);
 	}
 	StressClientMapLock->unlock();
 }
@@ -226,7 +224,7 @@ static void task_get_record_msg(HTASKRUN runtask, HTASKCONFIG taskcfg)
 				msg.recordTime = sqlite3_column_int64(stmt, 0);
 				msg.recordType = sqlite3_column_int(stmt, 1);
 				const char* ip = (const char*)sqlite3_column_text(stmt, 2);
-				snprintf(msg.ip, sizeof(msg.ip), ip);
+				snprintf(msg.ip, sizeof(msg.ip), "%s", ip);
 				msg.port = sqlite3_column_int(stmt, 3);
 				const char* content = (const char*)sqlite3_column_text(stmt, 4);
 				msg.contentLen = strlen(content);
@@ -256,6 +254,7 @@ static void task_chang_record_msg_addr(HTASKRUN runtask, HTASKCONFIG taskcfg, Re
 		char* p = strstr(dst.dstAddr, ":");
 		if (p)
 		{
+			memset(msg.ip, 0x0, sizeof(msg.ip));
 			memcpy(msg.ip, dst.dstAddr, p - dst.dstAddr);
 			msg.port = atoi(p + 1);
 		}
@@ -289,7 +288,7 @@ static void task_push_record_msg_to_client(HTASKRUN runtask, HTASKCONFIG taskcfg
 	{
 		if (iter->second->projectid != taskcfg->projectID)
 			continue;
-		IOCPPostSendEx(iter->first, buf, n + 8);
+		HsocketSend(iter->first, buf, n + 8);
 	}
 	StressClientMapLock->unlock();
 	sheeps_free(buf);
@@ -340,7 +339,7 @@ static void task_push_over(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	{
 		if (iter->second->projectid != taskcfg->projectID)
 			continue;
-		IOCPPostSendEx(iter->first, buf, n + 8);
+		HsocketSend(iter->first, buf, n + 8);
 	}
 	StressClientMapLock->unlock();
 
@@ -377,12 +376,16 @@ static void task_runing(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	}
 }
 
+#ifdef __WINDOWS__
 DWORD WINAPI task_runing_thread(LPVOID pParam)
+#else
+int task_runing_thread(void* pParam)
+#endif // __WINDOWS__
 {
 	HTASKRUN runtask = (HTASKRUN)pParam;
 	while (runtask->stage < STAGE_OVER)
 	{
-		Sleep(1);
+		TimeSleep(1);
 		task_runing(runtask, runtask->taskCfg);
 	}
 	sheeps_free(runtask);
@@ -398,8 +401,8 @@ static void send_console_msg(HSOCKET hsock, cJSON* root)
 	char buf[128] = { 0x0 };
 	int clen = (int)strlen(data);
 	int n = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin:*\r\nContent-Type: application/json\r\nContent-Lenth: %zd\r\n\r\n", strlen(data));
-	IOCPPostSendEx(hsock, buf, n);
-	IOCPPostSendEx(hsock, data, clen);
+	HsocketSend(hsock, buf, n);
+	HsocketSend(hsock, data, clen);
 	sheeps_free(data);
 	cJSON_Delete(root);
 }
@@ -467,7 +470,7 @@ static void do_stress_client_log(HSOCKET hsock, cJSON* root, char* uri)
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
 	for (; iter != StressClientMap->end(); ++iter)
 	{
-		IOCPPostSendEx(iter->first, buf, n + 8);
+		HsocketSend(iter->first, buf, n + 8);
 	}
 	StressClientMapLock->unlock();
 	cJSON* res = cJSON_CreateObject();
@@ -520,8 +523,8 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	task->spaceTime = space->valueint;
 	task->loopMode = loop->valueint;
 	task->ignoreErr = ignor->valueint == 0? false:true;
-	snprintf(task->dbName, sizeof(task->dbName), dbfile->valuestring);
-	snprintf(task->taskDes, sizeof(task->taskDes), des->valuestring);
+	snprintf(task->dbName, sizeof(task->dbName), "%s", dbfile->valuestring);
+	snprintf(task->taskDes, sizeof(task->taskDes), "%s", des->valuestring);
 	task->replayAddr = new std::list<Readdr>;
 	task->changeAddr = new std::map<std::string, Readdr>;
 	cJSON* array = cJSON_GetObjectItem(root, "replay");
@@ -536,13 +539,14 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 			cJSON* src = cJSON_GetObjectItem(item, "src");
 			if (src == NULL || src->type != cJSON_String)
 				continue;
-			Readdr addr = { 0x0 };
-			snprintf(addr.srcAddr, sizeof(addr.srcAddr), src->valuestring);
+			Readdr addr;
+			memset(&addr, 0, sizeof(addr));
+			snprintf(addr.srcAddr, sizeof(addr.srcAddr), "%s", src->valuestring);
 
 			cJSON* dst = cJSON_GetObjectItem(item, "dst");
 			if (dst != NULL && src->type == cJSON_String)
 			{
-				snprintf(addr.dstAddr, sizeof(addr.dstAddr), dst->valuestring);
+				snprintf(addr.dstAddr, sizeof(addr.dstAddr), "%s", dst->valuestring);
 				task->changeAddr->insert(std::pair<std::string, Readdr>(std::string(src->valuestring), addr));
 			}
 			task->replayAddr->push_back(addr);
@@ -742,13 +746,8 @@ static void do_console_task_run(HSOCKET hsock, cJSON* root, char* uri)
 	TaskRun.insert(std::pair<uint8_t, HTASKRUN>(taskcfg->taskID, taskrun));
 	TaskRunLock->unlock();
 
-	HANDLE ThreadHandle;
-	ThreadHandle = CreateThread(NULL, 0, task_runing_thread, taskrun, 0, NULL);
-	if (NULL == ThreadHandle) {
-		LOG(slogid, LOG_ERROR, "%s-%d create thread failed!", __func__, __LINE__);
-		return;
-	}
-	CloseHandle(ThreadHandle);
+	std::thread th(task_runing_thread, taskrun);
+	th.detach();
 
 	cJSON_AddStringToObject(res, "ret", "OK");
 	send_console_msg(hsock, res);
@@ -834,7 +833,7 @@ static void do_proxy_record_list(HSOCKET hsock, cJSON* root, char* uri)
 
 	sqlite3* dbConn;
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s\\%s", RecordPath, dbfile->valuestring);
+	snprintf(fullpath, sizeof(fullpath), "%s%s", RecordPath, dbfile->valuestring);
 	my_sqlite3_open(fullpath, &dbConn);
 
 	const char* sql = "select name from sqlite_sequence";
@@ -906,7 +905,7 @@ static void do_proxy_record_delete(HSOCKET hsock, cJSON* root, char* uri)
 		return;
 
 	char file[256] = { 0x0 };
-	snprintf(file, sizeof(file), "%s\\%s", RecordPath, dbfile->valuestring);
+	snprintf(file, sizeof(file), "%s%s", RecordPath, dbfile->valuestring);
 	sqlite3* dbConn;
 	my_sqlite3_open(file, &dbConn);
 
@@ -924,7 +923,7 @@ static void do_proxy_record_delete(HSOCKET hsock, cJSON* root, char* uri)
 		memset(sql, 0, sizeof(sql));
 		snprintf(sql, sizeof(sql), "DROP TABLE %s", table);
 
-		int ret = sqlite3_exec(dbConn, sql, NULL, NULL, NULL);
+		sqlite3_exec(dbConn, sql, NULL, NULL, NULL);
 	}
 	sqlite3_close(dbConn);
 	cJSON_AddStringToObject(res, "ret", "OK");
@@ -944,10 +943,11 @@ static void do_proxy_database_file(HSOCKET hsock, cJSON* root, char* uri)
 	}
 	cJSON_AddItemToObject(res, "data", array);
 
+#ifdef __WINDOWS__
 	intptr_t hFile = 0;
 	struct _finddata_t fileinfo;
 	char file[256] = { 0x0 };
-	snprintf(file, sizeof(file), "%s\\*", RecordPath);
+	snprintf(file, sizeof(file), "%s*", RecordPath);
 	if ((hFile = _findfirst(file, &fileinfo)) != -1)
 	{
 		do
@@ -963,6 +963,21 @@ static void do_proxy_database_file(HSOCKET hsock, cJSON* root, char* uri)
 		} while (_findnext(hFile, &fileinfo) == 0);
 		_findclose(hFile);
 	}
+#else
+	DIR    *dir;
+    struct    dirent    *ptr;
+    if ((dir = opendir(RecordPath)) != NULL)
+	{
+		while((ptr = readdir(dir)) != NULL)
+		{
+			if (ptr->d_type == DT_REG || ptr->d_type == DT_UNKNOWN )
+			{
+				cJSON_AddItemToArray(array, cJSON_CreateString(ptr->d_name));
+			}
+		}
+    	closedir(dir);
+	}
+#endif
 
 	cJSON_AddStringToObject(res, "ret", "OK");
 	send_console_msg(hsock, res);
@@ -985,7 +1000,7 @@ static void do_proxy_database_delete(HSOCKET hsock, cJSON* root, char* uri)
 	}
 
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s\\%s", RecordPath, dbfile->valuestring);
+	snprintf(fullpath, sizeof(fullpath), "%s%s", RecordPath, dbfile->valuestring);
 	int ret = remove(fullpath);
 	if (ret != 0)
 	{
@@ -1021,8 +1036,8 @@ static void do_proxy_database_name(HSOCKET hsock, cJSON* root, char* uri)
 	{
 		char oldfile[256] = { 0x0 };
 		char newfile[256] = { 0x0 };
-		snprintf(oldfile, sizeof(oldfile), "%s\\%s", RecordPath, dbfile->valuestring);
-		snprintf(newfile, sizeof(newfile), "%s\\%s", RecordPath, newname->valuestring);
+		snprintf(oldfile, sizeof(oldfile), "%s%s", RecordPath, dbfile->valuestring);
+		snprintf(newfile, sizeof(newfile), "%s%s", RecordPath, newname->valuestring);
 		int ret = rename(oldfile, newfile);
 		if (ret != 0)
 		{
@@ -1099,32 +1114,39 @@ static int get_uri_string(const char* http_stream, char* buff, size_t bufflen)
 }
 
 static int get_home_page(HSOCKET hsock)
-{	
+{
+	LOG(slogid, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
 #define PAGESIZE 30*1024
 #define SPACELEN 100
-	char* buf = (char*)sheeps_malloc(PAGESIZE);
 
-	char file[256] = { 0x0 };
-	snprintf(file, sizeof(file), "%s\\console.html", DllPath);
+	if (home_page == NULL)
+		home_page = (char*)sheeps_malloc(PAGESIZE);
 
-	FILE* hfile = NULL;
-	int ret = fopen_s(&hfile, file, "rb");
-	if (ret != 0)
+	if (page_len == 0)
 	{
-		LOG(slogid, LOG_ERROR, "%s:%d open file error\r\n", __func__, __LINE__);
-		sheeps_free(buf);
-		IOCPCloseHsocket(hsock);
-		return 0;
-	}
-	int flen = (int)fread(buf + SPACELEN, sizeof(char), PAGESIZE - SPACELEN, hfile);
-	int offset = snprintf(buf, SPACELEN, "HTTP/1.1 200 OK\r\nContent-Length:%d\r\n\r\n", flen);
-	char* s = buf + SPACELEN - offset;
-	memmove(s, buf, offset);
-	IOCPPostSendEx(hsock, s, offset + flen);
+		char file[256] = { 0x0 };
+		snprintf(file, sizeof(file), "%sconsole.html", DllPath);
 
-	fclose(hfile);
-	sheeps_free(buf);
-	IOCPCloseHsocket(hsock);
+		FILE* hfile = NULL;
+#ifdef __WINDOWS__
+		int ret = fopen_s(&hfile, file, "rb");
+#else
+		hfile = fopen(file, "rb");
+#endif
+		if (hfile == NULL)
+		{
+			LOG(slogid, LOG_ERROR, "%s:%d open file error [%d]\r\n", __func__, __LINE__, errno);
+			HsocketClose(hsock);
+			return 0;
+		}
+		page_len = (int)fread(home_page + SPACELEN, sizeof(char), PAGESIZE - SPACELEN, hfile);
+		fclose(hfile);
+	}
+	int offset = snprintf(home_page, SPACELEN, "HTTP/1.1 200 OK\r\nContent-Length:%d\r\n\r\n", page_len);
+	char* s = home_page + SPACELEN - offset;
+	memmove(s, home_page, offset);
+	HsocketSend(hsock, s, offset + page_len);
+	HsocketClose(hsock);
 	return 0;
 }
 
@@ -1158,6 +1180,6 @@ int CheckConsoleRequest(HSOCKET hsock, ServerProtocol* proto, const char* data, 
 
 	sheeps_free(content);
 	cJSON_Delete(root);
-	IOCPCloseHsocket(hsock);
+	HsocketClose(hsock);
 	return 0;
 }

@@ -1,14 +1,16 @@
-#include "pch.h"
+ï»¿#include "pch.h"
+#include "ServerStress.h"
+#ifdef __WINDOWS__
 #include "io.h"
 #include "direct.h"
-#include "ServerStress.h"
+#endif
 
 typedef int (*serverStress_cmd_cb) (HSOCKET hsock, ServerProtocol* proto, int cmdNO, cJSON* root);
 
 std::map<HSOCKET, HCLIENTINFO>* StressClientMap;
 std::mutex* StressClientMapLock = NULL;
 
-std::map<std::string, t_file_update> updatefile;
+static std::map<std::string, t_file_update> updatefile;
 
 int StressServerInit()
 {
@@ -33,7 +35,7 @@ static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 	char sockbuf[256] = { 0x0 };
 	memcpy(sockbuf, &head, sizeof(t_stress_protocol_head));
 	memcpy(sockbuf + sizeof(t_stress_protocol_head), buf, len);
-	IOCPPostSendEx(hsock, sockbuf, head.msgLen);
+	HsocketSend(hsock, sockbuf, head.msgLen);
 	LOG(slogid, LOG_DEBUG, "%s:%d [%d %d:%s]\r\n", __func__, __LINE__, len, cmdNo, msg);
 	return 0;
 }
@@ -44,12 +46,13 @@ static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 	head.cmdNo = cmdNo;
 	head.msgLen = len + sizeof(t_stress_protocol_head);
 
-	IOCPPostSendEx(hsock, (char*)&head, sizeof(t_stress_protocol_head));
-	IOCPPostSendEx(hsock, data, len);
+	HsocketSend(hsock, (char*)&head, sizeof(t_stress_protocol_head));
+	HsocketSend(hsock, data, len);
 	LOG(slogid, LOG_DEBUG, "%s:%d [%d %d:%s]\r\n", __func__, __LINE__, len, cmdNo, data);
 	return 0;
 }
 
+#ifdef __WINDOWS__
 static void getFiles(char* project_path, std::map<std::string, t_file_update>* files)
 {
 	intptr_t hFile = 0;
@@ -78,7 +81,7 @@ static void getFiles(char* project_path, std::map<std::string, t_file_update>* f
 				snprintf(shortpath, sizeof(shortpath), ".\\%s", fullpath + strlen(DllPath));
 
 				t_file_update info = { 0x0 };
-				getfilemd5view(fullpath, (unsigned char*)info.fmd5, sizeof(info.fmd5));
+				getfilemd5view(fullpath, info.fmd5, sizeof(info.fmd5));
 
 				struct _stat64 finfo;
 				_stat64(fullpath, &finfo);
@@ -90,11 +93,14 @@ static void getFiles(char* project_path, std::map<std::string, t_file_update>* f
 		_findclose(hFile);
 	}
 }
+#endif
 
 static int sync_files(HSOCKET hsock)
 {
 	updatefile.clear();
+#ifdef __WINDOWS__
 	getFiles(ProjectPath, &updatefile);
+#endif // __WINDOWS__
 	cJSON* root = cJSON_CreateObject();
 	cJSON* array = cJSON_CreateArray();
 	cJSON_AddItemToObject(root, "filelist", array);
@@ -152,7 +158,7 @@ static int server_cmd_10_download_file(HSOCKET hsock, ServerProtocol* proto, int
 	}
 	char filepath[128] = { 0x0 };
 	memcpy(filepath, file->valuestring, strlen(file->valuestring));
-	if (cmdNO == 10)  //ÁÙÊ±´úÂë
+	if (cmdNO == 10)  //ä¸´æ—¶ä»£ç 
 	{
 		char* s = filepath;
 		char* p = NULL;
@@ -164,7 +170,7 @@ static int server_cmd_10_download_file(HSOCKET hsock, ServerProtocol* proto, int
 			*p = '\\';
 			s = p + 1;
 		}
-	}//ÁÙÊ±´úÂë
+	}//ä¸´æ—¶ä»£ç 
 
 	char* p = strchr(filepath, '\\');
 	if (p == NULL)
@@ -176,15 +182,18 @@ static int server_cmd_10_download_file(HSOCKET hsock, ServerProtocol* proto, int
 	char fullpath[256] = { 0x0 };
 	snprintf(fullpath, sizeof(fullpath), "%s%s", DllPath, p + 1);
 	FILE* hfile;
+#ifdef __WINDOWS__
 	int ret = fopen_s(&hfile, fullpath, "rb");
-	if (ret != 0)
+#else
+	hfile = fopen(fullpath, "rb");
+#endif // __WINDOWS__
+	if (hfile == NULL)
 	{
 		LOG(slogid, LOG_ERROR, "%s:%d open file error\r\n", __func__, __LINE__);
 		return -1;
 	}
 
 #define FILEBUFLEN 10240
-	int len = 0;
 	int count = size->valueint / FILEBUFLEN;
 	int last = size->valueint % FILEBUFLEN;
 	char* res = NULL;
@@ -202,7 +211,7 @@ static int server_cmd_10_download_file(HSOCKET hsock, ServerProtocol* proto, int
 	for (int i = 0; i < count; i++)
 	{
 		fread(buf, sizeof(char), FILEBUFLEN, hfile);
-		size_t n = base64_encode(buf, FILEBUFLEN, base64);
+		base64_encode(buf, FILEBUFLEN, base64);
 		//LOG(slogid, LOG_DEBUG, "base64=[%s]\r\n", base64);
 		cJSON* data = cJSON_CreateObject();
 		if (data == NULL)
@@ -229,7 +238,7 @@ static int server_cmd_10_download_file(HSOCKET hsock, ServerProtocol* proto, int
 	if (last > 0)
 	{
 		fread(buf, sizeof(char), last, hfile);
-		size_t n = base64_encode(buf, last, base64);
+		base64_encode(buf, last, base64);
 		//LOG(slogid, LOG_DEBUG, "base64=[%d:%s]\r\n", n, base64);
 		cJSON* data = cJSON_CreateObject();
 		if (data == NULL)
@@ -291,7 +300,7 @@ static void do_server_func_by_cmd(HSOCKET hsock, ServerProtocol* proto, int cmdN
 
 int CheckStressRequest(HSOCKET hsock,ServerProtocol* proto , const char* data, int len)
 {
-	if (len < sizeof(t_stress_protocol_head))
+	if (len < (int)sizeof(t_stress_protocol_head))
 		return 0;
 	t_stress_protocol_head head;
 	memcpy(&head, data, sizeof(t_stress_protocol_head));
@@ -303,7 +312,7 @@ int CheckStressRequest(HSOCKET hsock,ServerProtocol* proto , const char* data, i
 		return -1;
 	memcpy(body, data + sizeof(t_stress_protocol_head), clen);
 	LOG(slogid, LOG_DEBUG, "%s:%d [%d %d:%s]\r\n", __func__, __LINE__, head.msgLen, head.cmdNo, body);
-	if (head.cmdNo == 10)  //ÁÙÊ±´úÂë
+	if (head.cmdNo == 10)  //ä¸´æ—¶ä»£ç 
 	{
 		char* s = body;
 		char* p = NULL;
@@ -315,7 +324,7 @@ int CheckStressRequest(HSOCKET hsock,ServerProtocol* proto , const char* data, i
 			*p = '/';
 			s = p + 1;
 		}
-	}//ÁÙÊ±´úÂë
+	}//ä¸´æ—¶ä»£ç 
 	cJSON* root = cJSON_Parse(body);
 	if (root == NULL)
 	{

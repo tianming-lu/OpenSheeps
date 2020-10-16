@@ -49,14 +49,21 @@ extern "C" {
 # define SQLITE_EXTERN extern
 #endif
 /*#ifndef SQLITE_API
-# define SQLITE_API __declspec(dllexport)
+# define SQLITE_API
 #endif*/
+
+#ifdef _MSC_VER
 
 #if defined COMMON_LIB || defined STRESS_EXPORTS
 #define SQLITE_API __declspec(dllexport)
 #else
 #define SQLITE_API __declspec(dllimport)
 #endif // COMMON_LIB
+#else
+#ifndef SQLITE_API
+# define SQLITE_API
+#endif
+#endif // _MSV_VER
 
 #ifndef SQLITE_CDECL
 # define SQLITE_CDECL

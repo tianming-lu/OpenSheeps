@@ -158,29 +158,21 @@
   <ItemGroup>
     <ClInclude Include="cJSON.h" />
     <ClInclude Include="common.h" />
-    <ClInclude Include="framework.h" />
+    <ClInclude Include="Config.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="md5.h" />
     <ClInclude Include="mycrypto.h" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="sha1.h" />
     <ClInclude Include="sqlite3.h" />
-    <ClInclude Include="sqlite3ext.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cJSON.c" />
-    <ClCompile Include="common.cpp" />
+    <ClCompile Include="common.c" />
+    <ClCompile Include="Config.cpp" />
     <ClCompile Include="log.c" />
     <ClCompile Include="md5.c" />
     <ClCompile Include="mycrypto.c" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="sha1.c" />
-    <ClCompile Include="shell.c" />
     <ClCompile Include="sqlite3.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

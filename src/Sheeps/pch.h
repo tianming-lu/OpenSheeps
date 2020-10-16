@@ -7,15 +7,22 @@
 #ifndef PCH_H
 #define PCH_H
 
-// 添加要在此处预编译的标头
+#if !defined(__WINDOWS__) && (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))
+#define __WINDOWS__
+#endif
+
+#ifdef __WINDOWS__
 #define WIN32_LEAN_AND_MEAN             // 从 Windows 头文件中排除极少使用的内容
-// Windows 头文件
 #include <windows.h>
+#else
+#define MAX_PATH 260
+#endif // __WINDOWS__
 #include "../third/cJSON.h"
 #include "../third/common.h"
 #include "../third/log.h"
 #include "../third/mycrypto.h"
 #include "../third/sqlite3.h"
+#include "../third/Config.h"
 
 extern char DllPath[];
 extern char ConfigFile[];

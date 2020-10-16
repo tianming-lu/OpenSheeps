@@ -170,7 +170,7 @@
   <ItemGroup>
     <ClInclude Include="ClientProtocol.h" />
     <ClInclude Include="ClientProtocolSub.h" />
-    <ClInclude Include="IOCPReactor.h" />
+    <ClInclude Include="Reactor.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerConsole.h" />
     <ClInclude Include="ServerProtocol.h" />

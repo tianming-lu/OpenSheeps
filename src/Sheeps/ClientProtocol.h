@@ -1,7 +1,7 @@
 #ifndef _CLIENT_PROTOCOL_H_
 #define _CLIENT_PROTOCOL_H_
 #include "SheepsStruct.h"
-#include "IOCPReactor.h"
+#include "Reactor.h"
 
 class ClientProtocol :
 	public BaseProtocol

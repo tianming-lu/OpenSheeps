@@ -56,7 +56,6 @@
 #endif
 
 #include "cJSON.h"
-#include "pch.h"
 
 /* define our own boolean type */
 #ifdef true

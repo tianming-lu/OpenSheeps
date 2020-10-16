@@ -6,11 +6,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if !defined(__WINDOWS__) && (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))
+#define __WINDOWS__
+#endif
+
+#ifdef __WINDOWS__
+
 #if defined COMMON_LIB || defined STRESS_EXPORTS
 #define crypto_API __declspec(dllexport)
 #else
 #define crypto_API __declspec(dllimport)
 #endif // COMMON_LIB
+#else
+#define crypto_API
+#endif
 
 //base64
 typedef unsigned char u_char;
@@ -40,7 +49,7 @@ crypto_API void GetStringSHA1(char *input, unsigned long length, char *output);
 //sha1
 
 //md5
-crypto_API int getfilemd5view(const char* filename, unsigned char* md5, size_t size);
+crypto_API int getfilemd5view(const char* filename, char* md5, size_t size);
 //md5
 
 #ifdef __cplusplus
