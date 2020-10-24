@@ -25,7 +25,6 @@ public:
 	int	 Loop();
 	int  Destroy();
 
-	bool ReportError();
 	void CheckReq(HSOCKET hsock, const char* data, int len);
 	int  CheckRequest(HSOCKET hsock, const char* data, int len);
 };

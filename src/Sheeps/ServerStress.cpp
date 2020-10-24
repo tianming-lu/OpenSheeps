@@ -53,13 +53,16 @@ static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 }
 
 #ifdef __WINDOWS__
-static void getFiles(char* project_path, std::map<std::string, t_file_update>* files)
+static void getFiles(char* dir_path,const char* subpro_path, std::map<std::string, t_file_update>* files)
 {
+	if (strcmp(ProjectPath, dir_path) != 0 && strcmp(dir_path, subpro_path) != 0)
+		return;
+
 	intptr_t hFile = 0;
 	struct _finddata_t fileinfo;
 
 	char allfile[256] = { 0x0 };
-	snprintf(allfile, sizeof(allfile), "%s\\*", project_path);
+	snprintf(allfile, sizeof(allfile), "%s\\*", dir_path);
 
 	char fullpath[256] = { 0x0 };
 	if ((hFile = _findfirst(allfile, &fileinfo)) != -1)
@@ -67,16 +70,16 @@ static void getFiles(char* project_path, std::map<std::string, t_file_update>* f
 		do
 		{
 			memset(fullpath, 0, sizeof(fullpath));
-			snprintf(fullpath, sizeof(fullpath), "%s\\%s", project_path, fileinfo.name);
-
 			if ((fileinfo.attrib & _A_SUBDIR))
 			{
+				snprintf(fullpath, sizeof(fullpath), "%s%s", dir_path, fileinfo.name);
 				if (strcmp(fileinfo.name, ".") == 0 || strcmp(fileinfo.name, "..") == 0)
 					continue;
-				getFiles(fullpath, files);
+				getFiles(fullpath, subpro_path, files);
 			}
 			else
 			{
+				snprintf(fullpath, sizeof(fullpath), "%s\\%s", dir_path, fileinfo.name);
 				char shortpath[128] = { 0x0 };
 				snprintf(shortpath, sizeof(shortpath), ".\\%s", fullpath + strlen(DllPath));
 
@@ -95,11 +98,13 @@ static void getFiles(char* project_path, std::map<std::string, t_file_update>* f
 }
 #endif
 
-static int sync_files(HSOCKET hsock)
+static int sync_files(HSOCKET hsock, int projectid)
 {
 	updatefile.clear();
+	char subpro_path[256] = { 0x0 };
+	snprintf(subpro_path, sizeof(subpro_path), "%s%d", ProjectPath, projectid);
 #ifdef __WINDOWS__
-	getFiles(ProjectPath, &updatefile);
+	getFiles(ProjectPath, subpro_path, &updatefile);
 #endif // __WINDOWS__
 	cJSON* root = cJSON_CreateObject();
 	cJSON* array = cJSON_CreateArray();
@@ -141,7 +146,7 @@ static int server_cmd_1_report_client_info(HSOCKET hsock, ServerProtocol* proto,
 	StressClientMapLock->unlock();
 
 	MsgResponse(hsock, 1, 0, "OK");
-	sync_files(hsock);
+	sync_files(hsock, projectid->valueint);
 	return 0;
 }
 

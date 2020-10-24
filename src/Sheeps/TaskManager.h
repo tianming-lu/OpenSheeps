@@ -74,14 +74,6 @@ typedef struct {
 	bool		udp;
 }t_cache_message, *HMESSAGE;
 
-typedef struct
-{
-	uint8_t		taskID;
-	int32_t		userID;
-	long long	timeStamp;
-	char		errMsg[64];
-}t_task_error;
-
 typedef struct {
 	int			logfd;
 	uint8_t		status;    //0 未开始 1初始化中 2初始化完成 3任务运行中 4任务中止清理资源过程中
@@ -92,8 +84,7 @@ typedef struct {
 	uint16_t	userCount;
 	bool		ignoreErr;
 
-	uint8_t			workThreadCount;  //任务工作线程，所有线程退出后开始销毁任务
-	std::mutex*		workThereaLock;
+	long		workThreadCount;  //任务工作线程计数，使用原子操作，所有线程退出后开始销毁任务
 
 	std::vector<t_cache_message*>*	messageList;    //任务消息缓存
 	bool							stopMessageCache;
@@ -105,8 +96,6 @@ typedef struct {
 	std::list<ReplayProtocol*>*	userDes;			//运行结束用户列表
 	std::mutex*			userDesLock;
 
-	std::list<t_task_error*>*	taskErr;
-	std::mutex*					taskErrlock;
 }t_task_config, *HTASKCFG;
 
 typedef ReplayProtocol* (*CREATEAPI)();
@@ -135,6 +124,7 @@ public:
 	bool		SelfDead = false;
 	uint8_t		PlayState = PLAY_NORMAL;
 	MSGPointer	MsgPointer = { 0x0 };
+	char		LastError[128];
 
 public:
 	virtual void Init() = 0;
@@ -160,10 +150,6 @@ bool			insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t
 bool			stop_task_by_id(uint8_t taskID);
 int				task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory);
 void			set_task_log_level(uint8_t level, uint8_t taskID);
-
-t_task_error*	get_task_error_front();
-void			delete_task_error(t_task_error* error);
-
 
 //项目业务逻辑API
 Task_API void		TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop);

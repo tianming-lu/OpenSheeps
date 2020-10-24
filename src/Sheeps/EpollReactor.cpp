@@ -30,7 +30,6 @@ static HSOCKET new_hsockt()
 	memset(hsock->recv_buf, 0, DATA_BUFSIZE);
 	hsock->_recv_buf.offset = 0;
 	hsock->_recv_buf.size = DATA_BUFSIZE;
-	hsock->_sendlock = new std::mutex;  //临时代码
 	return hsock;
 }
 
@@ -40,7 +39,6 @@ static void release_hsock(HSOCKET hsock)
 	{
 		if (hsock->recv_buf) free(hsock->recv_buf);
 		if (hsock->_sendbuff) free(hsock->_sendbuff);
-		if (hsock->_sendlock) delete hsock->_sendlock;
 		free(hsock);
 	}
 }
@@ -206,7 +204,7 @@ static void do_write_udp(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 {
 	if (hsock->_is_close == 0)
 	{
-		hsock->_sendlock->lock();
+		//hsock->_sendlock->lock();
 		char* data = hsock->_sendbuff;
 		int len = hsock->_send_buf.offset;
 		
@@ -216,7 +214,7 @@ static void do_write_udp(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 			sendto(hsock->fd, data, len, 0, (struct sockaddr*)&hsock->peer_addr, socklen);
 			hsock->_send_buf.offset = 0;
 		}
-		hsock->_sendlock->unlock();
+		//hsock->_sendlock->unlock();
 	
 		epoll_mod_read(hsock, READ);
 	}
@@ -230,7 +228,8 @@ static void do_write_tcp(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 {
 	if (hsock->_is_close == 0)
 	{
-		hsock->_sendlock->lock();
+		while (__sync_fetch_and_or(&hsock->_send_buf.lock_flag, 1)) usleep(0);
+
 		char* data = hsock->_sendbuff;
 		int len = hsock->_send_buf.offset;
 		int not_over = 0;
@@ -247,7 +246,7 @@ static void do_write_tcp(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 			else if(errno == EINTR || errno == EAGAIN) 
 				not_over = 1;
 		}
-		hsock->_sendlock->unlock();
+		__sync_fetch_and_and(&hsock->_send_buf.lock_flag, 0);
 	
 		if (not_over)
 			epoll_mod_write(hsock, WRITE);
@@ -341,6 +340,7 @@ static int do_read_tcp(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 
 static void do_read(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 {
+	if (__sync_fetch_and_or(&hsock->_recv_buf.lock_flag, 1)) return;
 	int ret = 0;
 	if(hsock->_conn_type == UDP_CONN)
 		ret = do_read_udp(hsock, fc, proto);
@@ -371,6 +371,7 @@ static void do_read(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 		epoll_mod_write(hsock, WRITE);
 	else
 		epoll_mod_read(hsock, READ);
+	__sync_fetch_and_and(&hsock->_recv_buf.lock_flag, 0);
 }
 
 static void check_read_write_events(HSOCKET hsock, int events,  BaseFactory* fc, BaseProtocol* proto)
@@ -605,62 +606,56 @@ HSOCKET HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE 
 	return hsock;
 }
 
-bool HsocketSend(HSOCKET hsock, const char* data, int len)
+static void HsocketSendUdp(HSOCKET hsock, const char* data, int len)
 {
-	if (hsock == NULL || hsock->fd < 0 ||len <= 0) return false;
-	hsock->_sendlock->lock();
-	int sendlen = 0;
-	int n = 0;
-	if (hsock->_conn_type == TCP_CONN)
+	socklen_t socklen = sizeof(hsock->peer_addr);
+	if (len > 0)
 	{
-		while (sendlen < len)
-		{
-			n = send(hsock->fd, data+ sendlen, len -sendlen, MSG_DONTWAIT | MSG_NOSIGNAL);
-			if(n > 0) 
-				sendlen += n;
-			else if (n < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
-				continue;
-			else
-				break;
-		}
+		sendto(hsock->fd, data, len, 0, (struct sockaddr*)&hsock->peer_addr, socklen);
 	}
-	else
-	{
-		socklen_t socklen = sizeof(hsock->peer_addr);
-		if (len > 0)
-		{
-			sendto(hsock->fd, data, len, 0, (struct sockaddr*)&hsock->peer_addr, socklen);
-		}
-	}
-	hsock->_sendlock->unlock();
-	/*if (hsock->_sendbuff == NULL)
+}
+
+static void HsocketSendTcp(HSOCKET hsock, const char* data, int len)
+{
+	if (hsock->_sendbuff == NULL)
 	{
 		hsock->_sendbuff = (char*)malloc(len);
-		if (hsock->_sendbuff == NULL) return false;
+		if (hsock->_sendbuff == NULL) return;
 		hsock->_send_buf.size = len;
 		hsock->_send_buf.offset = 0;
-		hsock->_sendlock = new std::mutex;
 	}
-	hsock->_sendlock->lock();
+
+	while (__sync_fetch_and_or(&hsock->_send_buf.lock_flag, 1)) usleep(0);
 	if (hsock->_send_buf.size < hsock->_send_buf.offset + len)
 	{
 		char* newbuf = (char*)realloc(hsock->_sendbuff, hsock->_send_buf.offset + len);
-		if (newbuf == NULL) {hsock->_sendlock->unlock();return false;}
+		if (newbuf == NULL) {__sync_fetch_and_and(&hsock->_send_buf.lock_flag, 0);;return;}
 		hsock->_sendbuff = newbuf;
 		hsock->_send_buf.size = hsock->_send_buf.offset + len;
 	}
 	memcpy(hsock->_sendbuff + hsock->_send_buf.offset, data, len);
 	hsock->_send_buf.offset += len;
-	hsock->_sendlock->unlock();
-	//epoll_mod_write(hsock, WRITE);*/
+	__sync_fetch_and_and(&hsock->_send_buf.lock_flag, 0);
+	epoll_mod_write(hsock, WRITE);
+}
+
+bool HsocketSend(HSOCKET hsock, const char* data, int len)
+{
+	if (hsock == NULL || hsock->fd < 0 ||len <= 0) return false;
+
+	if (hsock->_conn_type == UDP_CONN)
+		HsocketSendUdp(hsock, data, len);
+	else
+		HsocketSendTcp(hsock, data, len);
 	return true;
 }
 
-bool HsocketClose(HSOCKET hsock)
+bool HsocketClose(HSOCKET &hsock)
 {
 	if (hsock == NULL || hsock->fd < 0) return false;
 	shutdown(hsock->fd, SHUT_RD);
 	//close(hsock->fd);  直接关闭epoll没有事件通知，所以需要shutdown
+	hsock = NULL;
 	return true;
 }
 

@@ -9,19 +9,7 @@ bool TaskManagerRuning = false;
 std::map<int, t_task_config*> taskAll;
 std::map<int, t_task_config*> taskDel;
 
-std::list<t_task_error*> taskError;
-std::mutex taskErrLock;
-
 t_replay_dll default_api = { 0x0 };
-
-static int changTask_work_thread(HTASKCFG task, uint8_t count)
-{
-	task->workThereaLock->lock();
-	task->workThreadCount += count;
-	uint8_t left = task->workThreadCount;
-	task->workThereaLock->unlock();
-	return left;
-}
 
 static void update_user_time_clock(ReplayProtocol* proto)
 {
@@ -174,8 +162,6 @@ static void destroy_task(HTASKCFG task)
 		delete task->userAll;
 		delete task->userAllLock;
 
-		delete task->workThereaLock;
-
 		if (userClean == true && default_api.taskstop)
 		{
 			default_api.taskstop(task);
@@ -274,8 +260,11 @@ int taskWorkerThread(void* pParam)
 #endif // __WINDOWS__
 {
 	t_task_config* task = (t_task_config*)pParam;
-	changTask_work_thread(task, 1);
-
+#ifdef __WINDOWS__   //原子操作线程计数
+	InterlockedIncrement(&task->workThreadCount);
+#else
+	__sync_add_and_fetch(&task->workThreadCount, 1);
+#endif // __WINDOWS__
 	ReplayProtocol* user = NULL;
 	int cut_count;  //上报和下发需要剪切的用户数量
 	std::list<ReplayProtocol*> userlist;
@@ -287,11 +276,9 @@ int taskWorkerThread(void* pParam)
 		cut_count = 0;
 		get_userAll_splice(task, userlist, 10, cut_count);
 		if (userlist.empty()) {continue; }
-		//printf("%s:%d curuser[%zd] cut[%d]\n", __func__, __LINE__, userlist.size(), cut_count);
 		iter = userlist.begin();
 		for ( ; iter != userlist.end();)
 		{
-			//printf("%s:%d curuser[%zd] cut[%d]\n", __func__, __LINE__, userlist.size(), cut_count);
 			user = *iter;
 			if (cut_count > 0)
 			{
@@ -351,8 +338,11 @@ int taskWorkerThread(void* pParam)
 		add_to_userDes(task, dellist);
 		TimeSleep(1);
 	}
-
-	if (changTask_work_thread(task, -1) == 0)
+#ifdef __WINDOWS__
+	if (InterlockedDecrement(&task->workThreadCount) == 0)
+#else
+	if (__sync_sub_and_fetch(&task->workThreadCount, 1) == 0)
+#endif // __WINDOWS__
 		destroy_task(task);
 	return 0;
 }
@@ -387,14 +377,11 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 		char path[256] = { 0x0 };
 		snprintf(path, sizeof(path), "%stask%03d.log", LogPath, taskID);
 		task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
-		task->workThereaLock = new std::mutex;
 		task->messageList = new std::vector<t_cache_message*>;
 		task->userAll = new std::list<ReplayProtocol*>;
 		task->userAllLock = new std::mutex;
 		task->userDes = new std::list<ReplayProtocol*>;
 		task->userDesLock = new std::mutex;
-		task->taskErr = &taskError;
-		task->taskErrlock = &taskErrLock;
 		taskAll.insert(std::pair<int, HTASKCFG>(taskID, task));
 		return task;
 	}
@@ -561,35 +548,16 @@ int task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory)
 	return 0;
 }
 
-t_task_error* get_task_error_front()
-{
-	t_task_error* err = NULL;
-	taskErrLock.lock();
-	if (!taskError.empty())
-	{
-		err = taskError.front();
-		taskError.pop_front();
-	}
-	taskErrLock.unlock();
-	return err;
-}
-
-void delete_task_error(t_task_error* error)
-{
-	sheeps_free(error);
-}
-
 bool TaskUserSocketClose(HSOCKET &hsock)
 {
 #ifdef __WINDOWS__
-	if (hsock == NULL || hsock->fd == INVALID_SOCKET)
-		return false;
-	SOCKET fd = hsock->fd;
-	hsock->fd = INVALID_SOCKET;
-	//hsock->_user->sockCount -= 1;
-	InterlockedDecrement(&hsock->_user->sockCount);
-	CancelIo((HANDLE)fd);
-	closesocket(fd);
+	SOCKET fd = InterlockedExchange(&hsock->fd, INVALID_SOCKET);
+	if (fd != INVALID_SOCKET && fd != NULL)
+	{
+		InterlockedDecrement(&hsock->_user->sockCount);
+		CancelIo((HANDLE)fd);	//取消等待执行的异步操作
+		closesocket(fd);
+	}
 	hsock = NULL;
 #else
 	if (hsock == NULL || hsock->_is_close == 1)
@@ -605,26 +573,10 @@ bool TaskUserSocketClose(HSOCKET &hsock)
 bool TaskUserDead(ReplayProtocol* proto, const char* fmt, ...)
 {
 	proto->SelfDead = true;
-
-	/*t_task_error* err = (t_task_error*)sheeps_malloc(sizeof(t_task_error));
-	if (err == NULL)
-		return false;
-	t_task_config* task = proto->Task;
-	err->taskID = task->taskID;
-	err->userID = proto->UserNumber;
-	err->timeStamp = time(NULL);
-	int l = 0;
-#define REASON_LEN 512
-	char reason[REASON_LEN];
 	va_list ap;
 	va_start(ap, fmt);
-	l += vsnprintf(reason + l, (size_t)REASON_LEN - l - 1, fmt, ap);
+	vsnprintf(proto->LastError, sizeof(proto->LastError) - 1, fmt, ap);
 	va_end(ap);
-
-	memcpy(err->errMsg, reason, (l < (int)sizeof(err->errMsg)) ? l : sizeof(err->errMsg));
-	task->taskErrlock->lock();
-	task->taskErr->push_back(err);
-	task->taskErrlock->unlock();*/
 	return true;
 }
 

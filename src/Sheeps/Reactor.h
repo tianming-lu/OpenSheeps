@@ -59,6 +59,7 @@ typedef struct _EPOLL_BUFF
 {
 	size_t offset;
 	size_t size;
+	uint8_t lock_flag;
 }EPOLL_BUFF, * HBUFF;
 #endif
 
@@ -91,7 +92,6 @@ typedef struct _EPOLL_SOCKET
 	EPOLL_BUFF		_recv_buf;
 	char*			_sendbuff;
 	EPOLL_BUFF		_send_buf;
-	std::mutex*		_sendlock;
 }EPOLL_SOCKET, * HSOCKET;
 #endif // __WINDOWS__
 
@@ -168,7 +168,7 @@ extern "C"
 	Reactor_API int		FactoryStop(BaseFactory* fc);
 	Reactor_API HSOCKET	HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE iotype);
 	Reactor_API bool	HsocketSend(HSOCKET hsock, const char* data, int len);
-	Reactor_API bool	HsocketClose(HSOCKET hsock);
+	Reactor_API bool	HsocketClose(HSOCKET &hsock);
 	Reactor_API int		HsocketSkipBuf(HSOCKET hsock, int len);
 
 #ifdef __cplusplus

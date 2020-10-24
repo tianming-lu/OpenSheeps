@@ -110,6 +110,16 @@ static bool PostAcceptClient(BaseFactory* fc)
 	return true;
 }
 
+static inline void CloseSocket(IOCP_SOCKET* IocpSock)
+{
+	SOCKET fd = InterlockedExchange(&IocpSock->fd, INVALID_SOCKET);
+	if (fd != INVALID_SOCKET && fd != NULL)
+	{
+		CancelIo((HANDLE)fd);	//取消等待执行的异步操作
+		closesocket(fd);
+	}
+}
+
 static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 {
 	switch (IocpBuff->type)
@@ -137,13 +147,13 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 			proto->protolock->lock();
 			if (IocpSock->fd != INVALID_SOCKET)
 			{
-				//left_count = proto->sockCount -= 1;
 				left_count = InterlockedDecrement(&proto->sockCount);
 				if (CONNECT == IocpBuff->type)
 					proto->ConnectionFailed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
 				else
 					proto->ConnectionClosed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
 			}
+			CloseSocket(IocpSock);
 			proto->protolock->unlock();
 		}
 		else
@@ -153,24 +163,17 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 				proto->ConnectionFailed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
 			else
 				proto->ConnectionClosed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+			CloseSocket(IocpSock);
 		}
 	}
 	if (left_count == 0 && proto != NULL && proto->protoType == SERVER_PROTOCOL)
 		IocpSock->factory->DeleteProtocol(proto);
 
-	if (IocpSock->fd != INVALID_SOCKET && IocpSock->fd != NULL)
-	{
-		SOCKET fd = IocpSock->fd;
-		IocpSock->fd = INVALID_SOCKET;
-		CancelIo((HANDLE)fd);	//取消等待执行的异步操作
-		closesocket(fd);
-
-	}
 	if (IocpSock->recv_buf)
 		pst_free(IocpSock->recv_buf);
 	ReleaseIOCP_Buff(IocpBuff);
 	ReleaseIOCP_Socket(IocpSock);
-	MemoryBarrier();
+	//MemoryBarrier();
 }
 
 static bool ResetIocp_Buff(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
@@ -452,6 +455,7 @@ int ReactorStart(Reactor* reactor)
 
 	std::thread th(mainIOCPServer, reactor);
 	th.detach();
+
 	return 0;
 }
 
@@ -624,7 +628,6 @@ HSOCKET HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE 
 		ReleaseIOCP_Socket(IocpSock);
 		return NULL;
 	}
-	//proto->sockCount += 1;
 	InterlockedIncrement(&proto->sockCount);
 	return IocpSock;
 }
@@ -687,11 +690,13 @@ bool HsocketSend(IOCP_SOCKET* IocpSock, const char* data, int len)    //注意�
 	return true;
 }
 
-bool HsocketClose(IOCP_SOCKET*  IocpSock)
+bool HsocketClose(IOCP_SOCKET*  &IocpSock)
 {
 	if (IocpSock == NULL ||IocpSock->fd == INVALID_SOCKET)
 		return false;
-	closesocket(IocpSock->fd);
+	shutdown(IocpSock->fd, SD_RECEIVE);
+	IocpSock = NULL;
+	//closesocket(IocpSock->fd);
 	return true;
 }
 

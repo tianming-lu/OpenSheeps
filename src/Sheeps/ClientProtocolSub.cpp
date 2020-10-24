@@ -191,14 +191,15 @@ void getFiles(char* path, std::map<std::string, t_file_info>* files)
 		do
 		{
 			memset(fullpath, 0, sizeof(fullpath));
-			snprintf(fullpath, sizeof(fullpath), "%s\\%s", path, fileinfo.name);
 			if ((fileinfo.attrib & _A_SUBDIR))
 			{
+				snprintf(fullpath, sizeof(fullpath), "%s%s", path, fileinfo.name);
 				if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0)
 					getFiles(fullpath, files);
 			}
 			else
 			{
+				snprintf(fullpath, sizeof(fullpath), "%s\\%s", path, fileinfo.name);
 				t_file_info info = { 0x0 };
 				getfilemd5view(fullpath, info.fmd5, sizeof(info.fmd5));
 
