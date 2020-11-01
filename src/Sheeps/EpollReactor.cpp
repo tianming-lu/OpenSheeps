@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/sysinfo.h>
-#include <thread>
 
 #define DATA_BUFSIZE 5120
 
@@ -484,8 +483,16 @@ static void main_work_thread(void* args)
 
     for (; i < reactor->CPU_COUNT*2; i++)
 	{
-		std::thread th(sub_work_thread, args);
-		th.detach();
+		pthread_attr_t attr;
+   		pthread_t tid;
+		pthread_attr_init(&attr);
+		pthread_attr_setstacksize(&attr, 1024*1024*16);
+		int rc;
+
+		if((rc = pthread_create(&tid, &attr, (void*(*)(void*))sub_work_thread, reactor)) != 0)
+		{
+			return;
+		}
 	}
 	while (reactor->Run)
 	{
@@ -505,8 +512,16 @@ int ReactorStart(Reactor* reactor)
 		return -1;
 
 	reactor->CPU_COUNT = get_nprocs_conf();
-	std::thread th(main_work_thread, reactor);
-	th.detach();
+	pthread_attr_t attr;
+   	pthread_t tid;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, 1024*1024*16);
+	int rc;
+
+	if((rc = pthread_create(&tid, &attr, (void*(*)(void*))main_work_thread, reactor)) != 0)
+	{
+		return -1;
+	}
 	return 0;
 }
 
@@ -601,7 +616,6 @@ HSOCKET HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE 
 		release_hsock(hsock);
 		return NULL;
 	}
-	//proto->sockCount += 1;
 	__sync_add_and_fetch(&proto->sockCount, 1);
 	return hsock;
 }
@@ -609,15 +623,27 @@ HSOCKET HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE 
 static void HsocketSendUdp(HSOCKET hsock, const char* data, int len)
 {
 	socklen_t socklen = sizeof(hsock->peer_addr);
-	if (len > 0)
-	{
-		sendto(hsock->fd, data, len, 0, (struct sockaddr*)&hsock->peer_addr, socklen);
-	}
+	sendto(hsock->fd, data, len, 0, (struct sockaddr*)&hsock->peer_addr, socklen);
 }
 
 static void HsocketSendTcp(HSOCKET hsock, const char* data, int len)
 {
-	if (hsock->_sendbuff == NULL)
+	while (__sync_fetch_and_or(&hsock->_send_buf.lock_flag, 1)) usleep(0);
+	int slen = 0;
+	int n = 0;
+	while (len > slen)
+	{
+		n = send(hsock->fd, data + n, len - n, MSG_DONTWAIT | MSG_NOSIGNAL);
+		if(n > 0) 
+		{
+			slen += n;
+		}
+		else if(errno == EINTR || errno == EAGAIN) 
+			continue;
+	}
+	__sync_fetch_and_and(&hsock->_send_buf.lock_flag, 0);
+
+	/*if (hsock->_sendbuff == NULL)
 	{
 		hsock->_sendbuff = (char*)malloc(len);
 		if (hsock->_sendbuff == NULL) return;
@@ -636,7 +662,7 @@ static void HsocketSendTcp(HSOCKET hsock, const char* data, int len)
 	memcpy(hsock->_sendbuff + hsock->_send_buf.offset, data, len);
 	hsock->_send_buf.offset += len;
 	__sync_fetch_and_and(&hsock->_send_buf.lock_flag, 0);
-	epoll_mod_write(hsock, WRITE);
+	epoll_mod_write(hsock, WRITE);*/
 }
 
 bool HsocketSend(HSOCKET hsock, const char* data, int len)

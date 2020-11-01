@@ -12,9 +12,11 @@ char* LogString[] = {"TRACE", "DEBUG", "NORMAL", "ERROR", "FAULT", "NONE"};
 #include "direct.h"
 #define LOGLOCK(a)  while (InterlockedExchange(a, 1)){Sleep(0);}
 #define LOGUNLOCK(a)	InterlockedExchange(a, 0)
+#define LOGTRYLOCK(a)	InterlockedExchange(a, 1)
 #else
 #define LOGLOCK(a)	while (__sync_fetch_and_or(a, 1)){sleep(0);}
 #define LOGUNLOCK(a)	__sync_fetch_and_and(a, 0)
+#define LOGTRYLOCK(a)	__sync_fetch_and_or(a, 1)
 #define INVALID_HANDLE_VALUE -1
 #endif
 
@@ -337,7 +339,9 @@ static void ScanLogs()
 		if (ctx->filefd == 0) continue;
 #endif // __WINDOWS__
 
-		LOGLOCK(&ctx->Lock);
+		//LOGLOCK(&ctx->Lock);
+		if (LOGTRYLOCK(&ctx->Lock))
+			continue;
 		if (ctx->RotateTime > 0 && ctx->RotateTime < now)
 		{
 			NewFile = ShiftFile(ctx);

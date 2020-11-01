@@ -199,7 +199,6 @@
     <ClCompile Include="ServerProxy.cpp" />
     <ClCompile Include="SheepsFactory.cpp" />
     <ClCompile Include="SheepsMain.cpp" />
-    <ClCompile Include="SheepsMemory.cpp" />
     <ClCompile Include="TaskManager.cpp" />
   </ItemGroup>
   <ItemGroup>

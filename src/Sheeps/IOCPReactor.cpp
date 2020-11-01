@@ -2,9 +2,8 @@
 #include "Reactor.h"
 #include <Ws2tcpip.h>
 #include <map>
-#include <thread>
 
-#pragma comment(lib, "Ws2_32.lib")	
+#pragma comment(lib, "Ws2_32.lib")
 
 #define DATA_BUFSIZE 5120
 #define READ	0
@@ -27,22 +26,22 @@ static inline void pst_free(void* ptr)
 	GlobalFree(ptr);
 }
 
-static IOCP_SOCKET* NewIOCP_Socket()
+static inline IOCP_SOCKET* NewIOCP_Socket()
 {
 	return (IOCP_SOCKET*)pst_malloc(sizeof(IOCP_SOCKET));
 }
 
-static void ReleaseIOCP_Socket(IOCP_SOCKET* IocpSock)
+static inline void ReleaseIOCP_Socket(IOCP_SOCKET* IocpSock)
 {
 	pst_free(IocpSock);
 }
 
-static IOCP_BUFF* NewIOCP_Buff()
+static inline IOCP_BUFF* NewIOCP_Buff()
 {
 	return (IOCP_BUFF*)pst_malloc(sizeof(IOCP_BUFF));
 }
 
-static void ReleaseIOCP_Buff(IOCP_BUFF* IocpBuff)
+static inline void ReleaseIOCP_Buff(IOCP_BUFF* IocpBuff)
 {
 	pst_free(IocpBuff);
 }
@@ -69,19 +68,19 @@ static SOCKET GetListenSock(int port)
 	return listenSock;
 }
 
-static bool PostAcceptClient(BaseFactory* fc)
+static void PostAcceptClient(BaseFactory* fc)
 {
 	IOCP_BUFF* IocpBuff;
 	IocpBuff = NewIOCP_Buff();
 	if (IocpBuff == NULL)
 	{
-		return false;
+		return;
 	}
 	IocpBuff->databuf.buf = (char*)pst_malloc(DATA_BUFSIZE);
 	if (IocpBuff->databuf.buf == NULL)
 	{
 		ReleaseIOCP_Buff(IocpBuff);
-		return false;
+		return;
 	}
 	IocpBuff->databuf.len = DATA_BUFSIZE;
 	IocpBuff->type = ACCEPT;
@@ -90,7 +89,7 @@ static bool PostAcceptClient(BaseFactory* fc)
 	if (IocpBuff->fd == INVALID_SOCKET)
 	{
 		ReleaseIOCP_Buff(IocpBuff);
-		return false;
+		return;
 	}
 
 	/*调用AcceptEx函数，地址长度需要在原有的上面加上16个字节向服务线程投递一个接收连接的的请求*/
@@ -104,10 +103,10 @@ static bool PostAcceptClient(BaseFactory* fc)
 		if (WSAGetLastError() != ERROR_IO_PENDING)
 		{
 			ReleaseIOCP_Buff(IocpBuff);
-			return false;
+			return;
 		}
 	}
-	return true;
+	return;
 }
 
 static inline void CloseSocket(IOCP_SOCKET* IocpSock)
@@ -198,16 +197,17 @@ static bool ResetIocp_Buff(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 	if (IocpBuff->databuf.len == 0)
 	{
 		IocpBuff->size += DATA_BUFSIZE;
-		IocpSock->recv_buf = (char*)pst_realloc(IocpSock->recv_buf, IocpBuff->size);
-		if (IocpSock->recv_buf == NULL)
+		char* new_ptr = (char*)pst_realloc(IocpSock->recv_buf, IocpBuff->size);
+		if (new_ptr == NULL)
 			return false;
+		IocpSock->recv_buf = new_ptr;
 		IocpBuff->databuf.len = IocpBuff->size - IocpBuff->offset;
 	}
 	IocpBuff->databuf.buf = IocpSock->recv_buf + IocpBuff->offset;
 	return true;
 }
 
-static bool PostRecvUDP(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol* proto)
+static inline void PostRecvUDP(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol* proto)
 {
 	int fromlen = sizeof(struct sockaddr);
 	DWORD flags = 0;
@@ -215,34 +215,29 @@ static bool PostRecvUDP(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol
 	{
 		if (ERROR_IO_PENDING != WSAGetLastError())
 		{
-			Close(IocpSock, IocpBuff);
-			return false;
+			return Close(IocpSock, IocpBuff);
 		}
 	}
-	return true;
 }
 
-static bool PostRecvTCP(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol* proto)
+static inline void PostRecvTCP(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol* proto)
 {
 	DWORD flags = 0;
 	if (SOCKET_ERROR == WSARecv(IocpSock->fd, &IocpBuff->databuf, 1, NULL, &flags, &IocpBuff->overlapped, NULL))
 	{
 		if (ERROR_IO_PENDING != WSAGetLastError())
 		{
-			Close(IocpSock, IocpBuff);
-			return false;
+			return Close(IocpSock, IocpBuff);
 		}
 	}
-	return true;
 }
 
-static bool PostRecv(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol* proto)
+static void PostRecv(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol* proto)
 {
 	IocpBuff->type = READ;
 	if (ResetIocp_Buff(IocpSock, IocpBuff) == false)
 	{
-		Close(IocpSock, IocpBuff);
-		return false;
+		return Close(IocpSock, IocpBuff);
 	}
 
 	if (IocpSock->_iotype == UDP_CONN)
@@ -250,7 +245,7 @@ static bool PostRecv(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff, BaseProtocol* p
 	return PostRecvTCP(IocpSock, IocpBuff, proto);
 }
 
-static bool AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
+static void AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 {
 	BaseFactory* fc = IocpListenSock->factory;
 	Reactor* reactor = fc->reactor;
@@ -259,16 +254,14 @@ static bool AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 	IOCP_SOCKET* IocpSock = NewIOCP_Socket();
 	if (IocpSock == NULL)
 	{
-		Close(IocpListenSock, IocpBuff);
-		return false;
+		return Close(IocpListenSock, IocpBuff);
 	}
 	IocpSock->fd = IocpBuff->fd;
 	BaseProtocol* proto = fc->CreateProtocol();	//用户指针
 	if (proto == NULL)
 	{
 		ReleaseIOCP_Socket(IocpSock);
-		Close(IocpListenSock, IocpBuff);
-		return false;
+		return Close(IocpListenSock, IocpBuff);
 	}
 	if (proto->factory == NULL)
 		proto->SetFactory(fc, SERVER_PROTOCOL);
@@ -280,7 +273,7 @@ static bool AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 	getpeername(IocpSock->fd, (SOCKADDR*)&IocpSock->peer_addr, &nSize);
 	inet_ntop(AF_INET, &IocpSock->peer_addr.sin_addr, IocpSock->peer_ip, sizeof(IocpSock->peer_ip));
 	IocpSock->peer_port = ntohs(IocpSock->peer_addr.sin_port);
-	//proto->sockCount += 1;
+
 	InterlockedIncrement(&proto->sockCount);
 	CreateIoCompletionPort((HANDLE)IocpSock->fd, reactor->ComPort, (ULONG_PTR)IocpSock, 0);	//将监听到的套接字关联到完成端口
 	if (proto->protolock)
@@ -296,10 +289,9 @@ static bool AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 
 	PostRecv(IocpSock, IocpBuff, proto);
 	PostAcceptClient(IocpListenSock->factory);
-	return true;
 }
 
-static bool ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
+static void ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 {
 	BaseProtocol* proto = NULL;
 	switch (IocpBuff->type)
@@ -317,20 +309,29 @@ static bool ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 			{
 				proto->protolock->lock();
 				if (IocpSock->fd != INVALID_SOCKET)
+				{
 					proto->Recved(IocpSock, IocpSock->peer_ip, IocpSock->peer_port, IocpSock->recv_buf, IocpBuff->offset);
-				proto->protolock->unlock();
+					proto->protolock->unlock();
+				}
+				else
+				{
+					proto->protolock->unlock();
+					return Close(IocpSock, IocpBuff);
+				}
 			}
 			else
 			{
 				proto->Recved(IocpSock, IocpSock->peer_ip, IocpSock->peer_port, IocpSock->recv_buf, IocpBuff->offset);
 			}
-				
-
 			PostRecv(IocpSock, IocpBuff, proto);
+		}
+		else
+		{
+			return Close(IocpSock, IocpBuff);
 		}
 		break;
 	case WRITE:
-		Close(IocpSock, IocpBuff);
+		return Close(IocpSock, IocpBuff);
 		break;
 	case ACCEPT:
 		AceeptClient(IocpSock, IocpBuff);
@@ -343,8 +344,15 @@ static bool ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 			{
 				proto->protolock->lock();
 				if (IocpSock->fd != INVALID_SOCKET)
+				{
 					proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
-				proto->protolock->unlock();
+					proto->protolock->unlock();
+				}
+				else
+				{
+					proto->protolock->unlock();
+					return Close(IocpSock, IocpBuff);
+				}
 			}
 			else
 			{
@@ -354,13 +362,12 @@ static bool ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 		}
 		else
 		{
-			Close(IocpSock, IocpBuff);
+			return Close(IocpSock, IocpBuff);
 		}
 		break;
 	default:
 		break;
 	}
-	return true;
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -407,12 +414,16 @@ DWORD WINAPI mainIOCPServer(LPVOID pParam)
 	for (int i = 0; i < reactor->CPU_COUNT*2; i++)
 	//for (unsigned int i = 0; i < 1; i++)
 	{
-		std::thread th(serverWorkerThread, pParam);
-		th.detach();
+		HANDLE ThreadHandle;
+		ThreadHandle = CreateThread(NULL, 1024*1024*16, serverWorkerThread, pParam, 0, NULL);
+		if (NULL == ThreadHandle) {
+			return -4;
+		}
+		CloseHandle(ThreadHandle);
 	}
+	std::map<uint16_t, BaseFactory*>::iterator iter;
 	while (reactor->Run)
 	{
-		std::map<uint16_t, BaseFactory*>::iterator iter;
 		for (iter = reactor->FactoryAll.begin(); iter != reactor->FactoryAll.end(); ++iter)
 		{
 			iter->second->FactoryLoop();
@@ -453,9 +464,12 @@ int ReactorStart(Reactor* reactor)
 	}
 	closesocket(tempSock);
 
-	std::thread th(mainIOCPServer, reactor);
-	th.detach();
-
+	HANDLE ThreadHandle;
+	ThreadHandle = CreateThread(NULL, 1024*1024*16, mainIOCPServer, reactor, 0, NULL);
+	if (NULL == ThreadHandle) {
+		return -4;
+	}
+	CloseHandle(ThreadHandle);
 	return 0;
 }
 

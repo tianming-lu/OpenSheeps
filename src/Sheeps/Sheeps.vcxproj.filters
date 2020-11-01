@@ -92,9 +92,6 @@
     <ClCompile Include="SheepsMain.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="SheepsMemory.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Sheeps.def">

@@ -124,7 +124,7 @@ public:
 	bool		SelfDead = false;
 	uint8_t		PlayState = PLAY_NORMAL;
 	MSGPointer	MsgPointer = { 0x0 };
-	char		LastError[128];
+	char		LastError[128] = {0x0};
 
 public:
 	virtual void Init() = 0;

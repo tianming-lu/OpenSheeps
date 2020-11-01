@@ -35,7 +35,7 @@
 #define THREAD_ID syscall(SYS_gettid)
 #endif
 
-#define MAX_LOG_LEN	10240
+#define MAX_LOG_LEN	1024
 
 enum loglevel {LOG_TRACE = 0, LOG_DEBUG, LOG_NORMAL, LOG_ERROR, LOG_FAULT, LOG_NONE}; 
 
