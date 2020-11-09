@@ -132,7 +132,7 @@ $(document).ready(function(){
       if (total_user == 0 || isNaN(total_user) || once_user == 0 || isNaN(once_user)||space_time == 0 || isNaN(space_time)){
         return;
       }
-      var jsondata = {"des":des,"project_id":projectid,"env_id":0,"total_user":total_user,"once_user":once_user,"space_time":space_time,"loop_mode":loop,"ignor_error":ignor_err,"db_file":db_file};
+      var jsondata = {"des":des,"project_id":projectid,"total_user":total_user,"once_user":once_user,"space_time":space_time,"loop_mode":loop,"ignor_error":ignor_err,"db_file":db_file};
       jsondata["replay"] = [];
       $(".replay_addr:checked").each(function(index, item){
         var reitem = {"src": $("#replay_src"+$(this).val()).text()};
