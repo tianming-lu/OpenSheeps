@@ -21,16 +21,15 @@ SheepsFactory::~SheepsFactory()
 
 bool SheepsFactory::FactoryInit()
 {
-
-	this->ClientInit();
-
+	bool ret = true;
+	if (!this->ClientInit()) ret = false;
 	if (this->ServerPort > 0)
 	{
-		ServerInit(ConfigFile);
-		StressServerInit();
-		ProxyServerInit();
+		if (!ServerInit(ConfigFile)) ret = false;
+		if (!StressServerInit()) ret = false;
+		if (!ProxyServerInit()) ret = false;
 	}
-	return true;
+	return ret;
 }
 
 bool SheepsFactory::ClientInit()
@@ -39,12 +38,16 @@ bool SheepsFactory::ClientInit()
 	{
 		ClientLogInit(ConfigFile);
 		if (this->ClientProto == NULL)
-			this->ClientProto = new ClientProtocol();
-		this->ClientProto->SetFactory(this, CLIENT_PROTOCOL);
-		memcpy(this->ClientProto->StressSerIP, this->StressServerIp, strlen(this->StressServerIp));
-		this->ClientProto->StressSerPort = this->StressServerPort;
-		this->ClientProto->ProjectID = this->projectid;
-		this->ClientRuning = true;
+			this->ClientProto = new(std::nothrow) ClientProtocol();
+		if (this->ClientProto)
+		{
+			this->ClientProto->SetFactory(this, CLIENT_PROTOCOL);
+			this->ClientProto->SetNoLock();
+			memcpy(this->ClientProto->StressSerIP, this->StressServerIp, strlen(this->StressServerIp));
+			this->ClientProto->StressSerPort = this->StressServerPort;
+			this->ClientProto->ProjectID = this->projectid;
+			this->ClientRuning = true;
+		}
 	}
 	return true;
 }

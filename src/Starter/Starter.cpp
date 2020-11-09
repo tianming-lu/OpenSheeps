@@ -53,6 +53,7 @@ int main(int argc, char* argv[])
 	strdll.run(ip, port, listen);
 	char in[4] = { 0x0 };
 #ifdef __WINDOWS__
+	system("chcp 65001");
 #define clear_screen "CLS"
 #else
 #define clear_screen "clear"

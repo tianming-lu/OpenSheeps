@@ -38,7 +38,7 @@ UserProtocol::~UserProtocol()
 
 void UserProtocol::Init()
 {	/*用户初始化，用户实例被创建后会被调用一次*/
-	TaskUserLog(this, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
+	TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 }
 
 void UserProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)

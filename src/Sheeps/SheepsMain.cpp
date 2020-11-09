@@ -33,12 +33,16 @@ int StressClientRun(char *stressIp, short stressPort, short listenPort)
 
 	if (rec == NULL)
 	{
-		rec = new Reactor();
+		rec = new(std::nothrow) Reactor();
 		ReactorStart(rec);
 	}
 	if (NULL == stressfc)
 	{
-		stressfc = new SheepsFactory();
+		stressfc = new(std::nothrow) SheepsFactory();
+	}
+	if (rec == NULL || stressfc == NULL)
+	{
+		return -1;
 	}
 	stressfc->Set(rec, listenPort);
 	memcpy(stressfc->StressServerIp, stressIp, strlen(stressIp));
@@ -58,12 +62,16 @@ int SheepsClientRun(const char* stressIp, short stressPort, int projectid)
 
 	if (rec == NULL)
 	{
-		rec = new Reactor();
+		rec = new(std::nothrow) Reactor();
 		ReactorStart(rec);
 	}
 	if (NULL == stressfc)
 	{
-		stressfc = new SheepsFactory();
+		stressfc = new(std::nothrow) SheepsFactory();
+	}
+	if (rec == NULL || stressfc == NULL)
+	{
+		return -1;
 	}
 	stressfc->Set(rec, 0);
 	memcpy(stressfc->StressServerIp, stressIp, strlen(stressIp));

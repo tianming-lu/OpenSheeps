@@ -70,6 +70,6 @@ public:
 	int  CheckRequest(HSOCKET hsock, const char* ip, int port, const char* data, int len);
 };
 
-void ServerInit(char* configfile);
+bool ServerInit(char* configfile);
 
 #endif // !_SERVER_PROTOCOL_H_

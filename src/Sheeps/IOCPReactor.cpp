@@ -480,19 +480,20 @@ void ReactorStop(Reactor* reactor)
 
 int FactoryRun(BaseFactory* fc)
 {	
-	fc->FactoryInit();
+	if (!fc->FactoryInit())
+		return -1;
 
 	if (fc->ServerPort != 0)
 	{
 		fc->Listenfd = GetListenSock(fc->ServerPort);
 		if (fc->Listenfd == SOCKET_ERROR)
-			return -1;
+			return -2;
 
 		IOCP_SOCKET* IcpSock = NewIOCP_Socket();
 		if (IcpSock == NULL)
 		{
 			closesocket(fc->Listenfd);
-			return -2;
+			return -3;
 		}
 		IcpSock->factory = fc;
 		IcpSock->fd = fc->Listenfd;

@@ -16,6 +16,11 @@
 #define Common_API
 #endif // __WINDOWS__
 
+#ifdef __WINDOWS__
+#define TimeSleep(ms) Sleep(ms)
+#else
+#define TimeSleep(ms) usleep(ms*1000)
+#endif // __WINDOWS__
 
 #ifdef __cplusplus
 extern "C"
@@ -25,14 +30,59 @@ extern "C"
 Common_API int GetHostByName(char* name, char* buf, size_t size);
 #ifdef __WINDOWS__
 #include <Winsock2.h>
-Common_API int GetSockName(SOCKET fd, struct sockaddr* addr, int* nSize);
+static inline int GetSockName(SOCKET fd, struct sockaddr* addr, int* nSize)
+{
+	return getsockname(fd, addr, nSize);
+}
 #else
 #include <sys/socket.h>
-Common_API int GetSockName(int fd, struct sockaddr* addr, int* nSize);
+static inline int GetSockName(int fd, struct sockaddr* addr, int* nSize)
+{
+	return getsockname(fd, addr, (socklen_t*)nSize);
+}
 #endif // __WINDOWS__
-Common_API int GetCpuCount();
-Common_API long long int GetSysTimeMicros();
-Common_API void TimeSleep(int time_ms);
+
+#ifdef __WINDOWS__
+#include <windows.h>
+static inline int GetCpuCount()
+{
+	SYSTEM_INFO sysInfor;
+	GetSystemInfo(&sysInfor);
+	return sysInfor.dwNumberOfProcessors;
+#else
+#include <sys/sysinfo.h>
+static inline int GetCpuCount()
+{
+	return get_nprocs_conf();
+#endif // __WINDOWS__
+}
+
+#ifdef __WINDOWS__
+#include <windows.h>
+static inline long long int GetSysTimeMicros()
+{
+	// 从1601年1月1日0:0:0:000到1970年1月1日0:0:0:000的时间(单位100ns)
+#define EPOCHFILETIME   (116444736000000000UL)
+	FILETIME ft;
+	LARGE_INTEGER li;
+	long long tt = 0;
+	GetSystemTimeAsFileTime(&ft);
+	li.LowPart = ft.dwLowDateTime;
+	li.HighPart = ft.dwHighDateTime;
+	// 从1970年1月1日0:0:0:000到现在的微秒数(UTC时间)
+	tt = (li.QuadPart - EPOCHFILETIME) / 10;
+	return tt;
+}
+#else
+#include <sys/time.h>
+#include <unistd.h>
+static inline long long int GetSysTimeMicros()
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec * 1000000 + tv.tv_usec;
+}
+#endif // __WINDOWS__
 
 #ifdef __cplusplus
 }

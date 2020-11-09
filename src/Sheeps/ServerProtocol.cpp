@@ -6,7 +6,7 @@
 
 int slogid = -1;
 
-void ServerInit(char* configfile)
+bool ServerInit(char* configfile)
 {
 	const char* file = config_get_string_value("LOG", "server_file", "server.log");
 	char fullpath[256] = { 0x0 };
@@ -15,6 +15,7 @@ void ServerInit(char* configfile)
 	int maxsize = config_get_int_value("LOG", "serveer_size", 20);
 	int timesplit = config_get_int_value("LOG", "server_time", 3600);
 	slogid = RegisterLog(fullpath, loglevel, maxsize, timesplit, 5);
+	return true;
 }
 
 ServerProtocol::ServerProtocol()

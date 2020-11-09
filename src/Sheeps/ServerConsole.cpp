@@ -49,14 +49,19 @@ static int task_init_record_sql(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	}
 
 	runtask->dbsql = (char*)sheeps_malloc(SQL_SIZE);
+	if (runtask->dbsql == NULL)
+	{
+		LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+		return -1;
+	}
 
 	char temp[256] = { 0x0 };
 	char table[64] = { 0x0 };
-	std::list<Readdr>::iterator iter = taskcfg->replayAddr->begin();
+	std::list<Readdr*>::iterator iter = taskcfg->replayAddr->begin();
 	for (; iter != taskcfg->replayAddr->end(); ++iter)
 	{
 		memset(table, 0, sizeof(table));
-		int offset = snprintf(table, sizeof(table), "record_%s", iter->srcAddr);
+		int offset = snprintf(table, sizeof(table), "record_%s", (*iter)->srcAddr);
 		std::replace(table, table + offset, '.', '_');
 		std::replace(table, table + offset, ':', 'p');
 
@@ -100,9 +105,9 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	char buf[512] = { 0x0 };
 	char tem[128] = { 0x0 };
 	if (taskcfg->loopMode == 0 && taskcfg->ignoreErr == true)
-		snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"EnvID\":%d,\"IgnoreErr\":true,", taskcfg->taskID, taskcfg->projectID, taskcfg->envID);
+		snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"IgnoreErr\":true,", taskcfg->taskID, taskcfg->projectID);
 	else
-		snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"EnvID\":%d,\"IgnoreErr\":false,", taskcfg->taskID, taskcfg->projectID, taskcfg->envID);
+		snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"IgnoreErr\":false,", taskcfg->taskID, taskcfg->projectID);
 
 	int machine_id = 0;
 	StressClientMapLock->lock();
@@ -128,7 +133,13 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 
 	runtask->lastChangUserTime = time(NULL);
 	runtask->stage = STAGE_LOOP;
-	runtask->tempMsg = new std::list<RecordMsg>;
+	runtask->tempMsg = new(std::nothrow) std::list<RecordMsg*>;
+	if (runtask->tempMsg == NULL)
+	{
+		LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+		runtask->stage = STAGE_CLEAN;
+		return;
+	}
 	taskcfg->taskState = STATE_RUNING;
 	char fullname[256] = { 0x0 };
 	snprintf(fullname, sizeof(fullname), "%s%s", RecordPath, taskcfg->dbName);
@@ -220,16 +231,27 @@ static void task_get_record_msg(HTASKRUN runtask, HTASKCONFIG taskcfg)
 			while (sqlite3_step(stmt) == SQLITE_ROW)
 			{
 				rowcount++;
-				RecordMsg msg;
-				msg.recordTime = sqlite3_column_int64(stmt, 0);
-				msg.recordType = sqlite3_column_int(stmt, 1);
+				RecordMsg* msg = (RecordMsg*)sheeps_malloc(sizeof(RecordMsg));
+				if (msg == NULL)
+				{
+					LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+					continue;
+				}
+				msg->recordTime = sqlite3_column_int64(stmt, 0);
+				msg->recordType = sqlite3_column_int(stmt, 1);
 				const char* ip = (const char*)sqlite3_column_text(stmt, 2);
-				snprintf(msg.ip, sizeof(msg.ip), "%s", ip);
-				msg.port = sqlite3_column_int(stmt, 3);
+				snprintf(msg->ip, sizeof(msg->ip), "%s", ip);
+				msg->port = sqlite3_column_int(stmt, 3);
 				const char* content = (const char*)sqlite3_column_text(stmt, 4);
-				msg.contentLen = strlen(content);
-				msg.content = (char*)sheeps_malloc(msg.contentLen + 1);
-				memcpy(msg.content, content, msg.contentLen);
+				msg->contentLen = strlen(content);
+				msg->content = (char*)sheeps_malloc(msg->contentLen + 1);
+				if (msg->content == NULL)
+				{
+					LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+					sheeps_free(msg);
+					continue;
+				}
+				memcpy(msg->content, content, msg->contentLen);
 				runtask->tempMsg->push_back(msg);
 			}
 		}
@@ -243,44 +265,49 @@ static void task_get_record_msg(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	}
 }
 
-static void task_chang_record_msg_addr(HTASKRUN runtask, HTASKCONFIG taskcfg, RecordMsg& msg)
+static void task_chang_record_msg_addr(HTASKRUN runtask, HTASKCONFIG taskcfg, RecordMsg* msg)
 {
 	char chang[32] = { 0x0 };
-	snprintf(chang, sizeof(chang), "%s:%d", msg.ip, msg.port);
-	std::map<std::string, Readdr>::iterator iter = taskcfg->changeAddr->find(chang);
+	snprintf(chang, sizeof(chang), "%s:%d", msg->ip, msg->port);
+	std::map<std::string, Readdr*>::iterator iter = taskcfg->changeAddr->find(chang);
 	if (iter != taskcfg->changeAddr->end())
 	{
-		Readdr dst = iter->second;
-		char* p = strstr(dst.dstAddr, ":");
+		Readdr* dst = iter->second;
+		char* p = strstr(dst->dstAddr, ":");
 		if (p)
 		{
-			memset(msg.ip, 0x0, sizeof(msg.ip));
-			memcpy(msg.ip, dst.dstAddr, p - dst.dstAddr);
-			msg.port = atoi(p + 1);
+			memset(msg->ip, 0x0, sizeof(msg->ip));
+			memcpy(msg->ip, dst->dstAddr, p - dst->dstAddr);
+			msg->port = atoi(p + 1);
 		}
 	}
 }
 
-static void task_push_record_msg_to_client(HTASKRUN runtask, HTASKCONFIG taskcfg, RecordMsg &msg)
+static void task_push_record_msg_to_client(HTASKRUN runtask, HTASKCONFIG taskcfg, RecordMsg* msg)
 {
 	task_chang_record_msg_addr(runtask, taskcfg, msg);
 
-	size_t alloc_len = msg.contentLen + 256;
+	size_t alloc_len = msg->contentLen + 256;
 	char* buf = (char*)sheeps_malloc(alloc_len);
-	int n = 0;
-	if (msg.recordType == 4)
+	if (buf == NULL)
 	{
-		msg.recordType = 1;
+		LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+		return;
+	}
+	int n = 0;
+	if (msg->recordType == 4)
+	{
+		msg->recordType = 1;
 		n = snprintf(buf + 8, alloc_len - 8, "{\"TaskID\":%d,\"Host\":\"%s\",\"Port\":%d,\"Timestamp\":%lld,\"Microsecond\":%lld,\"Msg\":\"%s\",\"Iotype\":\"UDP\"}",
-			taskcfg->taskID, msg.ip, msg.port, msg.recordTime / 1000000, msg.recordTime % 1000000, msg.content);
+			taskcfg->taskID, msg->ip, msg->port, msg->recordTime / 1000000, msg->recordTime % 1000000, msg->content);
 	}
 	else
 	{
 		n = snprintf(buf + 8, alloc_len - 8, "{\"TaskID\":%d,\"Host\":\"%s\",\"Port\":%d,\"Timestamp\":%lld,\"Microsecond\":%lld,\"Msg\":\"%s\"}",
-			taskcfg->taskID, msg.ip, msg.port, msg.recordTime / 1000000, msg.recordTime % 1000000, msg.content);
+			taskcfg->taskID, msg->ip, msg->port, msg->recordTime / 1000000, msg->recordTime % 1000000, msg->content);
 	}
 	*(int*)buf = n + 8;
-	*(int*)(buf + 4) = msg.recordType + 3;
+	*(int*)(buf + 4) = msg->recordType + 3;
 
 	StressClientMapLock->lock();
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
@@ -302,19 +329,20 @@ static void task_push_record_msg(HTASKRUN runtask, HTASKCONFIG taskcfg)
 		task_get_record_msg(runtask, taskcfg);
 	if (runtask->tempMsg->empty())
 		return;
-	RecordMsg msg = runtask->tempMsg->front();
+	RecordMsg *msg = runtask->tempMsg->front();
 	if (runtask->startReal == 0)
 	{
 		runtask->startReal = GetSysTimeMicros();
-		runtask->startRecord = msg.recordTime;
+		runtask->startRecord = msg->recordTime;
 	}
-	time_t shouldtime = msg.recordTime - runtask->startRecord;
+	time_t shouldtime = msg->recordTime - runtask->startRecord;
 	time_t realtime = GetSysTimeMicros() - runtask->startReal;
 	if (shouldtime > realtime)
 		return;
 	task_push_record_msg_to_client(runtask, taskcfg, msg);
 
-	sheeps_free(msg.content);
+	sheeps_free(msg->content);
+	sheeps_free(msg);
 	runtask->tempMsg->pop_front();
 }
 
@@ -345,8 +373,9 @@ static void task_push_over(HTASKRUN runtask, HTASKCONFIG taskcfg)
 
 	while (runtask->tempMsg && runtask->tempMsg->size())
 	{
-		RecordMsg msg = runtask->tempMsg->front();
-		sheeps_free(msg.content);
+		RecordMsg* msg = runtask->tempMsg->front();
+		sheeps_free(msg->content);
+		sheeps_free(msg);
 		runtask->tempMsg->pop_front();
 	}
 	if (runtask->tempMsg)
@@ -483,7 +512,6 @@ static void do_stress_client_log(HSOCKET hsock, cJSON* root, char* uri)
 static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 {
 	cJSON* projectid = cJSON_GetObjectItem(root, "project_id");
-	cJSON* envid = cJSON_GetObjectItem(root, "env_id");
 	cJSON* total = cJSON_GetObjectItem(root, "total_user");
 	cJSON* once = cJSON_GetObjectItem(root, "once_user");
 	cJSON* space = cJSON_GetObjectItem(root, "space_time");
@@ -491,9 +519,9 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	cJSON* ignor = cJSON_GetObjectItem(root, "ignor_error");
 	cJSON* dbfile = cJSON_GetObjectItem(root, "db_file");
 	cJSON* des = cJSON_GetObjectItem(root, "des");
-	if (projectid == NULL || envid == NULL || total == NULL || once == NULL || space == NULL || loop == NULL || ignor == NULL || dbfile == NULL || des == NULL||
-		projectid->type != cJSON_Number || envid->type != cJSON_Number || total->type != cJSON_Number || once->type != cJSON_Number ||
-		space->type != cJSON_Number || loop->type != cJSON_Number || ignor->type != cJSON_Number || dbfile->type != cJSON_String ||des->type != cJSON_String)
+	if (projectid == NULL || total == NULL || once == NULL || space == NULL || loop == NULL || ignor == NULL || dbfile == NULL || des == NULL||
+		projectid->type != cJSON_Number || total->type != cJSON_Number || once->type != cJSON_Number ||space->type != cJSON_Number || 
+		loop->type != cJSON_Number || ignor->type != cJSON_Number || dbfile->type != cJSON_String ||des->type != cJSON_String)
 	{
 		return;
 	}
@@ -517,7 +545,6 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	else
 		task->taskID = taskIndex++;
 	task->projectID = projectid->valueint;
-	task->envID = envid->valueint;
 	task->totalUser = total->valueint;
 	task->onceUser = once->valueint;
 	task->spaceTime = space->valueint;
@@ -525,8 +552,23 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	task->ignoreErr = ignor->valueint == 0? false:true;
 	snprintf(task->dbName, sizeof(task->dbName), "%s", dbfile->valuestring);
 	snprintf(task->taskDes, sizeof(task->taskDes), "%s", des->valuestring);
-	task->replayAddr = new std::list<Readdr>;
-	task->changeAddr = new std::map<std::string, Readdr>;
+	task->replayAddr = new(std::nothrow) std::list<Readdr*>;
+	if (task->replayAddr == NULL)
+	{
+		taskIndexPool.insert(std::pair<uint8_t, uint8_t>(task->taskID, task->taskID));
+		sheeps_free(task);
+		TaskCfgLock->unlock();
+		return;
+	}
+	task->changeAddr = new(std::nothrow) std::map<std::string, Readdr*>;
+	if (task->changeAddr == NULL)
+	{
+		taskIndexPool.insert(std::pair<uint8_t, uint8_t>(task->taskID, task->taskID));
+		delete task->replayAddr;
+		sheeps_free(task);
+		TaskCfgLock->unlock();
+		return;
+	}
 	cJSON* array = cJSON_GetObjectItem(root, "replay");
 	if (array != NULL && array->type == cJSON_Array)
 	{
@@ -539,15 +581,19 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 			cJSON* src = cJSON_GetObjectItem(item, "src");
 			if (src == NULL || src->type != cJSON_String)
 				continue;
-			Readdr addr;
-			memset(&addr, 0, sizeof(addr));
-			snprintf(addr.srcAddr, sizeof(addr.srcAddr), "%s", src->valuestring);
+			Readdr* addr = (Readdr*)sheeps_malloc(sizeof(Readdr));
+			if (addr == NULL)
+			{
+				LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+				continue;
+			}
+			snprintf(addr->srcAddr, sizeof(addr->srcAddr), "%s", src->valuestring);
 
 			cJSON* dst = cJSON_GetObjectItem(item, "dst");
 			if (dst != NULL && src->type == cJSON_String)
 			{
-				snprintf(addr.dstAddr, sizeof(addr.dstAddr), "%s", dst->valuestring);
-				task->changeAddr->insert(std::pair<std::string, Readdr>(std::string(src->valuestring), addr));
+				snprintf(addr->dstAddr, sizeof(addr->dstAddr), "%s", dst->valuestring);
+				task->changeAddr->insert(std::pair<std::string, Readdr*>(std::string(src->valuestring), addr));
 			}
 			task->replayAddr->push_back(addr);
 		}
@@ -605,13 +651,13 @@ static void do_console_task_info(HSOCKET hsock, cJSON* root, char* uri)
 		return;
 	}
 	cJSON_AddItemToObject(data, "replay", replay);
-	std::list<Readdr>::iterator it = taskcfg->replayAddr->begin();
+	std::list<Readdr*>::iterator it = taskcfg->replayAddr->begin();
 	for (;it != taskcfg->replayAddr->end(); ++it)
 	{
 		cJSON* item = cJSON_CreateObject();
 		if (item == NULL) continue;
-		cJSON_AddStringToObject(item, "src", it->srcAddr);
-		cJSON_AddStringToObject(item, "dst", it->dstAddr);
+		cJSON_AddStringToObject(item, "src", (*it)->srcAddr);
+		cJSON_AddStringToObject(item, "dst", (*it)->dstAddr);
 		cJSON_AddItemToArray(replay, item);
 	}
 	send_console_msg(hsock, res);
@@ -667,8 +713,15 @@ static void do_console_task_delete(HSOCKET hsock, cJSON* root, char* uri)
 	{
 		HTASKCONFIG taskcfg = iter->second;
 		taskIndexPool.insert(std::pair<uint8_t, uint8_t>(taskcfg->taskID, taskcfg->taskID));
+
+		std::list<Readdr*>::iterator itr;
+		for (itr = taskcfg->replayAddr->begin(); itr != taskcfg->replayAddr->end(); ++itr)
+		{
+			sheeps_free(*itr);
+		}
 		taskcfg->replayAddr->clear();
 		delete taskcfg->replayAddr;
+		taskcfg->changeAddr->clear();
 		delete taskcfg->changeAddr;
 		sheeps_free(taskcfg);
 		TaskCfg.erase(iter);
@@ -1121,6 +1174,12 @@ static int get_home_page(HSOCKET hsock)
 
 	if (home_page == NULL)
 		home_page = (char*)sheeps_malloc(PAGESIZE);
+	if (home_page == NULL)
+	{
+		LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+		HsocketClose(hsock);
+		return 0;
+	}
 
 	if (page_len == 0)
 	{
@@ -1169,7 +1228,11 @@ int CheckConsoleRequest(HSOCKET hsock, ServerProtocol* proto, const char* data, 
 
 	char* content = (char*)sheeps_malloc((size_t)len + 1);
 	if (content == NULL)
+	{
+		LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+		HsocketClose(hsock);
 		return 0;
+	}
 	memcpy(content, p + 4, len);
 	LOG(slogid, LOG_DEBUG, "%s:%d uri[%s] data[%s]\r\n", __func__, __LINE__, uri, content);
 	cJSON* root = cJSON_Parse(content);

@@ -25,7 +25,6 @@ typedef struct {
 	uint8_t		taskID;
 	uint8_t		projectID;
 	char		projectName[20];
-	uint8_t		envID;
 	int32_t		totalUser;
 	int32_t		onceUser;
 	uint16_t	spaceTime;
@@ -34,8 +33,8 @@ typedef struct {
 	uint8_t		taskState;
 	char		taskDes[64];
 	char		dbName[64];
-	std::list<Readdr>* replayAddr;
-	std::map<std::string, Readdr> *changeAddr;
+	std::list<Readdr*>* replayAddr;
+	std::map<std::string, Readdr*> *changeAddr;
 }TaskConfig, * HTASKCONFIG;
 
 typedef struct {
@@ -54,7 +53,7 @@ typedef struct {
 
 	time_t lastChangUserTime;
 
-	std::list<RecordMsg> *tempMsg;
+	std::list<RecordMsg*> *tempMsg;
 	time_t startRecord;
 	time_t startReal;
 	int32_t startRow;

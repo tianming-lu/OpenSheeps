@@ -15,7 +15,7 @@ typedef struct
 	size_t	size;
 }t_file_update;
 
-int StressServerInit();
+bool StressServerInit();
 int ServerUnInit();
 
 int CheckStressRequest(HSOCKET hsock, ServerProtocol* proto, const char* data, int len);

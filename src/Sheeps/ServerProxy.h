@@ -24,7 +24,7 @@ int	 CheckPoxyRequest(HSOCKET hsock, ServerProtocol* proto, const char* ip, int 
 void ProxyConnectionMade(HSOCKET hsock, ServerProtocol* proto, const char* ip, int port);
 void ProxyConnectionFailed(HSOCKET hsock, ServerProtocol* proto, const char* ip, int port);
 void ProxyConnectionClosed(HSOCKET hsock, ServerProtocol* proto, const char* ip, int port);
-void ProxyServerInit();
+bool ProxyServerInit();
 bool ChangeDatabaseName(const char* new_name);
 int	 my_sqlite3_open(char* inDbName, sqlite3** ppdb);
 

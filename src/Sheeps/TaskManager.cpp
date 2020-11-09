@@ -72,8 +72,12 @@ static ReplayProtocol* get_userDes_splice(HTASKCFG task, std::list<ReplayProtoco
 	std::list<ReplayProtocol*>* src = task->userDes;
 	std::list<ReplayProtocol*>::iterator iter;
 	ReplayProtocol* user;
-	if (src->empty()) return NULL;
 	task->userDesLock->lock();
+	if (src->empty())
+	{
+		task->userDesLock->unlock();
+		return NULL;
+	}
 	iter = src->begin();
 	user = *iter;
 	dst->splice(dst->end(), *src, iter);
@@ -92,88 +96,66 @@ static void add_to_userDes(HTASKCFG task, std::list<ReplayProtocol*>* src)
 
 static void destroy_task(HTASKCFG task)
 {
-	if (task->workThreadCount == 0)
+	LOG(clogId, LOG_DEBUG, "%s:%d Clean Task !\r\n", __func__, __LINE__);
+	std::vector<t_cache_message*>::iterator it;
+	for (it = task->messageList->begin(); it != task->messageList->end(); ++it)
 	{
-		LOG(clogId, LOG_DEBUG, "%s:%d Clean Task !\r\n", __func__, __LINE__);
-		std::vector<t_cache_message*>::iterator it;
-		for (it = task->messageList->begin(); it != task->messageList->end(); ++it)
-		{
-			t_cache_message* data = *it;
-			if (data->content)
-				sheeps_free(data->content);
-			sheeps_free(data);
-			*it = NULL;
-		}
-		task->messageList->clear();
-		delete task->messageList;
+		t_cache_message* data = *it;
+		if (data->content)
+			sheeps_free(data->content);
+		sheeps_free(data);
+		*it = NULL;
+	}
+	task->messageList->clear();
+	delete task->messageList;
 
-		ReplayProtocol* user = NULL;
-		std::list<ReplayProtocol*>* userlist = new std::list<ReplayProtocol*>;
-		std::list<ReplayProtocol*>::iterator iter;
-		int cut_count = 0;
-		
-		bool userClean = true;
-		while (true)
+	std::list<ReplayProtocol*>::iterator iter;
+	ReplayProtocol* user = NULL;
+	bool userClean = true;
+	for (iter = task->userAll->begin(); iter != task->userAll->end(); ++iter)
+	{
+		user = *iter;
+		if (user->sockCount == 0 && default_api.destory)
 		{
-			get_userDes_splice(task, userlist);
-			if (userlist->empty()) break;
-			
-			iter = userlist->begin();
-			for (; iter != userlist->end();)
-			{
-				user = *iter;
-				if (user->sockCount == 0 && default_api.destory)
-				{
-					default_api.destory(user);		//若连接未关闭，可能导致崩溃
-				}
-				else
-				{
-					TaskUserLog(user, LOG_ERROR, "userlist用户连接未完全关闭，导致内存泄漏！");
-					userClean = false;
-				}
-				userlist->erase(iter++);
-			}
-		}
-		delete task->userDes;
-		delete task->userDesLock;
-
-		while (true)
-		{
-			get_userAll_splice(task, userlist, 10, cut_count);
-			if (userlist->empty())
-				break;
-			iter = userlist->begin();
-			for (; iter != userlist->end();)
-			{
-				user = *iter;
-				if (user->sockCount == 0 && default_api.destory)
-				{
-					default_api.destory(user);		//若连接未关闭，可能导致崩溃
-				}
-				else
-				{
-					TaskUserLog(user, LOG_ERROR, "dellist用户连接未完全关闭，导致内存泄漏！");
-					userClean = false;
-				}
-				userlist->erase(iter++);
-			}
-		}
-		delete task->userAll;
-		delete task->userAllLock;
-
-		if (userClean == true && default_api.taskstop)
-		{
-			default_api.taskstop(task);
+			default_api.destory(user);		//若连接未关闭，可能导致崩溃
 		}
 		else
 		{
-			TaskLog(task, LOG_ERROR, "尚有用户连接未完全关闭，导致内存泄漏！");
+			TaskUserLog(user, LOG_ERROR, "userlist用户连接未完全关闭，导致内存泄漏！");
+			userClean = false;
 		}
-		CloseLog(task->logfd);
-		sheeps_free(task);
-		taskDel.erase(task->taskID);
-		delete userlist;
 	}
+	for (iter = task->userDes->begin(); iter != task->userDes->end(); ++iter)
+	{
+		user = *iter;
+		if (user->sockCount == 0 && default_api.destory)
+		{
+			default_api.destory(user);		//若连接未关闭，可能导致崩溃
+		}
+		else
+		{
+			TaskUserLog(user, LOG_ERROR, "userlist用户连接未完全关闭，导致内存泄漏！");
+			userClean = false;
+		}
+	}
+
+	delete task->userDes;
+	delete task->userDesLock;
+	delete task->userAll;
+	delete task->userAllLock;
+
+	if (userClean == true && default_api.taskstop)
+	{
+		default_api.taskstop(task);
+	}
+	else
+	{
+		TaskLog(task, LOG_ERROR, "尚有用户连接未完全关闭，导致内存泄漏！");
+	}
+	CloseLog(task->logfd);
+	sheeps_free(task);
+	taskDel.erase(task->taskID);
+	LOG(clogId, LOG_DEBUG, "%s:%d Clean Task Over!\r\n", __func__, __LINE__);
 }
 
 static void ReInit(ReplayProtocol* proto, bool loop)
@@ -257,6 +239,24 @@ static void Loop(ReplayProtocol* proto)
 	return;
 }
 
+static inline long task_add_workThead(t_task_config* task)
+{
+#ifdef __WINDOWS__   //原子操作线程计数
+	return InterlockedIncrement(&task->workThreadCount);
+#else
+	return __sync_add_and_fetch(&task->workThreadCount, 1);
+#endif // __WINDOWS__
+}
+
+static inline long task_sub_workThead(t_task_config* task)
+{
+#ifdef __WINDOWS__
+	return InterlockedDecrement(&task->workThreadCount);
+#else
+	return (__sync_sub_and_fetch(&task->workThreadCount, 1);
+#endif // __WINDOWS__
+}
+
 #ifdef __WINDOWS__
 DWORD WINAPI taskWorkerThread(LPVOID pParam)
 #else
@@ -264,22 +264,27 @@ int taskWorkerThread(void* pParam)
 #endif // __WINDOWS__
 {
 	t_task_config* task = (t_task_config*)pParam;
-#ifdef __WINDOWS__   //原子操作线程计数
-	InterlockedIncrement(&task->workThreadCount);
-#else
-	__sync_add_and_fetch(&task->workThreadCount, 1);
-#endif // __WINDOWS__
+	task_add_workThead(task);
+	
+	std::list<ReplayProtocol*>* userlist = NULL;
+	std::list<ReplayProtocol*>* dellist = NULL;
+	std::list<ReplayProtocol*>::iterator iter;
 	ReplayProtocol* user = NULL;
 	int need_cut, cuted;  //需要剪切的用户数，被剪切的用户数
-	std::list<ReplayProtocol*>* userlist = new std::list<ReplayProtocol*>;
-	std::list<ReplayProtocol*>* dellist = new std::list<ReplayProtocol*>;
-	std::list<ReplayProtocol*>::iterator iter;
+	userlist = new(std::nothrow) std::list<ReplayProtocol*>;
+	dellist = new(std::nothrow) std::list<ReplayProtocol*>;
+	if (userlist == NULL || dellist == NULL)
+	{
+		LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+		goto do_clean;
+	}
+	
 	while (task->status < 4)   //任务运行中
 	{
 		TimeSleep(1);
 		need_cut = 0;
 		cuted = 0;
-		get_userAll_splice(task, userlist, 10, need_cut);
+		get_userAll_splice(task, userlist, 20, need_cut);
 		if (userlist->empty()) {continue; }
 		iter = userlist->begin();
 		for ( ; iter != userlist->end();)
@@ -347,20 +352,20 @@ int taskWorkerThread(void* pParam)
 		add_to_userDes(task, dellist);
 		TimeSleep(1);
 	}
-#ifdef __WINDOWS__
-	if (InterlockedDecrement(&task->workThreadCount) == 0)
-#else
-	if (__sync_sub_and_fetch(&task->workThreadCount, 1) == 0)
-#endif // __WINDOWS__
+
+	do_clean:
+	if (task_sub_workThead(task) == 0)
 		destroy_task(task);
-	delete userlist;
-	delete dellist;
+	if (userlist)
+		delete userlist;
+	if (dellist)
+		delete dellist;
 	return 0;
 }
 
 static bool run_task_thread(HTASKCFG task)
 {
-	for (int i = 0; i < GetCpuCount(); i++)
+	for (int i = 0; i < GetCpuCount()*2; i++)
 	{
 #ifdef __WINDOWS__
 		HANDLE ThreadHandle;
@@ -405,11 +410,23 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 		char path[256] = { 0x0 };
 		snprintf(path, sizeof(path), "%stask%03d.log", LogPath, taskID);
 		task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
-		task->messageList = new std::vector<t_cache_message*>;
-		task->userAll = new std::list<ReplayProtocol*>;
-		task->userAllLock = new std::mutex;
-		task->userDes = new std::list<ReplayProtocol*>;
-		task->userDesLock = new std::mutex;
+		task->messageList = new(std::nothrow) std::vector<t_cache_message*>;
+		task->userAll = new(std::nothrow) std::list<ReplayProtocol*>;
+		task->userAllLock = new(std::nothrow) std::mutex;
+		task->userDes = new(std::nothrow) std::list<ReplayProtocol*>;
+		task->userDesLock = new(std::nothrow) std::mutex;
+		if (task->messageList == NULL || task->userAll == NULL || task->userAllLock == NULL ||
+			task->userDes == NULL || task->userDesLock == NULL)
+		{
+			LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+			if (task->messageList) delete task->messageList;
+			if (task->userAll) delete task->userAll;
+			if (task->userAllLock) delete task->userAllLock;
+			if (task->userDes) delete task->userDes;
+			if (task->userDesLock) delete task->userDesLock;
+			sheeps_free(task);
+			return NULL;
+		}
 		taskAll.insert(std::pair<int, HTASKCFG>(taskID, task));
 		return task;
 	}
@@ -425,7 +442,12 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 		return 0;
 	}
 
-	std::list<ReplayProtocol*>* userlist = new std::list<ReplayProtocol*>;
+	std::list<ReplayProtocol*>* userlist = new(std::nothrow) std::list<ReplayProtocol*>;
+	if (userlist == NULL)
+	{
+		LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+		return 0;
+	}
 	ReplayProtocol* user = NULL;
 	bool isNew = false;
 	for (int i = 0; i < userCount; i++)
@@ -438,6 +460,7 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 			user = default_api.create();
 			if (user == NULL)
 			{
+				LOG(clogId, LOG_ERROR, "%s:%d create user error\r\n", __func__, __LINE__);
 				break;
 			}
 			user->SetFactory(factory, CLIENT_PROTOCOL);
@@ -676,17 +699,19 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 
 static void TaskManagerForever(int projectid) 
 {
+#ifdef __WINDOWS__
+	system("chcp 65001");
+#define clear_screen "CLS"
+#else
+#define clear_screen "clear"
+#endif
+	system(clear_screen);
 	printf("正在启动...");
 	TimeSleep(1000);
 	printf("...");
 	TimeSleep(1000);
 	printf("...");
 	char in[4] = { 0x0 };
-#ifdef __WINDOWS__
-#define clear_screen "CLS"
-#else
-#define clear_screen "clear"
-#endif
 	while (true)
 	{
 		system(clear_screen);

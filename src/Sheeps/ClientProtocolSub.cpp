@@ -55,7 +55,6 @@ int client_cmd_2_task_init(HSOCKET hsock, int cmdNO, cJSON* root)
 {
 	cJSON* taskId = cJSON_GetObjectItem(root, "TaskID");
 	cJSON* projectId = cJSON_GetObjectItem(root, "projectID");
-	//cJSON* envId = cJSON_GetObjectItem(root, "EnvID");   //废弃字段
 	cJSON* userCount = cJSON_GetObjectItem(root, "UserCount");
 	cJSON* machineId = cJSON_GetObjectItem(root, "MachineID");
 	cJSON* ignoreErr = cJSON_GetObjectItem(root, "IgnoreErr");

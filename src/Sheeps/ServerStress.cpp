@@ -12,11 +12,17 @@ std::mutex* StressClientMapLock = NULL;
 
 static std::map<std::string, t_file_update> updatefile;
 
-int StressServerInit()
+bool StressServerInit()
 {
-	StressClientMap = new std::map<HSOCKET, HCLIENTINFO>;
-	StressClientMapLock = new std::mutex;
-	return 0;
+	StressClientMap = new(std::nothrow) std::map<HSOCKET, HCLIENTINFO>;
+	StressClientMapLock = new(std::nothrow) std::mutex;
+	if (StressClientMap == NULL || StressClientMapLock == NULL)
+	{
+		if (StressClientMap) delete StressClientMap;
+		if (StressClientMapLock) delete StressClientMapLock;
+		return false;
+	}
+	return true;
 }
 
 int ServerUnInit()

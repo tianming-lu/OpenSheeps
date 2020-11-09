@@ -35,19 +35,29 @@ int my_sqlite3_open(char* inDbName, sqlite3** ppdb)
 #endif // __WINDOWS__
 }
 
-void ProxyServerInit()
+bool ProxyServerInit()
 {
-	ProxyMap = new std::map<HSOCKET, HPROXYINFO>;
-	ProxyMapLock = new std::mutex;
-
-	recordList = new std::list<t_recode_info*>;
-	recordListLock = new std::mutex;
-	newrecordList = new std::list<t_recode_info*>;
+	ProxyMap = new(std::nothrow) std::map<HSOCKET, HPROXYINFO>;
+	ProxyMapLock = new(std::nothrow) std::mutex;
+	recordList = new(std::nothrow) std::list<t_recode_info*>;
+	recordListLock = new(std::nothrow) std::mutex;
+	newrecordList = new(std::nothrow) std::list<t_recode_info*>;
+	if (ProxyMap == NULL || ProxyMapLock == NULL || recordList == NULL || recordListLock == NULL ||
+		newrecordList == NULL)
+	{
+		if (ProxyMap) delete ProxyMap;
+		if (ProxyMapLock) delete ProxyMapLock;
+		if (recordList) delete recordList;
+		if (recordListLock) delete recordListLock;
+		if (newrecordList)	delete newrecordList;
+		return  false;
+	}
 
 	char dbfile[256] = { 0x0 };
 	snprintf(dbfile, sizeof(dbfile), "%s%s", RecordPath, record_database);
 	my_sqlite3_open(dbfile, &mysql);
 	sqlite3_exec(mysql, "PRAGMA synchronous = OFF; ", 0, 0, 0);
+	return true;
 }
 
 bool ChangeDatabaseName(const char* new_name)
@@ -78,6 +88,7 @@ bool ChangeDatabaseName(const char* new_name)
 static void insert_msg_to_record_list(const char* ip, int port, int type, const char* msg, int len)
 {
 	t_recode_info* info = (t_recode_info*)sheeps_malloc(sizeof(t_recode_info));
+	if (info == NULL) return;
 	info->time = GetSysTimeMicros();
 	snprintf(info->ip, sizeof(info->ip), "%s", ip);
 	info->port = port;
@@ -86,7 +97,10 @@ static void insert_msg_to_record_list(const char* ip, int port, int type, const 
 	{
 		info->msg = (char*)sheeps_malloc(len);
 		if (info->msg == NULL)
+		{
+			sheeps_free(info);
 			return;
+		}
 		memcpy(info->msg, msg, len);
 		info->msglen = len;
 	}
@@ -312,19 +326,21 @@ int CheckPoxyRequest(HSOCKET hsock, ServerProtocol* proto, const char* ip, int p
 		}
 		else if (proto->proxyInfo->proxytype == UDP_CONN)
 		{
-			char* buf = new char[(size_t)len + 10];
-			memcpy(buf, proto->proxyInfo->tempmsg, 10);
-			memcpy(buf + 10, data, len);
-			
-			/*多余操作*/
-			//proto->proxyInfo->udpClientSock->peer_addr.sin_family = AF_INET;
-			//proto->proxyInfo->udpClientSock->peer_addr.sin_port = htons(proto->proxyInfo->clientport);
-			//inet_pton(AF_INET, proto->proxyInfo->clientip, &proto->proxyInfo->udpClientSock->peer_addr.sin_addr);
-
-			HsocketSend(proto->proxyInfo->udpClientSock, buf, len + 10);
-			delete[] buf;
-			if (Proxy_record)
-				insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 5, data, len);
+			char* buf = (char*)sheeps_malloc((size_t)len + 10);
+			if (buf)
+			{
+				memcpy(buf, proto->proxyInfo->tempmsg, 10);
+				memcpy(buf + 10, data, len);
+				HsocketSend(proto->proxyInfo->udpClientSock, buf, len + 10);
+				sheeps_free(buf);
+				if (Proxy_record)
+					insert_msg_to_record_list(proto->proxyInfo->serverip, proto->proxyInfo->serverport, 5, data, len);
+			}
+			else
+			{
+				LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+				HsocketClose(proto->initSock);
+			}
 		}
 	}
 	else if (hsock == proto->proxyInfo->udpClientSock)
