@@ -99,6 +99,8 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 		return;
 	}
 	int once_user = task_add_once_user(runtask, taskcfg);
+	if (once_user == 0)
+		return;
 	int a = once_user / client_count;
 	int b = once_user % client_count;
 
@@ -156,7 +158,7 @@ static void task_push_add_once_user(HTASKRUN runtask, HTASKCONFIG taskcfg)
 
 	int client_count = task_client_count(runtask, taskcfg);
 	int once_user = task_add_once_user(runtask, taskcfg);
-	if (once_user == 0)
+	if (client_count == 0 || once_user == 0)
 		return;
 	int a = once_user / client_count;
 	int b = once_user % client_count;
@@ -417,10 +419,11 @@ int task_runing_thread(void* pParam)
 		TimeSleep(1);
 		task_runing(runtask, runtask->taskCfg);
 	}
-	sheeps_free(runtask);
+	
 	TaskRunLock->lock();
 	TaskRun.erase(runtask->taskCfg->taskID);
 	TaskRunLock->unlock();
+	sheeps_free(runtask);
 	return 0;
 }
 
@@ -432,7 +435,7 @@ static void send_console_msg(HSOCKET hsock, cJSON* root)
 	int n = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin:*\r\nContent-Type: application/json\r\nContent-Lenth: %zd\r\n\r\n", strlen(data));
 	HsocketSend(hsock, buf, n);
 	HsocketSend(hsock, data, clen);
-	sheeps_free(data);
+	free(data);
 	cJSON_Delete(root);
 }
 
@@ -474,7 +477,7 @@ static void do_stress_client_list(HSOCKET hsock, cJSON* root, char* uri)
 
 static void do_stress_client_local(HSOCKET hsock, cJSON* root, char* uri)
 {
-	stressfc->ClientRunOrStop("127.0.0.1", 1080);
+	sheepsfc->ClientRunOrStop("127.0.0.1", 1080);
 
 	cJSON* res = cJSON_CreateObject();
 	if (res == NULL)
@@ -1104,6 +1107,39 @@ static void do_proxy_database_name(HSOCKET hsock, cJSON* root, char* uri)
 	send_console_msg(hsock, res);
 }
 
+static void do_project_config(HSOCKET hsock, cJSON* root, char* uri)
+{
+	cJSON* res = cJSON_CreateObject();
+	cJSON* array = cJSON_CreateArray();
+	if (NULL == res || NULL == array)
+	{
+		if (res) cJSON_Delete(res);
+		if (array) cJSON_Delete(array);
+		return;
+	}
+	cJSON_AddItemToObject(res, "data", array);
+
+	int i = 0;
+	char key[16] = { 0x0 };
+	const char* val = NULL;
+	while (true)
+	{
+		memset(key, 0, sizeof(key));
+		val = NULL;
+		snprintf(key, sizeof(key), "%d", i);
+		val = config_get_string_value("project", key, NULL);
+		if (NULL == val)
+			break;
+		cJSON* item = cJSON_CreateObject();
+		if (NULL == item)
+			break;
+		cJSON_AddStringToObject(item, key, val);
+		cJSON_AddItemToArray(array, item);
+		i++;
+	}
+	send_console_msg(hsock, res);
+}
+
 std::map<std::string, serverConsole_cmd_cb> ConsoleFunc{
 	{std::string("/api/client_list"),	do_stress_client_list},		//受控端列表
 	{std::string("/api/client_open"),	do_stress_client_local},	//开启或者关闭本地受控端
@@ -1121,7 +1157,8 @@ std::map<std::string, serverConsole_cmd_cb> ConsoleFunc{
 	{std::string("/api/record_delete"), do_proxy_record_delete},	//删除db录制表
 	{std::string("/api/db_list"),		do_proxy_database_file},	//db文件列表
 	{std::string("/api/db_delete"),		do_proxy_database_delete},	//删除db
-	{std::string("/api/db_rename"),		do_proxy_database_name}		//db改名
+	{std::string("/api/db_rename"),		do_proxy_database_name},	//db改名
+	{std::string("/api/project"),		do_project_config}			//项目配置
 };
 
 static void do_request_by_uri(HSOCKET hsock, cJSON* root, char* uri)

@@ -20,11 +20,13 @@ void ClientProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 	LOG(clogId, LOG_DEBUG, "stress server connection made：[%s:%d]\r\n", ip, port);
 	StressHsocket = hsock;
 
+	HsocketSend(hsock, "sheeps", 6);
+
 	char data[64] = {0x0};
 	snprintf(data, sizeof(data), "{\"CPU\":%d, \"ProjectID\":%d}", GetCpuCount(), this->ProjectID);
 
 	int len = int(strlen(data));
-	t_stress_protocol_head head;
+	t_stress_protocol_head head = {0x0};
 	head.msgLen = sizeof(t_stress_protocol_head) + len;
 	head.cmdNo = 1;
 	char buf[128] = { 0x0 };
@@ -32,6 +34,7 @@ void ClientProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 	memcpy(buf + sizeof(t_stress_protocol_head), data, len);
 	HsocketSend(hsock, buf, len + 8);
 
+	this->heartbeat = time(NULL);
 	TaskManagerRuning = true;
 }
 
@@ -60,6 +63,26 @@ int ClientProtocol::Loop()
 		char ip[20] = { 0x0 };
 		GetHostByName((char*)this->StressSerIP, ip, sizeof(ip));
 		this->StressHsocket = HsocketConnect(this, ip, this->StressSerPort, TCP_CONN);
+	}
+	else
+	{
+		if (TaskManagerRuning)
+		{
+			if (time(NULL) - this->heartbeat < 30)
+				return 0;
+			this->heartbeat = time(NULL);
+			char data[64] = { 0x0 };
+			snprintf(data, sizeof(data), "{\"timestamp\":%lld}", time(NULL));
+
+			int len = int(strlen(data));
+			t_stress_protocol_head head = {0x0};
+			head.msgLen = sizeof(t_stress_protocol_head) + len;
+			head.cmdNo = 0;
+			char buf[128] = { 0x0 };
+			memcpy(buf, (char*)&head, sizeof(t_stress_protocol_head));
+			memcpy(buf + sizeof(t_stress_protocol_head), data, len);
+			HsocketSend(this->StressHsocket, buf, len + 8);
+		}
 	}
 	return 0;
 }
@@ -106,7 +129,8 @@ int ClientProtocol::CheckRequest(HSOCKET hsock, const char* data, int len)
 	if (body == NULL)
 		return -1;
 	memcpy(body, data + sizeof(t_stress_protocol_head), clen);
-	LOG(clogId, LOG_TRACE, "stress client recv [%d %d:%s]\r\n", head.msgLen, head.cmdNo, body);
+	if ( head.cmdNo > 0)
+		LOG(clogId, LOG_TRACE, "stress client recv [%d %d:%s]\r\n", head.msgLen, head.cmdNo, body);
 
 	cJSON * root = cJSON_Parse(body);
 	if (root == NULL)

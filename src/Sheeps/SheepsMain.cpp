@@ -23,71 +23,93 @@
 #endif
 #endif // __WINDOWS__
 
-int StressClientRun(char *stressIp, short stressPort, short listenPort)
-{
-	config_init(ConfigFile);
-	cJSON_Hooks jsonhook = { 0x0 };
-	jsonhook.malloc_fn = sheeps_malloc;
-	jsonhook.free_fn = sheeps_free;
-	cJSON_InitHooks(&jsonhook);
+char managerIp[16] = { 0x0 };
+int managerPort = 0;
 
+static int ReactorRun()
+{
 	if (rec == NULL)
 	{
 		rec = new(std::nothrow) Reactor();
-		ReactorStart(rec);
+		if (rec == NULL)
+		{
+			printf("%s:%d Reactor create failed!\n", __func__, __LINE__);
+			return -1;
+		}
+		if (ReactorStart(rec))
+		{
+			printf("%s:%d Reactor start failed!\n", __func__, __LINE__);
+			return -2;
+		}
 	}
-	if (NULL == stressfc)
-	{
-		stressfc = new(std::nothrow) SheepsFactory();
-	}
-	if (rec == NULL || stressfc == NULL)
-	{
-		return -1;
-	}
-	stressfc->Set(rec, listenPort);
-	memcpy(stressfc->StressServerIp, stressIp, strlen(stressIp));
-	stressfc->StressServerPort = stressPort;
-	if (stressPort > 0)
-		stressfc->ClientRun = true;
-	FactoryRun(stressfc);
 	return 0;
 }
 
-int SheepsClientRun(const char* stressIp, short stressPort, int projectid)
+static int SheepsFactoryRun(const char* sheepsIp, int sheepsPort, int projectId, int listenPort)
 {
-	cJSON_Hooks jsonhook = { 0x0 };
-	jsonhook.malloc_fn = sheeps_malloc;
-	jsonhook.free_fn = sheeps_free;
-	cJSON_InitHooks(&jsonhook);
+	if (NULL == sheepsfc)
+	{
+		sheepsfc = new(std::nothrow) SheepsFactory();
+		if (sheepsfc == NULL)
+		{
+			printf("%s:%d Sheeps factory create failed!\n", __func__, __LINE__);
+			return -1;
+		}
+	}
+	if (sheepsIp == NULL || sheepsPort <= 0)
+	{
+		sheepsfc->Set(rec, listenPort);
+		sheepsfc->StressServerPort = 0;
+	}
+	else
+	{
+		sheepsfc->Set(rec, listenPort);
+		memcpy(sheepsfc->StressServerIp, sheepsIp, strlen(sheepsIp));
+		sheepsfc->StressServerPort = sheepsPort;
+		sheepsfc->projectid = projectId;
+		sheepsfc->ClientRun = true;
+	}
+	
+	if (FactoryRun(sheepsfc))
+	{
+		printf("%s:%d Sheeps factory start failed!\n", __func__, __LINE__);
+		return -2;
+	}
+	return 0;
+}
 
-	if (rec == NULL)
-	{
-		rec = new(std::nothrow) Reactor();
-		ReactorStart(rec);
-	}
-	if (NULL == stressfc)
-	{
-		stressfc = new(std::nothrow) SheepsFactory();
-	}
-	if (rec == NULL || stressfc == NULL)
-	{
-		return -1;
-	}
-	stressfc->Set(rec, 0);
-	memcpy(stressfc->StressServerIp, stressIp, strlen(stressIp));
-	stressfc->StressServerPort = stressPort;
-	stressfc->projectid = projectid;
-	if (stressPort > 0)
-		stressfc->ClientRun = true;
-	FactoryRun(stressfc);
+int SheepsServerRun(u_short listenPort)
+{
+	config_init(ConfigFile);
+	if (listenPort <=  0)
+		listenPort = config_get_int_value("agent", "srv_port", 1080);
+
+	if (ReactorRun()) return -1;
+	if (SheepsFactoryRun(NULL, 0, 0, listenPort)) return -2;
+
+	return listenPort;
+}
+
+int SheepsClientRun(int projectid, bool server)
+{
+	config_init(ConfigFile);
+	const char* sheepsIp = config_get_string_value("agent", "srv_ip", "127.0.0.1");
+	snprintf(managerIp, sizeof(managerIp), "%s", sheepsIp);
+	managerPort = config_get_int_value("agent", "srv_port", 1080);
+	u_short listen_port = 0;
+	if (server)
+		listen_port = managerPort;
+
+	if (ReactorRun()) return -1;
+	if (SheepsFactoryRun(managerIp, managerPort, projectid, listen_port)) return -2;
 	return 0;
 }
 
 int StressClientStop()
 {
-	FactoryStop(stressfc);
-	//ReactorStop(stressfc);
-	//delete stressfc;
+	FactoryStop(sheepsfc);
+	//ReactorStop(sheepsfc);
+	//delete sheepsfc;
 	return 0;
 }
 

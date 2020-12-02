@@ -11,7 +11,7 @@ std::map<int, t_task_config*> taskDel;
 
 t_replay_dll default_api = { 0x0 };
 
-static void update_user_time_clock(ReplayProtocol* proto)
+static inline void update_user_time_clock(ReplayProtocol* proto)
 {
 	HMSGPOINTER pointer = &proto->MsgPointer;
 
@@ -23,74 +23,24 @@ static void update_user_time_clock(ReplayProtocol* proto)
 	}
 }
 
-static void get_userAll_splice(HTASKCFG task, std::list<ReplayProtocol*>* dst, int count, int &cut_count)
+static inline HUserEvent get_userDes_front(t_task_config* task)
 {
-	std::list<ReplayProtocol*>* src = task->userAll;
-	task->userAllLock->lock();
-
-	if (src->empty())
-	{
-		task->userAllLock->unlock();
-		return;
-	}
-	int usize = (int)src->size();
-	count = count > usize ? usize : count;
-	std::list<ReplayProtocol*>::iterator it = src->begin();
-	advance(it, count);
-	
-	dst->splice(dst->end(), *src, src->begin(), it);
-	if (task->userCount < task->aliveCount)
-	{
-		int temp = task->aliveCount - task->userCount;
-		cut_count = temp > count ? count : temp;
-		task->aliveCount -= cut_count;
-	}
-	task->userAllLock->unlock();
-	
-}
-
-static void add_to_userAll(HTASKCFG task, std::list<ReplayProtocol*>* src, int cut_count)
-{
-	std::list<ReplayProtocol*>* dst = task->userAll;
-	uint16_t src_size = (uint16_t)src->size();
-	task->userAllLock->lock();
-	if (src_size)
-		dst->splice(dst->end(), *src);
-	if (cut_count < 0)
-	{
-		task->aliveCount += src_size;
-	}
-	else 
-	{
-		task->aliveCount -= cut_count;
-	}
-	task->userAllLock->unlock();
-}
-
-static ReplayProtocol* get_userDes_splice(HTASKCFG task, std::list<ReplayProtocol*>* dst)
-{
-	std::list<ReplayProtocol*>* src = task->userDes;
-	std::list<ReplayProtocol*>::iterator iter;
-	ReplayProtocol* user;
 	task->userDesLock->lock();
-	if (src->empty())
+	if (task->userDes->empty())
 	{
 		task->userDesLock->unlock();
-		return NULL;
+		return  NULL;
 	}
-	iter = src->begin();
-	user = *iter;
-	dst->splice(dst->end(), *src, iter);
+	HUserEvent ue = task->userDes->front();
+	task->userDes->pop_front();
 	task->userDesLock->unlock();
-	return user;
+	return ue;
 }
 
-static void add_to_userDes(HTASKCFG task, std::list<ReplayProtocol*>* src)
+static inline void push_userDes_back(t_task_config* task, HUserEvent ue)
 {
-	if (src->empty()) return;
-	std::list<ReplayProtocol*>* dst = task->userDes;
 	task->userDesLock->lock();
-	dst->splice(dst->end(), *src);
+	task->userDes->push_back(ue);
 	task->userDesLock->unlock();
 }
 
@@ -109,12 +59,15 @@ static void destroy_task(HTASKCFG task)
 	task->messageList->clear();
 	delete task->messageList;
 
-	std::list<ReplayProtocol*>::iterator iter;
+	std::list<HUserEvent>::iterator iter;
+	HUserEvent ue = NULL;
 	ReplayProtocol* user = NULL;
 	bool userClean = true;
 	for (iter = task->userAll->begin(); iter != task->userAll->end(); ++iter)
 	{
-		user = *iter;
+		ue = *iter;
+		user = ue->user;
+		user->Destroy();
 		if (user->sockCount == 0 && default_api.destory)
 		{
 			default_api.destory(user);		//若连接未关闭，可能导致崩溃
@@ -124,25 +77,12 @@ static void destroy_task(HTASKCFG task)
 			TaskUserLog(user, LOG_ERROR, "userlist用户连接未完全关闭，导致内存泄漏！");
 			userClean = false;
 		}
-	}
-	for (iter = task->userDes->begin(); iter != task->userDes->end(); ++iter)
-	{
-		user = *iter;
-		if (user->sockCount == 0 && default_api.destory)
-		{
-			default_api.destory(user);		//若连接未关闭，可能导致崩溃
-		}
-		else
-		{
-			TaskUserLog(user, LOG_ERROR, "userlist用户连接未完全关闭，导致内存泄漏！");
-			userClean = false;
-		}
+		sheeps_free(ue);
 	}
 
+	delete task->userAll;
 	delete task->userDes;
 	delete task->userDesLock;
-	delete task->userAll;
-	delete task->userAllLock;
 
 	if (userClean == true && default_api.taskstop)
 	{
@@ -153,8 +93,8 @@ static void destroy_task(HTASKCFG task)
 		TaskLog(task, LOG_ERROR, "尚有用户连接未完全关闭，导致内存泄漏！");
 	}
 	CloseLog(task->logfd);
-	sheeps_free(task);
 	taskDel.erase(task->taskID);
+	sheeps_free(task);
 	LOG(clogId, LOG_DEBUG, "%s:%d Clean Task Over!\r\n", __func__, __LINE__);
 }
 
@@ -239,23 +179,61 @@ static void Loop(ReplayProtocol* proto)
 	return;
 }
 
-static inline long task_add_workThead(t_task_config* task)
+#ifdef __WINDOWS__
+static inline void user_set_next_timer(t_task_config* task, ReplayProtocol* proto, HUserEvent hue)
 {
-#ifdef __WINDOWS__   //原子操作线程计数
-	return InterlockedIncrement(&task->workThreadCount);
-#else
-	return __sync_add_and_fetch(&task->workThreadCount, 1);
-#endif // __WINDOWS__
+	if (proto->SelfDead == true) return;
+	HMSGPOINTER mp = &proto->MsgPointer;
+	if (mp->index != 0 && mp->index == task->messageList->size())
+	{
+		t_cache_message* msg = (*(task->messageList))[mp->index];
+		u_long next = u_long(((msg->recordtime - mp->start_record) - (mp->last - mp->start_real)) / 1000);
+		ChangeTimerQueueTimer(task->hTimerQueue, hue->timer, next > 10? next : 10, 20);
+	}
+	else
+	{
+		ChangeTimerQueueTimer(task->hTimerQueue, hue->timer, 10, 20);
+	}
 }
 
-static inline long task_sub_workThead(t_task_config* task)
+static inline void task_delete_user(t_task_config* task, ReplayProtocol* proto, HUserEvent hue)
 {
-#ifdef __WINDOWS__
-	return InterlockedDecrement(&task->workThreadCount);
-#else
-	return (__sync_sub_and_fetch(&task->workThreadCount, 1);
-#endif // __WINDOWS__
+	push_userDes_back(task, hue);
+	DeleteTimerQueueTimer(task->hTimerQueue, hue->timer, NULL);
 }
+
+VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
+{
+	HUserEvent hue = (HUserEvent)lpParam;
+	ReplayProtocol* proto = hue->user;
+	t_task_config* task = proto->Task;
+
+	proto->protolock->lock();
+	if (proto->SelfDead == false)
+	{
+		Loop(proto);
+		proto->protolock->unlock();
+	}
+	else
+	{
+		if (task->ignoreErr)
+		{
+			ReInit(proto, true);
+			proto->LastError[0] = 0x0;
+			proto->protolock->unlock();
+		}
+		else
+		{
+			proto->Destroy();
+			proto->LastError[0] = 0x0;
+			proto->protolock->unlock();
+			task_delete_user(task, proto, hue);
+		}
+	}
+	//user_set_next_timer(task, proto, hue);
+}
+#endif // __WINDOWS__
+
 
 #ifdef __WINDOWS__
 DWORD WINAPI taskWorkerThread(LPVOID pParam)
@@ -264,112 +242,22 @@ int taskWorkerThread(void* pParam)
 #endif // __WINDOWS__
 {
 	t_task_config* task = (t_task_config*)pParam;
-	task_add_workThead(task);
-	
-	std::list<ReplayProtocol*>* userlist = NULL;
-	std::list<ReplayProtocol*>* dellist = NULL;
-	std::list<ReplayProtocol*>::iterator iter;
-	ReplayProtocol* user = NULL;
-	int need_cut, cuted;  //需要剪切的用户数，被剪切的用户数
-	userlist = new(std::nothrow) std::list<ReplayProtocol*>;
-	dellist = new(std::nothrow) std::list<ReplayProtocol*>;
-	if (userlist == NULL || dellist == NULL)
+	while (task->status < TASK_CLEANING)   //任务运行中
 	{
-		LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
-		goto do_clean;
+		TimeSleep(500);
 	}
-	
-	while (task->status < 4)   //任务运行中
-	{
-		TimeSleep(1);
-		need_cut = 0;
-		cuted = 0;
-		get_userAll_splice(task, userlist, 20, need_cut);
-		if (userlist->empty()) {continue; }
-		iter = userlist->begin();
-		for ( ; iter != userlist->end();)
-		{
-			user = *iter;
-			if (need_cut > 0)
-			{
-				user->protolock->lock();
-				if (user->LastError[0] == 0x0)
-					snprintf(user->LastError, sizeof(user->LastError), "%s", "user cuted");
-				user->Destroy();
-				user->LastError[0] = 0x0;
-				user->protolock->unlock();
-
-				dellist->splice(dellist->end(), *userlist, iter++);
-				need_cut--;
-				continue;
-			}
-
-			user->protolock->lock();
-			if (user->SelfDead == true)
-			{
-				if (task->ignoreErr)
-				{
-					ReInit(user, true);
-					user->LastError[0] = 0x0;
-					user->protolock->unlock();
-				}
-				else
-				{
-					user->Destroy();
-					user->LastError[0] = 0x0;
-					user->protolock->unlock();
-
-					dellist->splice(dellist->end(), *userlist, iter++);
-					cuted++;
-				}
-				continue;
-			}
-			Loop(user);
-			user->protolock->unlock();
-			++iter;
-		}
-		add_to_userAll(task, userlist, cuted);
-		add_to_userDes(task, dellist);
-	}
-
-	while (task->status == 4)  //清理资源
-	{
-		get_userAll_splice(task, userlist, 10, need_cut);
-		if (userlist->empty())
-			break;
-		iter = userlist->begin();
-		for (; iter != userlist->end();)
-		{
-			user = *iter;
-			if (user == NULL)
-				break;
-			user->protolock->lock();
-			user->Destroy();
-			user->protolock->unlock();
-
-			dellist->splice(dellist->end(), *userlist, iter++);
-		}
-		add_to_userDes(task, dellist);
-		TimeSleep(1);
-	}
-
-	do_clean:
-	if (task_sub_workThead(task) == 0)
-		destroy_task(task);
-	if (userlist)
-		delete userlist;
-	if (dellist)
-		delete dellist;
+	DeleteTimerQueueEx(task->hTimerQueue, INVALID_HANDLE_VALUE);
+	destroy_task(task);
 	return 0;
 }
 
 static bool run_task_thread(HTASKCFG task)
 {
-	for (int i = 0; i < GetCpuCount()*2; i++)
+	for (int i = 0; i < 1; i++)
 	{
 #ifdef __WINDOWS__
 		HANDLE ThreadHandle;
-		ThreadHandle = CreateThread(NULL, 1024*1024*16, taskWorkerThread, task, 0, NULL);
+		ThreadHandle = CreateThread(NULL, 0, taskWorkerThread, task, 0, NULL);
 		if (NULL == ThreadHandle) {
 			return false;
 		}
@@ -411,19 +299,18 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 		snprintf(path, sizeof(path), "%stask%03d.log", LogPath, taskID);
 		task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
 		task->messageList = new(std::nothrow) std::vector<t_cache_message*>;
-		task->userAll = new(std::nothrow) std::list<ReplayProtocol*>;
-		task->userAllLock = new(std::nothrow) std::mutex;
-		task->userDes = new(std::nothrow) std::list<ReplayProtocol*>;
+		task->userAll = new(std::nothrow) std::list<HUserEvent>;
+		task->userDes = new(std::nothrow) std::list<HUserEvent>;
 		task->userDesLock = new(std::nothrow) std::mutex;
-		if (task->messageList == NULL || task->userAll == NULL || task->userAllLock == NULL ||
-			task->userDes == NULL || task->userDesLock == NULL)
+		task->hTimerQueue = CreateTimerQueue();
+		if (!task->messageList || !task->userAll || !task->userDes || !task->userDesLock|| !task->hTimerQueue)
 		{
 			LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
 			if (task->messageList) delete task->messageList;
 			if (task->userAll) delete task->userAll;
-			if (task->userAllLock) delete task->userAllLock;
 			if (task->userDes) delete task->userDes;
 			if (task->userDesLock) delete task->userDesLock;
+			if (task->hTimerQueue) DeleteTimerQueueEx(task->hTimerQueue, INVALID_HANDLE_VALUE);
 			sheeps_free(task);
 			return NULL;
 		}
@@ -436,49 +323,75 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 {
 	if (userCount <= 0)
 	{
+		return 0;
 		task->userCount += userCount;
 		if (task->userCount < 0)
 			task->userCount = 0;
 		return 0;
 	}
 
-	std::list<ReplayProtocol*>* userlist = new(std::nothrow) std::list<ReplayProtocol*>;
-	if (userlist == NULL)
-	{
-		LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
-		return 0;
-	}
+	HUserEvent ue = NULL;
 	ReplayProtocol* user = NULL;
 	bool isNew = false;
 	for (int i = 0; i < userCount; i++)
 	{
+		ue = NULL;
+		user = NULL;
 		isNew = false;
-		user = get_userDes_splice(task, userlist);
-		if (user == NULL && default_api.create)
+		ue = get_userDes_front(task);
+		if (ue == NULL)
 		{
 			isNew = true;
-			user = default_api.create();
-			if (user == NULL)
+			ue = (HUserEvent)sheeps_malloc(sizeof(UserEvent));
+			if (ue == NULL)
 			{
 				LOG(clogId, LOG_ERROR, "%s:%d create user error\r\n", __func__, __LINE__);
-				break;
+				continue;
 			}
-			user->SetFactory(factory, CLIENT_PROTOCOL);
-			user->Task = task;
-			user->UserNumber = task->userNumber++;
-			userlist->push_back(user);
-		}
-		if (user)
-		{
-			if (isNew)
-				user->Init();
+			if (default_api.create)
+			{
+				user = default_api.create();
+				if (user == NULL)
+				{
+					LOG(clogId, LOG_ERROR, "%s:%d create user error\r\n", __func__, __LINE__);
+					sheeps_free(ue);
+					continue;
+				}
+				user->SetFactory(factory, CLIENT_PROTOCOL);
+				user->Task = task;
+				user->UserNumber = task->userNumber++;
+				ue->user = user;
+			}
 			else
-				ReInit(user, true);
+			{
+				LOG(clogId, LOG_ERROR, "%s:%d create user error\r\n", __func__, __LINE__);
+				sheeps_free(ue);
+				break;;
+			}
+		}
+		else
+		{
+			user = ue->user;
+		}
+
+		if (isNew)
+		{
+			task->userAll->push_back(ue);
+			task->userCount++;
+			user->Init();
+		}
+		else
+		{
+			ReInit(user, true);
+		}
+
+		if (!CreateTimerQueueTimer(&ue->timer, task->hTimerQueue, (WAITORTIMERCALLBACK)userWorkFunc, ue, 10, 20, 0))
+		{
+			printf("CreateTimerQueueTimer failed (%d)\n", GetLastError());
+			push_userDes_back(task, ue);
+			continue;
 		}
 	}
-	task->userCount += (uint16_t)userlist->size();
-	add_to_userAll(task, userlist, -1);
-	delete userlist;
 	return 0;
 }
 
@@ -520,7 +433,7 @@ void set_task_log_level(uint8_t level, uint8_t taskID)
 		task = iter->second;
 		taskAll.erase(iter);
 		taskDel.insert(std::pair<int, HTASKCFG>(taskID, task));
-		task->status = 4;
+		task->status = TASK_CLEANING;
 		iter = taskAll.begin();
 		return true;
 	}
@@ -537,7 +450,7 @@ bool stop_task_by_id(uint8_t taskID)
 		task = iter->second;
 		taskAll.erase(iter);
 		taskDel.insert(std::pair<int, HTASKCFG>(taskID, task));
-		task->status = 4;
+		task->status = TASK_CLEANING;
 		return true;
 	}
 	return false;
@@ -566,12 +479,12 @@ bool insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t p
 	message->port = port;
 	if (content)
 	{
-		Base64_Context str;
+		Base64_Context str = {0x0};
 		str.data = (u_char*)content;
 		str.len = strlen(content);
 
-		Base64_Context temp;
-		temp.len = (str.len) * 6 / 8;
+		Base64_Context temp = {0x0};
+		temp.len = (str.len) * 6 / 8+2;
 
 		message->content = (char*)sheeps_malloc(temp.len);
 		if (message->content == NULL)
@@ -600,7 +513,7 @@ int task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory)
 	return 0;
 }
 
-bool TaskUserSocketClose(HSOCKET &hsock)
+bool TaskUserSocketClose(HSOCKET hsock)
 {
 #ifdef __WINDOWS__
 	if (hsock == NULL) return false;
@@ -611,14 +524,12 @@ bool TaskUserSocketClose(HSOCKET &hsock)
 		CancelIo((HANDLE)fd);	//取消等待执行的异步操作
 		closesocket(fd);
 	}
-	hsock = NULL;
 #else
 	if (hsock == NULL || hsock->_is_close == 1)
 		return false;
 	hsock->_is_close = 1;
 	__sync_sub_and_fetch(&hsock->_user->sockCount, 1);
 	shutdown(hsock->fd, SHUT_RD);
-	hsock = NULL;
 #endif // __WINDOWS__
 	return true;
 }
@@ -649,7 +560,7 @@ void TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...)
 	localtime_r(&now, &tmm);
 #endif // __WINDOWS__
 	char* slog = GetLogStr(level);
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%u]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
@@ -681,7 +592,7 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 	localtime_r(&now, &tmm);
 #endif // __WINDOWS__
 	char* slog = GetLogStr(level);
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[NO.%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (long)THREAD_ID, proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%u]:[NO.%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
@@ -691,7 +602,8 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 
 #ifdef __WINDOWS__
 	DWORD written;
-	WriteFile(GetLogFileHandle(logfd), buf, l, &written, NULL);
+	HANDLE fd = GetLogFileHandle(logfd);
+	WriteFile(fd, buf, l, &written, NULL);
 #else
 	write(GetLogFileHandle(logfd), buf, l);
 #endif // __WINDOWS__
@@ -712,10 +624,13 @@ static void TaskManagerForever(int projectid)
 	TimeSleep(1000);
 	printf("...");
 	char in[4] = { 0x0 };
+	char project[16] = { 0x0 };
+	snprintf(project, sizeof(project), "%d", projectid);
 	while (true)
 	{
 		system(clear_screen);
-		printf("\nSheeps负载端正在运行，项目ID[%d]:\n\n", projectid);
+		printf("\nSheeps负载端正在运行，%d号项目：%s\n\n", projectid, config_get_string_value("project", project, "未配置"));
+		printf("控制端：[%s:%d]\n", managerIp, managerPort);
 		if (TaskManagerRuning)
 			printf("状态：连接成功\n");
 		else
@@ -727,16 +642,19 @@ static void TaskManagerForever(int projectid)
 	}
 }
 
-void TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop)
+void TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server)
 {
-	config_init(ConfigFile);
 	default_api.create = create;
 	default_api.destory = destory;
 	default_api.taskstart = taskstart;
 	default_api.taskstop = taskstop;
 
-	const char* ip = config_get_string_value("agent", "srv_ip", "127.0.0.1");
-	int port = config_get_int_value("agent", "srv_port", 1080);
-	SheepsClientRun(ip, port, projectid);
-	TaskManagerForever(projectid);
+	if (!SheepsClientRun(projectid, server))
+	{
+		TaskManagerForever(projectid);
+	}
+	else
+	{
+		system("pause");
+	}
 }

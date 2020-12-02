@@ -168,7 +168,7 @@ extern "C"
 	Reactor_API int		FactoryStop(BaseFactory* fc);
 	Reactor_API HSOCKET	HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE iotype);
 	Reactor_API bool	HsocketSend(HSOCKET hsock, const char* data, int len);
-	Reactor_API bool	HsocketClose(HSOCKET &hsock);
+	Reactor_API bool	HsocketClose(HSOCKET hsock);
 	Reactor_API int		HsocketSkipBuf(HSOCKET hsock, int len);
 
 #ifdef __cplusplus

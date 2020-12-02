@@ -23,7 +23,7 @@
 int main()
 {
 	int projectid = 0;
-    TaskManagerRun(projectid, CreateUser, DestoryUser, TaskStart, TaskStop);
+    TaskManagerRun(projectid, CreateUser, DestoryUser, TaskStart, TaskStop, false);
 }
 
 // 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单

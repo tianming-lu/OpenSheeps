@@ -152,7 +152,7 @@ void MD5Final(unsigned char digest[16], LPMD5_Context ctx)
 	MD5Transform(ctx->stat, (uint32_t *) ctx->buf);
 	memset(ctx->buf, 0, 56);
     } else {
-	memset(p, 0, count - 8);
+	memset(p, 0, (size_t)count - 8);
     }
 
     ((uint32_t *) ctx->buf)[14] = ctx->count[0];

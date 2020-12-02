@@ -15,6 +15,7 @@ public:
 	uint16_t	StressSerPort = 0;
 	uint8_t		ProjectID = 0;
 	HSOCKET		StressHsocket = NULL;
+	time_t		heartbeat = 0;
 
 
 public:

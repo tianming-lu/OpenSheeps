@@ -113,11 +113,11 @@ static bool get_base64_string(char** content, char* src, int srclen)
 {
 	if (src)
 	{
-		Base64_Context str;
+		Base64_Context str = {0x0};
 		str.data = (u_char*)src;
 		str.len = srclen;
 
-		Base64_Context temp;
+		Base64_Context temp = {0x0};
 		temp.len = str.len * 8 / 6 + 5;
 		temp.data = (u_char*)sheeps_malloc(temp.len);
 		if (temp.data == NULL)
@@ -369,7 +369,7 @@ void ProxyConnectionMade(HSOCKET hsock, ServerProtocol* proto, const char* ip, i
 		buf[0] = 0x5;
 		buf[3] = 0x1;
 
-		struct sockaddr_in addr_tcp;
+		struct sockaddr_in addr_tcp = {0x0};
 		int nSize = sizeof(addr_tcp);
 		GetSockName(proto->initSock->fd, (struct sockaddr*)&addr_tcp, &nSize);
 
@@ -377,7 +377,7 @@ void ProxyConnectionMade(HSOCKET hsock, ServerProtocol* proto, const char* ip, i
 			
 		if (proto->proxyInfo->proxytype == UDP_CONN)
 		{
-			struct sockaddr_in addr_udp;
+			struct sockaddr_in addr_udp = {0x0};
 			GetSockName(proto->proxyInfo->udpClientSock->fd, (struct sockaddr*)&addr_udp, &nSize);
 			memcpy(buf + 4 + sizeof(in_addr), (char*)&addr_udp.sin_port, 2);
 		}

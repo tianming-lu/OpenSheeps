@@ -3,54 +3,42 @@
 #include "Starter.h"
 #include <iostream>
 
-const char* defaultIP = "127.0.0.1";
-short defaultPort = 0;
-short defaultlisten = 1080;
-t_stress_dll strdll;
+short		defaultlisten = 0;
+t_sheeps_dll sheeps_api;
 
 int main(int argc, char* argv[])
 {
-	char* ip = (char*)defaultIP;
-	short port = defaultPort;
 	short listen = defaultlisten;
 	if (argc == 2)
 	{
 		listen = atoi(argv[1]);
-		port = 0;
-	}
-	else if (argc == 3)
-	{
-		ip = argv[1];
-		port = atoi(argv[2]);
-		listen = 0;
-	}
-	else if (argc == 4)
-	{
-		ip = argv[1];
-		port = atoi(argv[2]);
-		listen = atoi(argv[3]);
 	}
 #ifdef __WINDOWS__
-	strdll.dllHandle = LoadLibraryA("Sheeps.dll");
-	if (strdll.dllHandle == NULL)
+	sheeps_api.dllHandle = LoadLibraryA("Sheeps.dll");
+	if (sheeps_api.dllHandle == NULL)
 	{
 		printf("dll load failed.");
 		return -1;
 	}
-	strdll.run = (StressClientRun)GetProcAddress((HMODULE)strdll.dllHandle, "StressClientRun");
-	strdll.stop = (StressClientStop)GetProcAddress((HMODULE)strdll.dllHandle, "StressClientStop");
+	sheeps_api.run = (SheepsServerRun)GetProcAddress((HMODULE)sheeps_api.dllHandle, "SheepsServerRun");
+	sheeps_api.stop = (SheepsServerStop)GetProcAddress((HMODULE)sheeps_api.dllHandle, "SheepsServerStop");
 #else
-	strdll.dllHandle = dlopen("./libsheeps.so", RTLD_NOW);
-	if (strdll.dllHandle == NULL)
+	sheeps_api.dllHandle = dlopen("./libsheeps.so", RTLD_NOW);
+	if (sheeps_api.dllHandle == NULL)
 	{
 		printf("dll load failed: %s\n", dlerror());
 		return -1;
 	}
-	strdll.run = (StressClientRun)dlsym(strdll.dllHandle, "StressClientRun");
-	strdll.stop = (StressClientStop)dlsym(strdll.dllHandle, "StressClientStop");
+	sheeps_api.run = (SheepsServerRun)dlsym(sheeps_api.dllHandle, "SheepsServerRun");
+	sheeps_api.stop = (SheepsServerStop)dlsym(sheeps_api.dllHandle, "SheepsServerStop");
 #endif
 
-	strdll.run(ip, port, listen);
+	listen = sheeps_api.run(listen);
+	if (listen < 0)
+	{
+		system("pause");
+		return -2;
+	}
 	char in[4] = { 0x0 };
 #ifdef __WINDOWS__
 	system("chcp 65001");
@@ -68,7 +56,7 @@ int main(int argc, char* argv[])
 		if (in[0] == 'Q')
 			break;
 	}
-	strdll.stop();
+	sheeps_api.stop();
 	return 0;
 }
 

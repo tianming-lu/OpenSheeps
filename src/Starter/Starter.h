@@ -13,12 +13,12 @@
 #include <dlfcn.h>
 #endif
 
-typedef int (*StressClientRun)(char* ip, short port, short listen);
-typedef int (*StressClientStop)();
+typedef int (*SheepsServerRun)(u_short listen);
+typedef int (*SheepsServerStop)();
 typedef struct dllAPI
 {
 	void* dllHandle;
-	StressClientRun   run;
-	StressClientStop  stop;
-}t_stress_dll;
+	SheepsServerRun   run;
+	SheepsServerStop  stop;
+}t_sheeps_dll;
 #endif // !_STARTER_H_

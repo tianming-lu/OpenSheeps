@@ -50,7 +50,7 @@ static SOCKET GetListenSock(int port)
 {
 	SOCKET listenSock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 
-	SOCKADDR_IN serAdd;
+	SOCKADDR_IN serAdd = {0x0};
 	serAdd.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
 	serAdd.sin_family = AF_INET;
 	serAdd.sin_port = htons(port);
@@ -415,7 +415,7 @@ DWORD WINAPI mainIOCPServer(LPVOID pParam)
 	//for (unsigned int i = 0; i < 1; i++)
 	{
 		HANDLE ThreadHandle;
-		ThreadHandle = CreateThread(NULL, 1024*1024*16, serverWorkerThread, pParam, 0, NULL);
+		ThreadHandle = CreateThread(NULL, 0, serverWorkerThread, pParam, 0, NULL);
 		if (NULL == ThreadHandle) {
 			return -4;
 		}
@@ -465,7 +465,7 @@ int ReactorStart(Reactor* reactor)
 	closesocket(tempSock);
 
 	HANDLE ThreadHandle;
-	ThreadHandle = CreateThread(NULL, 1024*1024*16, mainIOCPServer, reactor, 0, NULL);
+	ThreadHandle = CreateThread(NULL, 0, mainIOCPServer, reactor, 0, NULL);
 	if (NULL == ThreadHandle) {
 		return -4;
 	}
@@ -705,13 +705,11 @@ bool HsocketSend(IOCP_SOCKET* IocpSock, const char* data, int len)    //注意�
 	return true;
 }
 
-bool HsocketClose(IOCP_SOCKET*  &IocpSock)
+bool HsocketClose(IOCP_SOCKET* IocpSock)
 {
 	if (IocpSock == NULL ||IocpSock->fd == INVALID_SOCKET)
 		return false;
-	shutdown(IocpSock->fd, SD_RECEIVE);
-	IocpSock = NULL;
-	//closesocket(IocpSock->fd);
+	shutdown(IocpSock->fd, SD_SEND);//SD_SEND缓冲区发送完成发送FIN
 	return true;
 }
 

@@ -2,6 +2,11 @@
 #include <time.h>
 #include <stdint.h>
 
+#ifdef _MSC_VER
+#pragma warning(disable:6031)
+#endif // _MSC_VER
+
+
 #define MAX_LOG	256
 #define DEFAULT_MIN_LOG_NUM 2
 
@@ -200,7 +205,7 @@ int CloseLog(int fd)
 }
 
 #ifdef __WINDOWS__
-static int strncasecmp(const char* input_buffer, char* s2, register int n)
+static int strncasecmp(const char* input_buffer, const char* s2, register int n)
 {
 	return _strnicmp(input_buffer, s2, n);
 }
@@ -252,7 +257,7 @@ void LOG(int fd, int level, const char* fmt, ...)
 	localtime_r(&now, &tmm);
 #endif // __WINDOWS__
 	char *slog = LogString[level];
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%ld]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%u]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);

@@ -25,15 +25,15 @@ ServerProtocol::ServerProtocol()
 
 ServerProtocol::~ServerProtocol()
 {
-	sheeps_free(this->proxyInfo);
-	sheeps_free(this->stressInfo);
+	if (this->proxyInfo)sheeps_free(this->proxyInfo);
+	if (this->stressInfo)sheeps_free(this->stressInfo);
 }
 
 
 //固有函数，继承自基类
 void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 {
-	//LOG(slogid, LOG_DEBUG, "%s:%d %s:%d\r\n", __func__, __LINE__, ip, port);
+	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	switch (this->peerType)
 	{
 	case PEER_UNNOWN:
@@ -51,7 +51,7 @@ void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 
 void ServerProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 {
-	//LOG(slogid, LOG_DEBUG, "connetion failed: %s:%d  [%d]\r\n", ip, port, this->sockCount);
+	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	switch (this->peerType)
 	{
 	case PEER_PROXY:
@@ -65,7 +65,7 @@ void ServerProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 
 void ServerProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
 {
-	//LOG(slogid, LOG_DEBUG, "%s:%d %s:%d\r\n", __func__, __LINE__, ip, port);
+	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	if (this->peerType == PEER_PROXY)
 	{
 		ProxyConnectionClosed(hsock, this, ip, port);
@@ -100,7 +100,10 @@ void ServerProtocol::CheckReq(HSOCKET hsock, const char* ip, int port, const cha
 				len = HsocketSkipBuf(hsock, clen);
 			}
 			else if (clen < 0)
+			{
 				HsocketClose(hsock);
+				break;
+			}
 			else
 				break;
 		}
@@ -120,7 +123,7 @@ void ServerProtocol::CheckReq(HSOCKET hsock, const char* ip, int port, const cha
 }
 
 #ifdef __WINDOWS__
-static int strncasecmp(const char* input_buffer, const char* s2, int n)
+static inline int strncasecmp(const char* input_buffer, const char* s2, int n)
 {
 	return _strnicmp(input_buffer, s2, n);
 }
@@ -141,14 +144,23 @@ int ServerProtocol::CheckRequest(HSOCKET hsock, const char* ip, int port, const 
 				return -1;
 			this->proxyInfo->retry = 3;
 		}
-		else if (strncasecmp(data, "GET", 3) == 0 || strncasecmp(data, "POST", 4) == 0)
+		else if (strncasecmp(data, "GET", 3) == 0 || strncasecmp(data, "POST", 4) == 0 || strncasecmp(data, "HEAD", 4) == 0 ||
+			strncasecmp(data, "PUT", 3) == 0 || strncasecmp(data, "DELETE", 6) == 0 || strncasecmp(data, "CONNECT", 7) == 0 ||
+			strncasecmp(data, "OPTIONS", 7) == 0 || strncasecmp(data, "TRACE", 5) == 0 || strncasecmp(data, "PATCH", 5) == 0)
+		{
 			this->peerType = PEER_CONSOLE;
-		else
+		}
+		else if (strncasecmp(data, "sheeps", 6) == 0)
 		{
 			this->peerType = PEER_STRESS;
 			this->stressInfo = (HCLIENTINFO)sheeps_malloc(sizeof(t_client_info));
 			if (this->stressInfo == NULL)
 				return -1;
+			len = HsocketSkipBuf(hsock, 6);
+		}
+		else
+		{
+			this->peerType = PEER_UNDEFINE;
 		}
 		goto do_switch;
 	case PEER_PROXY:
@@ -159,8 +171,11 @@ int ServerProtocol::CheckRequest(HSOCKET hsock, const char* ip, int port, const 
 		break;
 	case PEER_CONSOLE:
 		clen = CheckConsoleRequest(hsock, this, data, len);
+	case PEER_UNDEFINE:
+		break;
 	default:
 		break;
 	}
+	//LOG(slogid, LOG_DEBUG, "%p peer_type[%d]\r\n", hsock, this->peerType);
 	return clen;
 }

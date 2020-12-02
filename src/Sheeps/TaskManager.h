@@ -52,6 +52,11 @@ enum {
 	PLAY_FAST
 };
 
+enum {
+	TASK_RUNNING = 0,
+	TASK_CLEANING,
+};
+
 typedef struct {
 	uint32_t	index;
 	uint64_t	start_record;		//微秒
@@ -74,9 +79,17 @@ typedef struct {
 	bool		udp;
 }t_cache_message, *HMESSAGE;
 
+#ifdef __WINDOWS__
+typedef struct _UserEvent {
+	HANDLE			timer;
+	ReplayProtocol* user;
+	//HTASKCFG		task;
+}UserEvent, * HUserEvent;
+#endif // __WINDOWS__
+
 typedef struct {
 	int			logfd;
-	uint8_t		status;    //0 未开始 1初始化中 2初始化完成 3任务运行中 4任务中止清理资源过程中
+	uint8_t		status;    //默认TASK_RUNNING
 
 	uint8_t		taskID;
 	uint8_t		projectID;
@@ -84,16 +97,14 @@ typedef struct {
 	uint16_t	userCount;
 	bool		ignoreErr;
 
-	long		workThreadCount;  //任务工作线程计数，使用原子操作，所有线程退出后开始销毁任务
-
 	std::vector<t_cache_message*>*	messageList;    //任务消息缓存
 	bool							stopMessageCache;
 
-	uint16_t	aliveCount;
+	HANDLE hTimerQueue;
+
 	uint16_t	userNumber;
-	std::list<ReplayProtocol*>*	userAll;			//运行任务中用户列表
-	std::mutex*			userAllLock;
-	std::list<ReplayProtocol*>*	userDes;			//运行结束用户列表
+	std::list<HUserEvent>* userAll;
+	std::list<HUserEvent>*	userDes;			//运行结束用户列表
 	std::mutex*			userDesLock;
 
 }t_task_config, *HTASKCFG;
@@ -120,7 +131,7 @@ public:
 
 public:
 	HTASKCFG	Task = NULL;
-	uint16_t	UserNumber = 0;
+	int			UserNumber = 0;
 	bool		SelfDead = false;
 	uint8_t		PlayState = PLAY_NORMAL;
 	MSGPointer	MsgPointer = { 0x0 };
@@ -152,12 +163,12 @@ int				task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* facto
 void			set_task_log_level(uint8_t level, uint8_t taskID);
 
 //项目业务逻辑API
-Task_API void		TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop);
+Task_API void		TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server);
 Task_API bool		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
-Task_API bool		TaskUserSocketClose(HSOCKET &hsock);
+Task_API bool		TaskUserSocketClose(HSOCKET hsock);
 Task_API void		TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);
 Task_API void		TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...);
-#define		TaskUserSocketConnet(ip, port, proto, iotype)	HsocketConnect(ip, port, proto, iotype)
+#define		TaskUserSocketConnet(proto, ip, port, iotype)	HsocketConnect(proto, ip, port, iotype)
 #define		TaskUserSocketSend(hsock, data, len)			HsocketSend(hsock, data, len)
 #define		TaskUserSocketSkipBuf(hsock, len)				HsocketSkipBuf(hsock, len)
 

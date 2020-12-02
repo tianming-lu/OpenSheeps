@@ -27,7 +27,7 @@ static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 {
 	char buf[128] = { 0x0 };
 	int len = snprintf(buf, sizeof(buf), "{\"retCode\":%d,\"retMsg\":\"%s\"}", retCode, msg);
-	t_stress_protocol_head head;
+	t_stress_protocol_head head = {0x0};
 	head.cmdNo = cmdNo;
 	head.msgLen = len + sizeof(t_stress_protocol_head);
 	
@@ -40,7 +40,7 @@ static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 
 static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 {
-	t_stress_protocol_head head;
+	t_stress_protocol_head head = {0x0};
 	head.cmdNo = cmdNo;
 	head.msgLen = len + sizeof(t_stress_protocol_head);
 

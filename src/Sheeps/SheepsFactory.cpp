@@ -8,7 +8,7 @@
 #include "TaskManager.h"
 
 Reactor* rec = NULL;
-SheepsFactory* stressfc = NULL;
+SheepsFactory* sheepsfc = NULL;
 
 SheepsFactory::SheepsFactory()
 {
@@ -42,7 +42,6 @@ bool SheepsFactory::ClientInit()
 		if (this->ClientProto)
 		{
 			this->ClientProto->SetFactory(this, CLIENT_PROTOCOL);
-			this->ClientProto->SetNoLock();
 			memcpy(this->ClientProto->StressSerIP, this->StressServerIp, strlen(this->StressServerIp));
 			this->ClientProto->StressSerPort = this->StressServerPort;
 			this->ClientProto->ProjectID = this->projectid;

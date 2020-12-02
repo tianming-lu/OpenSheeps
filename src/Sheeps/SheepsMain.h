@@ -7,23 +7,24 @@
 
 #ifdef __WINDOWS__
 #ifdef STRESS_EXPORTS
-#define Stress_API __declspec(dllexport)
+#define Sheeps_API __declspec(dllexport)
 #else
-#define Stress_API __declspec(dllimport)
+#define Sheeps_API __declspec(dllimport)
 #endif
 #else
-#define Stress_API
+#define Sheeps_API
 #endif // __WINDOWS__
 
-
+extern char managerIp[16];
+extern int managerPort;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-	Stress_API int StressClientRun(char* ip, short port, short listenPort);
-	Stress_API int SheepsClientRun(const char* stressIp, short stressPort, int projectid);
-	Stress_API int StressClientStop();
+	Sheeps_API int SheepsServerRun(u_short listenPort);
+	Sheeps_API int SheepsClientRun(int projectid, bool server);
+	Sheeps_API int StressClientStop();
 
 #ifdef __cplusplus
 }

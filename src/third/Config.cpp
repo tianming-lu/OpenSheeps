@@ -11,10 +11,17 @@ const char* default_configfile = "./config.ini";
 const char* default_section = "__HOME_SECTION__";
 std::map<std::string, void*>* MapConfig = NULL;
 
-static int right_blank(char* buf, int len)
+static inline bool char_is_blank(int c)
+{
+	if (c == 32 || c == 9 || c == 0x0a)
+		return true;
+	return false;
+}
+
+static inline int right_blank(char* buf, int len)
 {
 	char* p = buf + len-1;
-	while ((isblank(*p) || *p == 0x0a ) && p >= buf)
+	while (char_is_blank(*p)  && p >= buf)
 	{
 		*p = 0x0;
 		p--;
@@ -22,10 +29,10 @@ static int right_blank(char* buf, int len)
 	return int(p - buf) + 1;
 }
 
-static int left_blank(char* buf, int len)
+static inline int left_blank(char* buf, int len)
 {
 	char* p = buf;
-	while (isblank(*p) && p<buf+len)
+	while (char_is_blank(*p) && p<buf+len)
 	{
 		p++;
 	}
@@ -35,12 +42,19 @@ static int left_blank(char* buf, int len)
 	return len;
 }
 
-static int trim(char* buf, int len)
+static inline int trim(char* buf, int len)
 {
 	return left_blank(buf, right_blank(buf, len));
 }
 
-static void create_section(char* section, size_t secsize,const char* buf)
+#ifdef _MSC_VER
+static inline int strncasecmp(const char* input_buffer, const char* s2, register int n)
+{
+	return _strnicmp(input_buffer, s2, n);
+}
+#endif
+
+static inline void create_section(char* section, size_t secsize,const char* buf)
 {
 	memset(section, 0, secsize);
 	snprintf(section, secsize, "%s", buf);
@@ -181,4 +195,24 @@ int config_get_int_value(const char* section, const char* key, int def)
 	if (iter == node->end())
 		return def;
 	return  atoi((char*)iter->second);
+}
+
+bool config_get_bool_value(const char* section, const char* key, bool def)
+{
+	std::map<std::string, void*>::iterator iter;
+
+	if (section == NULL)
+		section = default_section;
+
+	iter = MapConfig->find(section);
+	if (iter == MapConfig->end())
+		return def;
+	std::map<std::string, void*>* node = (std::map<std::string, void*>*)iter->second;
+	iter = node->find(key);
+	if (iter == node->end())
+		return def;
+	if (isdigit(*(char*)(iter->second)))
+		return !(0 == atoi((char*)iter->second));
+	else
+		return strncasecmp((char*)iter->second, "true", 4) == 0;
 }

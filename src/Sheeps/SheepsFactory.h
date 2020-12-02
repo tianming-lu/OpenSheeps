@@ -31,6 +31,6 @@ public:
 };
 
 extern Reactor* rec;
-extern SheepsFactory* stressfc;
+extern SheepsFactory* sheepsfc;
 
 #endif // !_SHEEPS_FACTORY_H_

@@ -134,11 +134,11 @@ size_t base64_encode(char *src, int src_len, char *dst)
 	if (src == NULL)
 		return -1;
 
-	Base64_Context str;
+    Base64_Context str = {0x0};
     str.data = (u_char*)src;
     str.len = src_len;
 
-    Base64_Context temp;
+    Base64_Context temp = {0x0};
     temp.len = str.len*8/6+4;
     temp.data = malloc(temp.len);
 	if (temp.data == NULL)
@@ -156,11 +156,11 @@ size_t base64_decode(char *src, size_t src_len, char *dst)
 	if(src == NULL)
 		return -1;
 
-	Base64_Context str;
+    Base64_Context str = {0x0};
     str.data = (u_char*)src;
     str.len = src_len;
 
-	Base64_Context temp;
+    Base64_Context temp = {0x0};
     temp.len = (str.len)*6/8;
     temp.data = malloc(temp.len);
 	if (temp.data == NULL)

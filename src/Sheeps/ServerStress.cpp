@@ -34,7 +34,7 @@ static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 {
 	char buf[128] = { 0x0 };
 	int len = snprintf(buf, sizeof(buf), "{\"retCode\":%d,\"retMsg\":\"%s\"}", retCode, msg);
-	t_stress_protocol_head head;
+	t_stress_protocol_head head = { 0x0 };
 	head.cmdNo = cmdNo;
 	head.msgLen = len + sizeof(t_stress_protocol_head);
 
@@ -48,7 +48,7 @@ static int MsgResponse(HSOCKET hsock, int cmdNo, int retCode, const char* msg)
 
 static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 {
-	t_stress_protocol_head head;
+	t_stress_protocol_head head = {0x0};
 	head.cmdNo = cmdNo;
 	head.msgLen = len + sizeof(t_stress_protocol_head);
 
@@ -128,8 +128,14 @@ static int sync_files(HSOCKET hsock, int projectid)
 	char* data = cJSON_PrintUnformatted(root);
 	MsgSend(hsock, 9, data, (int)strlen(data));
 	//LOG(slogid, LOG_DEBUG, "%s\r\n", data);
-	sheeps_free(data);
+	free(data);
 	cJSON_Delete(root);
+	return 0;
+}
+
+static int server_cmd_0_hertbaet(HSOCKET hsock, ServerProtocol* proto, int cmdNO, cJSON* root)
+{
+	MsgResponse(hsock, 0, (int)time(NULL), "OK");
 	return 0;
 }
 
@@ -296,6 +302,7 @@ static int server_cmd_13_report_error(HSOCKET hsock, ServerProtocol* proto, int 
 }
 
 std::map<int, serverStress_cmd_cb> ServerFunc{
+	{0,		server_cmd_0_hertbaet},
 	{1,		server_cmd_1_report_client_info},
 	{10,	server_cmd_10_download_file},
 	{11,	server_cmd_11_sync_files_over},
@@ -351,9 +358,9 @@ int CheckStressRequest(HSOCKET hsock,ServerProtocol* proto , const char* data, i
 
 void StressConnectionClosed(HSOCKET hsock, ServerProtocol* proto)
 {
+	LOG(slogid, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
 	StressClientMapLock->lock();
 	StressClientMap->erase(proto->initSock);
 	StressClientMapLock->unlock();
 	proto->initSock = NULL;
-	LOG(slogid, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
 }
