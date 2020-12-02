@@ -328,7 +328,7 @@ bool CreateFileDirectory(const char* dir)
 	if ((nPathLen = strlen(path)) < 1)
 		return false;
 
-	for (int i = 0; i < nPathLen; ++i)
+	for (size_t i = 0; i < nPathLen; ++i)
 	{
 		if (path[i] == '\\')
 		{

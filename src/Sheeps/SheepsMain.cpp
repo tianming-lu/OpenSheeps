@@ -9,16 +9,16 @@
 #ifdef __WINDOWS__
 #ifdef _DEBUG
 #ifndef _WIN64
-#pragma comment(lib,".\\..\\Debug\\third.lib")
+#pragma comment(lib,".\\..\\Win32\\sheeps\\Debug\\third.lib")
 #else
-#pragma comment(lib, ".\\..\\X64\\Debug\\third.lib")
+#pragma comment(lib, ".\\..\\X64\\sheeps\\Debug\\third.lib")
 #endif // _WIN32
 
 #else
 #ifndef _WIN64
-#pragma comment(lib, ".\\..\\release\\third.lib")
+#pragma comment(lib, ".\\..\\Win32\\sheeps\\release\\third.lib")
 #else
-#pragma comment(lib, ".\\..\\X64\\release\\third.lib")
+#pragma comment(lib, ".\\..\\X64\\sheeps\\release\\third.lib")
 #endif // _WIN32
 #endif
 #endif // __WINDOWS__

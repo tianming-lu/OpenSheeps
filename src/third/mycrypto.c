@@ -213,7 +213,7 @@ void urlencode(unsigned char * src, int src_len, unsigned char * dest,
 }
 
 unsigned char* urldecode(unsigned char* encd, unsigned char* decd) {
-    int j, i;
+    size_t j, i;
     unsigned char *cd = encd;
     char p[2];
     size_t num = strlen((char*)cd);

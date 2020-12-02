@@ -6,16 +6,16 @@
 #ifdef __WINDOWS__
 #ifdef _DEBUG
 #ifndef _WIN64
-#pragma comment(lib,".\\..\\Debug\\sheeps\\sheeps.lib")
+#pragma comment(lib,".\\..\\Win32\\sheeps\\Debug\\sheeps.lib")
 #else
-#pragma comment(lib, ".\\..\\X64\\Debug\\sheeps\\Sheeps.lib")
+#pragma comment(lib, ".\\..\\X64\\sheeps\\Debug\\Sheeps.lib")
 #endif // _WIN32
 
 #else
 #ifndef _WIN64
-#pragma comment(lib, ".\\..\\Release\\sheeps\\sheeps.lib")
+#pragma comment(lib, ".\\..\\Win32\\sheeps\\Release\\sheeps.lib")
 #else
-#pragma comment(lib, ".\\..\\X64\\Release\\sheeps\\Sheeps.lib")
+#pragma comment(lib, ".\\..\\X64\\sheeps\\Release\\Sheeps.lib")
 #endif // _WIN32
 #endif
 #endif
@@ -23,7 +23,7 @@
 int main()
 {
 	int projectid = 0;
-    TaskManagerRun(projectid, CreateUser, DestoryUser, TaskStart, TaskStop, false);
+    TaskManagerRun(projectid, CreateUser, DestoryUser, TaskStart, TaskStop, true);
 }
 
 // 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单

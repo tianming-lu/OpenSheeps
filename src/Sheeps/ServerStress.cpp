@@ -92,8 +92,13 @@ static void getFiles(char* dir_path,const char* subpro_path, std::map<std::strin
 				t_file_update info = { 0x0 };
 				getfilemd5view(fullpath, info.fmd5, sizeof(info.fmd5));
 
+#ifdef _WIN64
 				struct _stat64 finfo;
 				_stat64(fullpath, &finfo);
+#else
+				struct _stat32 finfo;
+				_stat32(fullpath, &finfo);
+#endif //  _WIN64
 				info.size = finfo.st_size;
 
 				files->insert(std::pair<std::string, t_file_update>(shortpath, info));

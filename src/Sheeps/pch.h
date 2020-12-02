@@ -17,12 +17,12 @@
 #else
 #define MAX_PATH 260
 #endif // __WINDOWS__
-#include "../third/cJSON.h"
-#include "../third/common.h"
-#include "../third/log.h"
-#include "../third/mycrypto.h"
-#include "../third/sqlite3.h"
-#include "../third/Config.h"
+#include "cJSON.h"
+#include "common.h"
+#include "log.h"
+#include "mycrypto.h"
+#include "sqlite3.h"
+#include "Config.h"
 
 extern char DllPath[];
 extern char ConfigFile[];
