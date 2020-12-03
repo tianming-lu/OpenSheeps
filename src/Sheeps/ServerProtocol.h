@@ -62,10 +62,10 @@ public:
 	~ServerProtocol();
 
 public:
-	void ConnectionMade(HSOCKET hsock, const char* ip, int port);
-	void ConnectionFailed(HSOCKET hsock, const char* ip, int port);
-	void ConnectionClosed(HSOCKET hsock, const char* ip, int port);
-	void Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len);
+	void ConnectionMade(HSOCKET hsock);
+	void ConnectionFailed(HSOCKET hsock);
+	void ConnectionClosed(HSOCKET hsock);
+	void Recved(HSOCKET hsock, const char* data, int len);
 
 	void CheckReq(HSOCKET hsock, const char* ip, int port, const char* data, int len);
 	int  CheckRequest(HSOCKET hsock, const char* ip, int port, const char* data, int len);

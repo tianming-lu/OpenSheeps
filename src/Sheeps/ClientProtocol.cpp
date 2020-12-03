@@ -15,9 +15,9 @@ ClientProtocol::~ClientProtocol()
 
 
 //固有函数，继承自基类
-void ClientProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
+void ClientProtocol::ConnectionMade(HSOCKET hsock)
 {
-	LOG(clogId, LOG_DEBUG, "stress server connection made：[%s:%d]\r\n", ip, port);
+	LOG(clogId, LOG_DEBUG, "stress server connection made：[%s:%d]\r\n", hsock->peer_ip, hsock->peer_port);
 	StressHsocket = hsock;
 
 	HsocketSend(hsock, "sheeps", 6);
@@ -38,20 +38,20 @@ void ClientProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 	TaskManagerRuning = true;
 }
 
-void ClientProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
+void ClientProtocol::ConnectionFailed(HSOCKET hsock)
 {
 	//LOG(logId, LOG_DEBUG, "stress server connection failed:[%s:%d]\r\n", ip, port);
 	this->StressHsocket = NULL;
 }
 
-void ClientProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
+void ClientProtocol::ConnectionClosed(HSOCKET hsock)
 {
-	LOG(clogId, LOG_DEBUG, "stress server connection closed：[%s:%d] socket = %lld\r\n", ip, port, hsock->fd);
+	LOG(clogId, LOG_DEBUG, "stress server connection closed：[%s:%d] socket = %lld\r\n", hsock->peer_ip, hsock->peer_port, hsock->fd);
 	this->StressHsocket = NULL;
 	TaskManagerRuning = false;
 }
 
-void ClientProtocol::Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len)
+void ClientProtocol::Recved(HSOCKET hsock, const char* data, int len)
 {
 	return this->CheckReq(hsock, data, len);
 }

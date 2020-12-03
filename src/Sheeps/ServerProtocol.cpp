@@ -31,7 +31,7 @@ ServerProtocol::~ServerProtocol()
 
 
 //固有函数，继承自基类
-void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
+void ServerProtocol::ConnectionMade(HSOCKET hsock)
 {
 	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	switch (this->peerType)
@@ -40,7 +40,7 @@ void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 		this->initSock = hsock;
 		return;
 	case PEER_PROXY:
-		ProxyConnectionMade(hsock, this, ip, port);
+		ProxyConnectionMade(hsock, this, hsock->peer_ip, hsock->peer_port);
 		return;
 	default:
 		break;
@@ -49,13 +49,13 @@ void ServerProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
 	HsocketClose(hsock);
 }
 
-void ServerProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
+void ServerProtocol::ConnectionFailed(HSOCKET hsock)
 {
 	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	switch (this->peerType)
 	{
 	case PEER_PROXY:
-		ProxyConnectionFailed(hsock, this, ip, port);
+		ProxyConnectionFailed(hsock, this, hsock->peer_ip, hsock->peer_port);
 		return;
 	default:
 		break;
@@ -63,12 +63,12 @@ void ServerProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 	HsocketClose(this->initSock);
 }
 
-void ServerProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
+void ServerProtocol::ConnectionClosed(HSOCKET hsock)
 {
 	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	if (this->peerType == PEER_PROXY)
 	{
-		ProxyConnectionClosed(hsock, this, ip, port);
+		ProxyConnectionClosed(hsock, this, hsock->peer_ip, hsock->peer_port);
 	}
 	else if (this->peerType == PEER_STRESS)
 	{
@@ -80,9 +80,9 @@ void ServerProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)
 	}
 }
 
-void ServerProtocol::Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len)
+void ServerProtocol::Recved(HSOCKET hsock, const char* data, int len)
 {
-	return this->CheckReq(hsock, ip, port, data, len);
+	return this->CheckReq(hsock, hsock->peer_ip, hsock->peer_port, data, len);
 }
 
 //自定义类成员函数

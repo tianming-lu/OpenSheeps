@@ -148,9 +148,9 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 			{
 				left_count = InterlockedDecrement(&proto->sockCount);
 				if (CONNECT == IocpBuff->type)
-					proto->ConnectionFailed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+					proto->ConnectionFailed(IocpSock);
 				else
-					proto->ConnectionClosed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+					proto->ConnectionClosed(IocpSock);
 			}
 			CloseSocket(IocpSock);
 			proto->protolock->unlock();
@@ -159,9 +159,9 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 		{
 			left_count = InterlockedDecrement(&proto->sockCount);
 			if (CONNECT == IocpBuff->type)
-				proto->ConnectionFailed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+				proto->ConnectionFailed(IocpSock);
 			else
-				proto->ConnectionClosed(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+				proto->ConnectionClosed(IocpSock);
 			CloseSocket(IocpSock);
 		}
 	}
@@ -279,19 +279,19 @@ static void AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 	if (proto->protolock)
 	{
 		proto->protolock->lock();
-		proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+		proto->ConnectionMade(IocpSock);
 		proto->protolock->unlock();
 	}
 	else
 	{
-		proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+		proto->ConnectionMade(IocpSock);
 	}
 
 	PostRecv(IocpSock, IocpBuff, proto);
 	PostAcceptClient(IocpListenSock->factory);
 }
 
-static void ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
+static void ProcessIO(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 {
 	BaseProtocol* proto = NULL;
 	switch (IocpBuff->type)
@@ -310,7 +310,7 @@ static void ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 				proto->protolock->lock();
 				if (IocpSock->fd != INVALID_SOCKET)
 				{
-					proto->Recved(IocpSock, IocpSock->peer_ip, IocpSock->peer_port, IocpSock->recv_buf, IocpBuff->offset);
+					proto->Recved(IocpSock, IocpSock->recv_buf, IocpBuff->offset);
 					proto->protolock->unlock();
 				}
 				else
@@ -321,7 +321,7 @@ static void ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 			}
 			else
 			{
-				proto->Recved(IocpSock, IocpSock->peer_ip, IocpSock->peer_port, IocpSock->recv_buf, IocpBuff->offset);
+				proto->Recved(IocpSock, IocpSock->recv_buf, IocpBuff->offset);
 			}
 			PostRecv(IocpSock, IocpBuff, proto);
 		}
@@ -345,7 +345,7 @@ static void ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 				proto->protolock->lock();
 				if (IocpSock->fd != INVALID_SOCKET)
 				{
-					proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+					proto->ConnectionMade(IocpSock);
 					proto->protolock->unlock();
 				}
 				else
@@ -356,7 +356,7 @@ static void ProcessIO(IOCP_SOCKET* &IocpSock, IOCP_BUFF* &IocpBuff)
 			}
 			else
 			{
-				proto->ConnectionMade(IocpSock, IocpSock->peer_ip, IocpSock->peer_port);
+				proto->ConnectionMade(IocpSock);
 			}
 			PostRecv(IocpSock, IocpBuff, proto);
 		}

@@ -129,10 +129,10 @@ public:
 	long			sockCount = 0;
 
 public:
-	virtual void ConnectionMade(HSOCKET hsock, const char* ip, int port) = 0;
-	virtual void ConnectionFailed(HSOCKET, const char* ip, int port) = 0;
-	virtual void ConnectionClosed(HSOCKET hsock, const char* ip, int port) = 0;
-	virtual void Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len) = 0;
+	virtual void ConnectionMade(HSOCKET hsock) = 0;
+	virtual void ConnectionFailed(HSOCKET hsock) = 0;
+	virtual void ConnectionClosed(HSOCKET hsock) = 0;
+	virtual void Recved(HSOCKET hsock, const char* data, int len) = 0;
 };
 
 class BaseFactory

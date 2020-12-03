@@ -41,18 +41,18 @@ void UserProtocol::Init()
 	TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 }
 
-void UserProtocol::ConnectionMade(HSOCKET hsock, const char* ip, int port)
+void UserProtocol::ConnectionMade(HSOCKET hsock)
 {	/*当用户连接目标ip端口成功后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
-	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, ip, port, hsock->fd);
+	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, hsock->fd);
 	this->PlayState = PLAY_NORMAL;
 }
 
-void UserProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
+void UserProtocol::ConnectionFailed(HSOCKET hsock)
 {	/*当用户连接目标ip端口失败后，调用此函数，并传递对应网络地址（ip）和端口（port）*/
-	TaskUserLog(this, LOG_FAULT,"%s:%d [%s:%d]", __func__, __LINE__, ip, port);
+	TaskUserLog(this, LOG_FAULT,"%s:%d [%s:%d]", __func__, __LINE__, hsock->peer_ip, hsock->peer_port);
 	this->PlayState = PLAY_NORMAL;
 	TaskUserDead(this, "connection failed");
-	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
+	std::map<int, t_connection_info>::iterator it = this->Connection.find(hsock->peer_port);
 	if (it != this->Connection.end())
 	{
 		if (hsock == it->second.hsock)
@@ -64,10 +64,10 @@ void UserProtocol::ConnectionFailed(HSOCKET hsock, const char* ip, int port)
 	}
 }
 
-void UserProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)   //类销毁后，可能导致野指针
+void UserProtocol::ConnectionClosed(HSOCKET hsock)   //类销毁后，可能导致野指针
 {	/*当用户连接关闭后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
-	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, ip, port, hsock->fd);
-	std::map<int, t_connection_info>::iterator it = this->Connection.find(port);
+	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, hsock->fd);
+	std::map<int, t_connection_info>::iterator it = this->Connection.find(hsock->peer_port);
 	if (it != this->Connection.end())
 	{
 		if (hsock == it->second.hsock)
@@ -79,9 +79,9 @@ void UserProtocol::ConnectionClosed(HSOCKET hsock, const char* ip, int port)   /
 	}
 }
 
-void UserProtocol::Recved(HSOCKET hsock, const char* ip, int port, const char* data, int len)
+void UserProtocol::Recved(HSOCKET hsock, const char* data, int len)
 {	/*当用户连接收到消息后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port），以及数据指针（data）和消息长度（len）*/
-	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d][%.*s]", __func__, __LINE__, ip, port, len, data);
+	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d][%.*s]", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, len, data);
 	TaskUserSocketSkipBuf(hsock, len);
 	this->PlayState = PLAY_NORMAL;
 }
