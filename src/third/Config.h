@@ -20,11 +20,11 @@ extern "C"
 {
 #endif
 
-	Config_API int		config_init(const char* file);
-	Config_API int		netaddr_in_config(const char* ip, int port, const char* section, const char* key);
-	Config_API const char* config_get_string_value(const char* section, const char* key, const char* def);
-	Config_API int		config_get_int_value(const char* section, const char* key, int def);
-	Config_API bool		config_get_bool_value(const char* section, const char* key, bool def);
+	Config_API int	__stdcall	config_init(const char* file);
+	Config_API int	__stdcall	netaddr_in_config(const char* ip, int port, const char* section, const char* key);
+	Config_API const char* __stdcall config_get_string_value(const char* section, const char* key, const char* def);
+	Config_API int	__stdcall	config_get_int_value(const char* section, const char* key, int def);
+	Config_API bool	__stdcall	config_get_bool_value(const char* section, const char* key, bool def);
 
 #ifdef __cplusplus
 }

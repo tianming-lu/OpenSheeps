@@ -85,6 +85,11 @@ typedef struct _UserEvent {
 	ReplayProtocol* user;
 	//HTASKCFG		task;
 }UserEvent, * HUserEvent;
+#else
+typedef struct _UserEvent {
+	time_t			timer;
+	ReplayProtocol* user;
+}UserEvent, * HUserEvent;
 #endif // __WINDOWS__
 
 typedef struct {
@@ -99,8 +104,11 @@ typedef struct {
 
 	std::vector<t_cache_message*>*	messageList;    //任务消息缓存
 	bool							stopMessageCache;
-
+#ifdef __WINDOWS__
 	HANDLE hTimerQueue;
+#else
+	int hTimerQueue;
+#endif
 
 	uint16_t	userNumber;
 	std::list<HUserEvent>* userAll;
@@ -156,18 +164,18 @@ extern "C"
 {
 #endif
 
-int				create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, BaseFactory* factory);
-bool			insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t port, char* content, uint64_t timestamp, uint32_t microsecond, bool udp);
-bool			stop_task_by_id(uint8_t taskID);
-int				task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory);
-void			set_task_log_level(uint8_t level, uint8_t taskID);
+int		__stdcall	create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, BaseFactory* factory);
+bool	__stdcall	insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t port, char* content, uint64_t timestamp, uint32_t microsecond, bool udp);
+bool	__stdcall	stop_task_by_id(uint8_t taskID);
+int		__stdcall	task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory);
+void	__stdcall	set_task_log_level(uint8_t level, uint8_t taskID);
 
 //项目业务逻辑API
-Task_API void		TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server);
-Task_API bool		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
-Task_API bool		TaskUserSocketClose(HSOCKET hsock);
-Task_API void		TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);
-Task_API void		TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...);
+Task_API void	__stdcall	TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server);
+Task_API bool	__cdecl		TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
+Task_API bool	__stdcall	TaskUserSocketClose(HSOCKET hsock);
+Task_API void	__cdecl		TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);
+Task_API void	__cdecl		TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...);
 #define		TaskUserSocketConnet(proto, ip, port, iotype)	HsocketConnect(proto, ip, port, iotype)
 #define		TaskUserSocketSend(hsock, data, len)			HsocketSend(hsock, data, len)
 #define		TaskUserSocketSkipBuf(hsock, len)				HsocketSkipBuf(hsock, len)

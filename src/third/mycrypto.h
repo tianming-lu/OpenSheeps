@@ -33,23 +33,23 @@ typedef struct {
 extern "C"
 {
 #endif
-crypto_API void     encode_base64(Base64_Context* dst, Base64_Context* src);
-crypto_API int      decode_base64(Base64_Context* dst, Base64_Context* src);
-crypto_API size_t   base64_encode(char *src, int src_len, char *dst);
-crypto_API size_t   base64_decode(char *src, size_t src_len, char *dst);
+crypto_API void     __stdcall   encode_base64(Base64_Context* dst, Base64_Context* src);
+crypto_API int      __stdcall   decode_base64(Base64_Context* dst, Base64_Context* src);
+crypto_API size_t   __stdcall   base64_encode(char *src, int src_len, char *dst);
+crypto_API size_t   __stdcall   base64_decode(char *src, size_t src_len, char *dst);
 //base64
 
 //urlencode
-crypto_API void urlencode(unsigned char * src, int src_len, unsigned char * dest, int dest_len);
-crypto_API unsigned char* urldecode(unsigned char* encd, unsigned char* decd);
+crypto_API void __stdcall   urlencode(unsigned char * src, int src_len, unsigned char * dest, int dest_len);
+crypto_API unsigned char* __stdcall urldecode(unsigned char* encd, unsigned char* decd);
 //urlencode
 
 //sha1
-crypto_API void GetStringSHA1(char *input, unsigned long length, char *output);
+crypto_API void __stdcall GetStringSHA1(char *input, unsigned long length, char *output);
 //sha1
 
 //md5
-crypto_API int getfilemd5view(const char* filename, char* md5, size_t size);
+crypto_API int __stdcall getfilemd5view(const char* filename, char* md5, size_t size);
 //md5
 
 #ifdef __cplusplus

@@ -72,7 +72,7 @@ int ClientProtocol::Loop()
 				return 0;
 			this->heartbeat = time(NULL);
 			char data[64] = { 0x0 };
-			snprintf(data, sizeof(data), "{\"timestamp\":%lld}", time(NULL));
+			snprintf(data, sizeof(data), "{\"timestamp\":%lld}", (long long)time(NULL));
 
 			int len = int(strlen(data));
 			t_stress_protocol_head head = {0x0};

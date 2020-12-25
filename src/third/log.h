@@ -44,19 +44,19 @@ extern "C"
 {
 #endif
 
-log_API int				RegisterLog(const char* filename, int level, int rotatesize, int rotateintval, int filenum);
-log_API int				CloseLog(int fd);
-log_API char*			GetLogStr(int loglevel);
-log_API int				GetLogLevel(const char* loglevelstr) ;
-log_API void			SetLogLevel(int fd, int level);
+log_API int		__stdcall	RegisterLog(const char* filename, int level, int rotatesize, int rotateintval, int filenum);
+log_API int		__stdcall	CloseLog(int fd);
+log_API char*	__stdcall	GetLogStr(int loglevel);
+log_API int		__stdcall	GetLogLevel(const char* loglevelstr) ;
+log_API void	__stdcall	SetLogLevel(int fd, int level);
 #ifdef __WINDOWS__
-log_API HANDLE			GetLogFileHandle(int fd);
+log_API HANDLE	__stdcall	GetLogFileHandle(int fd);
 #else
-log_API int             GetLogFileHandle(int fd);
+log_API int		__stdcall	GetLogFileHandle(int fd);
 #endif
-log_API int				CheckLogLevel(int fd, int level);
-log_API void			LOG(int fd, int level, const char* fmt, ...);
-log_API void			LogLoop();
+log_API int		__stdcall	CheckLogLevel(int fd, int level);
+log_API void	__cdecl		LOG(int fd, int level, const char* fmt, ...);
+log_API void	__stdcall	LogLoop();
 
 #ifdef __cplusplus
 }

@@ -62,9 +62,9 @@ extern "C"
 {
 #endif
 
-int SHA1Reset( SHA1Context *);  
-int SHA1Input( SHA1Context *context, const uint8_t * message_array, unsigned length);
-int SHA1Result( SHA1Context *,uint8_t Message_Digest[SHA1HashSize]);  
+int __stdcall SHA1Reset( SHA1Context *);
+int __stdcall SHA1Input( SHA1Context *context, const uint8_t * message_array, unsigned length);
+int __stdcall SHA1Result( SHA1Context *,uint8_t Message_Digest[SHA1HashSize]);
 #ifdef __cplusplus
 }
 #endif 

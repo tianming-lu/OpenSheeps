@@ -4,6 +4,11 @@
 #include "SheepsMain.h"
 #include <thread>
 
+#ifdef __WINDOWS__
+DWORD written;
+#endif // __WINDOWS__
+
+
 bool TaskManagerRuning = false;
 
 std::map<int, t_task_config*> taskAll;
@@ -208,11 +213,11 @@ VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 	ReplayProtocol* proto = hue->user;
 	t_task_config* task = proto->Task;
 
-	proto->protolock->lock();
+	proto->Lock();
 	if (proto->SelfDead == false)
 	{
 		Loop(proto);
-		proto->protolock->unlock();
+		proto->UnLock();
 	}
 	else
 	{
@@ -220,13 +225,13 @@ VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 		{
 			ReInit(proto, true);
 			proto->LastError[0] = 0x0;
-			proto->protolock->unlock();
+			proto->UnLock();
 		}
 		else
 		{
 			proto->Destroy();
 			proto->LastError[0] = 0x0;
-			proto->protolock->unlock();
+			proto->UnLock();
 			task_delete_user(task, proto, hue);
 		}
 	}
@@ -246,7 +251,10 @@ int taskWorkerThread(void* pParam)
 	{
 		TimeSleep(500);
 	}
+#ifdef __WINDOWS__
 	DeleteTimerQueueEx(task->hTimerQueue, INVALID_HANDLE_VALUE);
+#else
+#endif
 	destroy_task(task);
 	return 0;
 }
@@ -302,7 +310,10 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 		task->userAll = new(std::nothrow) std::list<HUserEvent>;
 		task->userDes = new(std::nothrow) std::list<HUserEvent>;
 		task->userDesLock = new(std::nothrow) std::mutex;
+#ifdef __WINDOWS__
 		task->hTimerQueue = CreateTimerQueue();
+#else
+#endif
 		if (!task->messageList || !task->userAll || !task->userDes || !task->userDesLock|| !task->hTimerQueue)
 		{
 			LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
@@ -310,7 +321,10 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 			if (task->userAll) delete task->userAll;
 			if (task->userDes) delete task->userDes;
 			if (task->userDesLock) delete task->userDesLock;
+#ifdef __WINDOWS__
 			if (task->hTimerQueue) DeleteTimerQueueEx(task->hTimerQueue, INVALID_HANDLE_VALUE);
+#else
+#endif
 			sheeps_free(task);
 			return NULL;
 		}
@@ -384,13 +398,15 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 		{
 			ReInit(user, true);
 		}
-
+#ifdef __WINDOWS__
 		if (!CreateTimerQueueTimer(&ue->timer, task->hTimerQueue, (WAITORTIMERCALLBACK)userWorkFunc, ue, 10, 20, 0))
 		{
 			printf("CreateTimerQueueTimer failed (%d)\n", GetLastError());
 			push_userDes_back(task, ue);
 			continue;
 		}
+#else
+#endif
 	}
 	return 0;
 }
@@ -521,7 +537,7 @@ bool TaskUserSocketClose(HSOCKET hsock)
 	if (fd != INVALID_SOCKET && fd != NULL)
 	{
 		InterlockedDecrement(&hsock->_user->sockCount);
-		CancelIo((HANDLE)fd);	//取消等待执行的异步操作
+		//CancelIoEx((HANDLE)fd, NULL);	//取消等待执行的异步操作
 		closesocket(fd);
 	}
 #else
@@ -560,7 +576,7 @@ void TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...)
 	localtime_r(&now, &tmm);
 #endif // __WINDOWS__
 	char* slog = GetLogStr(level);
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%u]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%lu]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
@@ -569,7 +585,6 @@ void TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...)
 	l += snprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, "\r\n");
 
 #ifdef __WINDOWS__
-	DWORD written;
 	WriteFile(GetLogFileHandle(logfd), buf, l, &written, NULL);
 #else
 	write(GetLogFileHandle(logfd), buf, l);
@@ -592,7 +607,7 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 	localtime_r(&now, &tmm);
 #endif // __WINDOWS__
 	char* slog = GetLogStr(level);
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%u]:[NO.%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%lu]:[NO.%d]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, proto->UserNumber, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
@@ -601,7 +616,6 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 	l += snprintf(buf + l, (size_t)MAX_LOG_LEN - l - 1, "\r\n");
 
 #ifdef __WINDOWS__
-	DWORD written;
 	HANDLE fd = GetLogFileHandle(logfd);
 	WriteFile(fd, buf, l, &written, NULL);
 #else

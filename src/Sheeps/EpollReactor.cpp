@@ -145,9 +145,9 @@ static void do_close(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 			{
 				left_count = __sync_sub_and_fetch (&proto->sockCount, 1);
 				if (hsock->_epoll_type == READ)
-    				proto->ConnectionClosed(hsock, hsock->peer_ip, hsock->peer_port);
+    				proto->ConnectionClosed(hsock);
 				else
-					proto->ConnectionFailed(hsock, hsock->peer_ip, hsock->peer_port);	
+					proto->ConnectionFailed(hsock);	
 			}
 			proto->protolock->unlock();
 		}
@@ -155,9 +155,9 @@ static void do_close(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 		{
 			left_count = __sync_sub_and_fetch (&proto->sockCount, 1);
 			if (hsock->_epoll_type == READ)
-    			proto->ConnectionClosed(hsock, hsock->peer_ip, hsock->peer_port);
+    			proto->ConnectionClosed(hsock);
 			else
-				proto->ConnectionFailed(hsock, hsock->peer_ip, hsock->peer_port);	
+				proto->ConnectionFailed(hsock);	
 		}		
 	}
     
@@ -176,12 +176,12 @@ static void do_connect(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 		{
 			proto->protolock->lock();
 			if (hsock->_is_close == 0)
-				proto->ConnectionMade(hsock, hsock->peer_ip, hsock->peer_port);
+				proto->ConnectionMade(hsock);
 			proto->protolock->unlock();
 		}
 		else
 		{
-			proto->ConnectionMade(hsock, hsock->peer_ip, hsock->peer_port);
+			proto->ConnectionMade(hsock);
 		}
 	}
 
@@ -352,12 +352,12 @@ static void do_read(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 		{
 			proto->protolock->lock();
 			if (hsock->_is_close == 0)
-				proto->Recved(hsock,  hsock->peer_ip, hsock->peer_port, hsock->recv_buf, hsock->_recv_buf.offset);
+				proto->Recved(hsock, hsock->recv_buf, hsock->_recv_buf.offset);
 			proto->protolock->unlock();
 		}
 		else
 		{
-			proto->Recved(hsock,  hsock->peer_ip, hsock->peer_port, hsock->recv_buf, hsock->_recv_buf.offset);
+			proto->Recved(hsock, hsock->recv_buf, hsock->_recv_buf.offset);
 		}
 	}
 	else
@@ -418,12 +418,12 @@ static void do_accpet(HSOCKET listenhsock, BaseFactory* fc)
 		if(proto->protolock)
 		{
 			proto->protolock->lock();
-        	proto->ConnectionMade(hsock, hsock->peer_ip, hsock->peer_port);
+        	proto->ConnectionMade(hsock);
         	proto->protolock->unlock();
 		}
 		else
 		{
-			proto->ConnectionMade(hsock, hsock->peer_ip, hsock->peer_port);
+			proto->ConnectionMade(hsock);
 		}
 		if (hsock->_send_buf.offset > 0)
 			epoll_add_write(hsock, WRITE);
@@ -676,12 +676,11 @@ bool HsocketSend(HSOCKET hsock, const char* data, int len)
 	return true;
 }
 
-bool HsocketClose(HSOCKET &hsock)
+bool HsocketClose(HSOCKET hsock)
 {
 	if (hsock == NULL || hsock->fd < 0) return false;
 	shutdown(hsock->fd, SHUT_RD);
 	//close(hsock->fd);  直接关闭epoll没有事件通知，所以需要shutdown
-	hsock = NULL;
 	return true;
 }
 

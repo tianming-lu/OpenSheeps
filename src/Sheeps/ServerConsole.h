@@ -2,6 +2,7 @@
 #define _SERVER_CONSOLE_H_
 #include "ServerProtocol.h"
 #include <map>
+#include <string>
 
 enum {
 	STATE_UNSTART = 0,

@@ -27,16 +27,16 @@ extern "C"
 {
 #endif
 
-Common_API int GetHostByName(char* name, char* buf, size_t size);
+Common_API int __stdcall GetHostByName(char* name, char* buf, size_t size);
 #ifdef __WINDOWS__
 #include <Winsock2.h>
-static inline int GetSockName(SOCKET fd, struct sockaddr* addr, int* nSize)
+static inline int __stdcall GetSockName(SOCKET fd, struct sockaddr* addr, int* nSize)
 {
 	return getsockname(fd, addr, nSize);
 }
 #else
 #include <sys/socket.h>
-static inline int GetSockName(int fd, struct sockaddr* addr, int* nSize)
+static inline int __stdcall GetSockName(int fd, struct sockaddr* addr, int* nSize)
 {
 	return getsockname(fd, addr, (socklen_t*)nSize);
 }
@@ -44,14 +44,14 @@ static inline int GetSockName(int fd, struct sockaddr* addr, int* nSize)
 
 #ifdef __WINDOWS__
 #include <windows.h>
-static inline int GetCpuCount()
+static inline int __stdcall GetCpuCount()
 {
 	SYSTEM_INFO sysInfor;
 	GetSystemInfo(&sysInfor);
 	return sysInfor.dwNumberOfProcessors;
 #else
 #include <sys/sysinfo.h>
-static inline int GetCpuCount()
+static inline int __stdcall GetCpuCount()
 {
 	return get_nprocs_conf();
 #endif // __WINDOWS__
@@ -59,7 +59,7 @@ static inline int GetCpuCount()
 
 #ifdef __WINDOWS__
 #include <windows.h>
-static inline long long int GetSysTimeMicros()
+static inline long long int __stdcall GetSysTimeMicros()
 {
 	// 从1601年1月1日0:0:0:000到1970年1月1日0:0:0:000的时间(单位100ns)
 #define EPOCHFILETIME   (116444736000000000UL)
@@ -76,7 +76,7 @@ static inline long long int GetSysTimeMicros()
 #else
 #include <sys/time.h>
 #include <unistd.h>
-static inline long long int GetSysTimeMicros()
+static inline long long int __stdcall GetSysTimeMicros()
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);

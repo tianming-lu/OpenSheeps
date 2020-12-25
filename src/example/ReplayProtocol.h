@@ -4,8 +4,6 @@
 
 typedef struct {
 	HSOCKET hsock;
-	std::string sendbuf;
-	std::string recvbuf;
 }t_connection_info;
 
 class UserProtocol :

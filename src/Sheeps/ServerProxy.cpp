@@ -109,7 +109,7 @@ static void insert_msg_to_record_list(const char* ip, int port, int type, const 
 	recordListLock->unlock();
 }
 
-static bool get_base64_string(char** content, char* src, int srclen)
+static bool get_base64_string(char** content, size_t* len, char* src, int srclen)
 {
 	if (src)
 	{
@@ -125,6 +125,7 @@ static bool get_base64_string(char** content, char* src, int srclen)
 
 		encode_base64(&temp, &str);
 		*content = (char*)temp.data;
+		*len = temp.len;
 	}
 	else
 	{
@@ -157,33 +158,38 @@ static bool cratet_table(const char* tablename)
 	return true;
 }
 
-static bool insert_table(const char* tablename, t_recode_info* info, int flag)
+static int insert_table(const char* tablename, t_recode_info* info, int flag)
 {
 	char* errmsg = NULL;
-	char* B64;
-	bool res = get_base64_string(&B64, info->msg, info->msglen);
+	char* B64 = NULL;
+	size_t B64len = 0;
+	bool res = get_base64_string(&B64, &B64len, info->msg, info->msglen);
 	if (res == false)
-		return false;
+		return -1;
 
-	size_t alloc_len = (size_t)info->msglen + 256;
+	size_t alloc_len = B64len + 256;
 	char* sql = (char*)sheeps_malloc(alloc_len);
 	if (sql == NULL)
 	{
 		sheeps_free(B64);
-		return false;
+		return -2;
 	}
 	snprintf(sql, alloc_len, "insert into '%s' (recordtime, recordtype, ip, port, content) values(%lld, %d, '%s', %d, '%s')", tablename, info->time, info->type, info->ip, info->port, B64);
 	sheeps_free(B64);
 
 	int ret = sqlite3_exec(mysql, sql, NULL, NULL, &errmsg);
-	sheeps_free(sql);
 	if (ret != SQLITE_OK)
 	{
 		if (flag)
+		{
 			LOG(slogid, LOG_ERROR, "%s:%d sqlite3 error[%s]\r\n", __func__, __LINE__, errmsg);
-		return false;
+			LOG(slogid, LOG_ERROR, "%s:%d [%s]\r\n", __func__, __LINE__, sql);
+		}
+		sheeps_free(sql);
+		return -3;
 	}
-	return true;
+	sheeps_free(sql);
+	return 0;
 }
 
 void insert_msg_recodr_db()
@@ -210,11 +216,21 @@ void insert_msg_recodr_db()
 
 			if (info->type == 0)
 				cratet_table(tablename);
-			if (insert_table(tablename, info, 0) == false)
+			int ret = insert_table(tablename, info, 0);
+			if (ret != 0)
 			{
 				if (cratet_table(tablename) == true)
-					insert_table(tablename, info, 1);
+				{
+					ret = insert_table(tablename, info, 1);
+					if (ret != 0)
+						LOG(slogid, LOG_ERROR, "%s:%d insert error\n", __func__, __LINE__);
+				}
+				else
+				{
+					LOG(slogid, LOG_ERROR, "%s:%d create error\n", __func__, __LINE__);
+				}
 			}
+
 			if (info->msg)
 				sheeps_free(info->msg);
 			sheeps_free(info);
@@ -437,7 +453,6 @@ void ProxyConnectionClosed(HSOCKET hsock, ServerProtocol* proto, const char* ip,
 		if (proto->proxyInfo->proxyStat >= PROXY_CONNECTING)
 			HsocketClose(proto->proxyInfo->proxySock);
 		HsocketClose(proto->proxyInfo->udpClientSock);
-		proto->proxyInfo->proxyStat = PROXY_INIT;
 	}
 	else if (hsock == proto->proxyInfo->udpClientSock)
 	{

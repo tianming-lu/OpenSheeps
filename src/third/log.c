@@ -18,6 +18,8 @@ char* LogString[] = {"TRACE", "DEBUG", "NORMAL", "ERROR", "FAULT", "NONE"};
 #define LOGLOCK(a)  while (InterlockedExchange(a, 1)){Sleep(0);}
 #define LOGUNLOCK(a)	InterlockedExchange(a, 0)
 #define LOGTRYLOCK(a)	InterlockedExchange(a, 1)
+
+DWORD written;
 #else
 #define LOGLOCK(a)	while (__sync_fetch_and_or(a, 1)){sleep(0);}
 #define LOGUNLOCK(a)	__sync_fetch_and_and(a, 0)
@@ -254,10 +256,11 @@ void LOG(int fd, int level, const char* fmt, ...)
 #ifdef __WINDOWS__
 	localtime_s(&tmm, &now);
 #else
+#define u_long unsigned long
 	localtime_r(&now, &tmm);
 #endif // __WINDOWS__
 	char *slog = LogString[level];
-	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%u]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+	l = snprintf(buf, MAX_LOG_LEN - 1, "[%s:%lu]:[%04d-%02d-%02d %02d:%02d:%02d]", slog, (u_long)THREAD_ID, tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
 
 	va_list ap;
 	va_start(ap, fmt);
@@ -265,7 +268,6 @@ void LOG(int fd, int level, const char* fmt, ...)
 	va_end(ap);
 	
 #ifdef __WINDOWS__
-	DWORD written;
 	WriteFile(nctx->filefd, buf, l, &written, NULL);
 #else
 	write(nctx->filefd, buf, l);

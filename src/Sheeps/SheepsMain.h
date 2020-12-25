@@ -22,9 +22,9 @@ extern int managerPort;
 extern "C" {
 #endif
 
-	Sheeps_API int SheepsServerRun(u_short listenPort);
-	Sheeps_API int SheepsClientRun(int projectid, bool server);
-	Sheeps_API int StressClientStop();
+	Sheeps_API int __stdcall SheepsServerRun(u_short listenPort);
+	Sheeps_API int __stdcall SheepsClientRun(int projectid, bool server);
+	Sheeps_API int __stdcall StressClientStop();
 
 #ifdef __cplusplus
 }

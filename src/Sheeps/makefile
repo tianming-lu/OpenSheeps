@@ -1,7 +1,7 @@
-INC=
+INC=-I./../third
 LIB=-pthread -L./../third -lthird
 TARGET=libsheeps.so
-OBJ=ClientProtocol.o ClientProtocolSub.o EpollReactor.o pch.o ServerConsole.o ServerProtocol.o ServerProxy.o ServerStress.o SheepsFactory.o SheepsMain.o SheepsMemory.o TaskManager.o
+OBJ=EpollReactor.o SheepsMain.o pch.o ServerConsole.o ServerProtocol.o ServerProxy.o ServerStress.o ClientProtocol.o SheepsFactory.o ClientProtocolSub.o TaskManager.o
 
 CC=gcc
 CXX=g++ -std=c++11

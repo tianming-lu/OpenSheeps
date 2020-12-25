@@ -58,8 +58,6 @@ void UserProtocol::ConnectionFailed(HSOCKET hsock)
 		if (hsock == it->second.hsock)
 		{
 			it->second.hsock = NULL;
-			it->second.sendbuf.clear();
-			it->second.recvbuf.clear();
 		}
 	}
 }
@@ -73,8 +71,6 @@ void UserProtocol::ConnectionClosed(HSOCKET hsock)   //类销毁后，可能导�
 		if (hsock == it->second.hsock)
 		{
 			it->second.hsock = NULL;
-			it->second.sendbuf.clear();
-			it->second.recvbuf.clear();
 		}
 	}
 }
@@ -105,6 +101,11 @@ void UserProtocol::Event(uint8_t event_type, const char* ip, int port, const cha
 		TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]", ip, port);
 		this->PlayState = PLAY_PAUSE;
 		conn_hsock = TaskUserSocketConnet(this, ip, port, TCP_CONN);
+		if (conn_hsock == NULL)
+		{
+			TaskUserDead(this, "%s:%d conect failed!", __func__, __LINE__);
+			return;
+		}
 		it = this->Connection.find(port);
 		info.hsock = conn_hsock;
 		if (it == this->Connection.end())
@@ -114,10 +115,11 @@ void UserProtocol::Event(uint8_t event_type, const char* ip, int port, const cha
 		else
 		{
 			if (it->second.hsock != NULL)
+			{
 				TaskUserSocketClose(it->second.hsock);
+				it->second.hsock = NULL;
+			}
 			it->second.hsock = conn_hsock;
-			it->second.sendbuf.clear();
-			it->second.recvbuf.clear();
 		}
 		break;
 	case TYPE_CLOSE:	//关闭连接事件
@@ -145,13 +147,13 @@ void UserProtocol::Event(uint8_t event_type, const char* ip, int port, const cha
 
 void UserProtocol::ReInit()
 {	//用户重置到初始状态
-	TaskUserLog(this, LOG_NORMAL, "%s:%d", __func__, __LINE__);
+	TaskUserLog(this, LOG_NORMAL, "%s:%d %s", __func__, __LINE__, this->LastError);
 	this->CloseAllConnection();
 }
 
 void UserProtocol::Destroy()
 {	/*任务终止时，调用次函数，关闭所有连接，并且HSOCKET 句柄变量置为NULL*/
-	TaskUserLog(this, LOG_NORMAL, "%s:%d", __func__, __LINE__);
+	TaskUserLog(this, LOG_NORMAL, "%s:%d %s", __func__, __LINE__, this->LastError);
 	this->CloseAllConnection();
 }
 

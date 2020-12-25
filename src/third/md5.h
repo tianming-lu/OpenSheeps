@@ -14,14 +14,14 @@ extern "C"
 {
 #endif
 
-void MD5Init(LPMD5_Context ctx);
-void MD5Update(LPMD5_Context ctx, unsigned char const *buf, unsigned len);
-void MD5Final(unsigned char digest[16], LPMD5_Context ctx);
+void __stdcall MD5Init(LPMD5_Context ctx);
+void __stdcall MD5Update(LPMD5_Context ctx, unsigned char const *buf, unsigned len);
+void __stdcall MD5Final(unsigned char digest[16], LPMD5_Context ctx);
 
-void MD5Digest( const unsigned char *message, int len, unsigned char *digest);
-void MD5DigestHex( const unsigned char *message, int len, unsigned char *digest);
-void MD5HMAC(const unsigned char *password,  unsigned pass_len, const unsigned char *challenge, unsigned chal_len, unsigned char response[16]);
-void MD5HMAC2(const unsigned char *password,  unsigned pass_len, const unsigned char *challenge, unsigned chal_len, const unsigned char *challenge2, unsigned chal_len2, unsigned char response[16]);
+void __stdcall MD5Digest( const unsigned char *message, int len, unsigned char *digest);
+void __stdcall MD5DigestHex( const unsigned char *message, int len, unsigned char *digest);
+void __stdcall MD5HMAC(const unsigned char *password,  unsigned pass_len, const unsigned char *challenge, unsigned chal_len, unsigned char response[16]);
+void __stdcall MD5HMAC2(const unsigned char *password,  unsigned pass_len, const unsigned char *challenge, unsigned chal_len, const unsigned char *challenge2, unsigned chal_len2, unsigned char response[16]);
 #ifdef __cplusplus
 }
 #endif
