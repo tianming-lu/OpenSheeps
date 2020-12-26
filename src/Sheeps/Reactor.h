@@ -8,12 +8,16 @@
 #define API_EXPORTS
 
 #ifdef __WINDOWS__
+#define __STDCALL __stdcall
+#define __CDECL__	__cdecl
 #if defined API_EXPORTS
 #define Reactor_API __declspec(dllexport)
 #else
 #define Reactor_API __declspec(dllimport)
 #endif
 #else
+#define __STDCALL
+#define __CDECL__
 #define Reactor_API
 #endif // __WINDOWS__
 
@@ -27,6 +31,7 @@
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <mutex>
 #endif // __WINDOWS__
 
 
@@ -128,30 +133,40 @@ public:
 		this->protoType = SERVER_PROTOCOL;
 #ifdef __WINDOWS__
 		this->mutex = CreateMutexA(NULL, false, NULL);
+#else
+		this->mutex = new(std::nothrow) std::mutex();
 #endif
 	};
 	virtual ~BaseProtocol() {
 		if (this->mutex)
 #ifdef __WINDOWS__
 			CloseHandle(this->mutex);
+#else
+			delete this->mutex;
 #endif
 	};
 	void SetFactory(BaseFactory* pfc, PROTOCOL_TPYE prototype) { this->factory = pfc; this->protoType = prototype; };
 	void SetNoLock() {
 #ifdef __WINDOWS__
 		CloseHandle(this->mutex); this->mutex = NULL;
+#else
+		if (this->mutex) delete this->mutex; this->mutex = NULL;
 #endif
 	}
 	void Lock() { 
 		if(this->mutex)
 #ifdef __WINDOWS__
 			WaitForSingleObject(this->mutex, INFINITE);
+#else
+			this->mutex->lock();
 #endif
 	};
 	void UnLock() {
 		if (this->mutex)
 #ifdef __WINDOWS__
 			ReleaseMutex(this->mutex);
+#else
+			this->mutex->unlock();
 #endif
 	};
 
@@ -159,6 +174,8 @@ public:
 	BaseFactory*	factory = NULL;
 #ifdef __WINDOWS__
 	HANDLE			mutex = NULL;
+#else
+	std::mutex*		mutex = NULL;
 #endif // __WINDOWS__
 
 	//std::mutex*		protolock = NULL;
@@ -199,14 +216,14 @@ extern "C"
 {
 #endif
 
-	Reactor_API int		__stdcall	ReactorStart(Reactor* reactor);
-	Reactor_API void	__stdcall	ReactorStop(Reactor* reactor);
-	Reactor_API int		__stdcall	FactoryRun(BaseFactory* fc);
-	Reactor_API int		__stdcall	FactoryStop(BaseFactory* fc);
-	Reactor_API HSOCKET	__stdcall	HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE iotype);
-	Reactor_API bool	__stdcall	HsocketSend(HSOCKET hsock, const char* data, int len);
-	Reactor_API bool	__stdcall	HsocketClose(HSOCKET hsock);
-	Reactor_API int		__stdcall	HsocketSkipBuf(HSOCKET hsock, int len);
+	Reactor_API int		__STDCALL	ReactorStart(Reactor* reactor);
+	Reactor_API void	__STDCALL	ReactorStop(Reactor* reactor);
+	Reactor_API int		__STDCALL	FactoryRun(BaseFactory* fc);
+	Reactor_API int		__STDCALL	FactoryStop(BaseFactory* fc);
+	Reactor_API HSOCKET	__STDCALL	HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE iotype);
+	Reactor_API bool	__STDCALL	HsocketSend(HSOCKET hsock, const char* data, int len);
+	Reactor_API bool	__STDCALL	HsocketClose(HSOCKET hsock);
+	Reactor_API int		__STDCALL	HsocketSkipBuf(HSOCKET hsock, int len);
 
 #ifdef __cplusplus
 }

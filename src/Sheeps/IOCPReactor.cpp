@@ -68,8 +68,10 @@ static SOCKET GetListenSock(int port)
 	return listenSock;
 }
 
-static void PostAcceptClient(BaseFactory* fc)
+static void PostAcceptClient(IOCP_SOCKET* IocpSock)
 {
+	BaseFactory* fc = IocpSock->factory;
+
 	IOCP_BUFF* IocpBuff;
 	IocpBuff = NewIOCP_Buff();
 	if (IocpBuff == NULL)
@@ -84,6 +86,7 @@ static void PostAcceptClient(BaseFactory* fc)
 	}
 	IocpBuff->databuf.len = DATA_BUFSIZE;
 	IocpBuff->type = ACCEPT;
+	IocpBuff->hsock = IocpSock;
 
 	IocpBuff->fd = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (IocpBuff->fd == INVALID_SOCKET)
@@ -127,7 +130,7 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 		if (IocpBuff->databuf.buf)
 			pst_free(IocpBuff->databuf.buf);
 		ReleaseIOCP_Buff(IocpBuff);
-		PostAcceptClient(IocpSock->factory);
+		PostAcceptClient(IocpSock);
 		return;
 	case WRITE:
 		if (IocpBuff->databuf.buf != NULL)
@@ -159,7 +162,7 @@ static void Close(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff )
 	if (IocpSock->recv_buf)
 		pst_free(IocpSock->recv_buf);
 	ReleaseIOCP_Buff(IocpBuff);
-	ReleaseIOCP_Socket(IocpBuff->hsock);
+	ReleaseIOCP_Socket(IocpSock);
 	//MemoryBarrier();
 }
 
@@ -269,7 +272,7 @@ static void AceeptClient(IOCP_SOCKET* IocpListenSock, IOCP_BUFF* IocpBuff)
 	proto->UnLock();
 
 	PostRecv(IocpSock, IocpBuff, proto);
-	PostAcceptClient(IocpListenSock->factory);
+	PostAcceptClient(IocpListenSock);
 }
 
 static void ProcessIO(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
@@ -359,6 +362,8 @@ DWORD WINAPI serverWorkerThread(LPVOID pParam)
 		IocpBuff = NULL;
 		err = 0;
 		bRet = GetQueuedCompletionStatus(reactor->ComPort, &dwIoSize, (PULONG_PTR)&IocpSock, (LPOVERLAPPED*)&IocpBuff, INFINITE);
+		if (IocpBuff != NULL)
+			IocpSock = IocpBuff->hsock;   //强制closesocket后可能返回错误的IocpSock，从IocpBuff中获取正确的IocpSock
 		if (bRet == false)
 		{
 			err = GetLastError();  //64L,121L,995L
@@ -475,7 +480,7 @@ int FactoryRun(BaseFactory* fc)
 
 		CreateIoCompletionPort((HANDLE)fc->Listenfd, fc->reactor->ComPort, (ULONG_PTR)IcpSock, 0);
 		for (int i = 0; i < fc->reactor->CPU_COUNT; i++)
-			PostAcceptClient(fc);
+			PostAcceptClient(IcpSock);
 	}
 	
 	fc->reactor->FactoryAll.insert(std::pair<uint16_t, BaseFactory*>(fc->ServerPort, fc));

@@ -20,12 +20,17 @@
 #include <stdio.h>
 
 #ifdef __WINDOWS__
+#define __STDCALL __stdcall
+#define __CDECL__	__cdecl
+
 #if defined COMMON_LIB || defined STRESS_EXPORTS
 #define log_API __declspec(dllexport)
 #else
 #define log_API __declspec(dllimport)
 #endif // COMMON_LIB
 #else
+#define __STDCALL
+#define __CDECL__
 #define log_API
 #endif
 
@@ -44,19 +49,19 @@ extern "C"
 {
 #endif
 
-log_API int		__stdcall	RegisterLog(const char* filename, int level, int rotatesize, int rotateintval, int filenum);
-log_API int		__stdcall	CloseLog(int fd);
-log_API char*	__stdcall	GetLogStr(int loglevel);
-log_API int		__stdcall	GetLogLevel(const char* loglevelstr) ;
-log_API void	__stdcall	SetLogLevel(int fd, int level);
+log_API int		__STDCALL	RegisterLog(const char* filename, int level, int rotatesize, int rotateintval, int filenum);
+log_API int		__STDCALL	CloseLog(int fd);
+log_API char*	__STDCALL	GetLogStr(int loglevel);
+log_API int		__STDCALL	GetLogLevel(const char* loglevelstr) ;
+log_API void	__STDCALL	SetLogLevel(int fd, int level);
 #ifdef __WINDOWS__
-log_API HANDLE	__stdcall	GetLogFileHandle(int fd);
+log_API HANDLE	__STDCALL	GetLogFileHandle(int fd);
 #else
-log_API int		__stdcall	GetLogFileHandle(int fd);
+log_API int		__STDCALL	GetLogFileHandle(int fd);
 #endif
-log_API int		__stdcall	CheckLogLevel(int fd, int level);
-log_API void	__cdecl		LOG(int fd, int level, const char* fmt, ...);
-log_API void	__stdcall	LogLoop();
+log_API int		__STDCALL	CheckLogLevel(int fd, int level);
+log_API void	__CDECL__	LOG(int fd, int level, const char* fmt, ...);
+log_API void	__STDCALL	LogLoop();
 
 #ifdef __cplusplus
 }

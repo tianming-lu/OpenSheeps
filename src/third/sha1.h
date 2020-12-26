@@ -17,6 +17,18 @@
 #ifndef _SHA1_H_  
 #define _SHA1_H_  
 #include <stdint.h>  
+
+#if !defined(__WINDOWS__) && (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))
+#define __WINDOWS__
+#endif
+
+#ifdef __WINDOWS__
+#define __STDCALL __stdcall
+#define __CDECL__	__cdecl
+#else
+#define __STDCALL
+#define __CDECL__
+#endif
 /* 
  * * If you do not have the ISO standard stdint.h header File, then you 
  * * must typdef the following: 
@@ -62,9 +74,9 @@ extern "C"
 {
 #endif
 
-int __stdcall SHA1Reset( SHA1Context *);
-int __stdcall SHA1Input( SHA1Context *context, const uint8_t * message_array, unsigned length);
-int __stdcall SHA1Result( SHA1Context *,uint8_t Message_Digest[SHA1HashSize]);
+int __STDCALL SHA1Reset( SHA1Context *);
+int __STDCALL SHA1Input( SHA1Context *context, const uint8_t * message_array, unsigned length);
+int __STDCALL SHA1Result( SHA1Context *,uint8_t Message_Digest[SHA1HashSize]);
 #ifdef __cplusplus
 }
 #endif 

@@ -7,12 +7,17 @@
 #endif
 
 #ifdef __WINDOWS__
+#define __STDCALL __stdcall
+#define __CDECL__	__cdecl
+
 #if defined COMMON_LIB || defined STRESS_EXPORTS
 #define Common_API __declspec(dllexport)
 #else
 #define Common_API __declspec(dllimport)
 #endif // COMMON_LIB
 #else
+#define __STDCALL
+#define __CDECL__
 #define Common_API
 #endif // __WINDOWS__
 
@@ -27,16 +32,16 @@ extern "C"
 {
 #endif
 
-Common_API int __stdcall GetHostByName(char* name, char* buf, size_t size);
+Common_API int __STDCALL GetHostByName(char* name, char* buf, size_t size);
 #ifdef __WINDOWS__
 #include <Winsock2.h>
-static inline int __stdcall GetSockName(SOCKET fd, struct sockaddr* addr, int* nSize)
+static inline int __STDCALL GetSockName(SOCKET fd, struct sockaddr* addr, int* nSize)
 {
 	return getsockname(fd, addr, nSize);
 }
 #else
 #include <sys/socket.h>
-static inline int __stdcall GetSockName(int fd, struct sockaddr* addr, int* nSize)
+static inline int __STDCALL GetSockName(int fd, struct sockaddr* addr, int* nSize)
 {
 	return getsockname(fd, addr, (socklen_t*)nSize);
 }
@@ -51,7 +56,7 @@ static inline int __stdcall GetCpuCount()
 	return sysInfor.dwNumberOfProcessors;
 #else
 #include <sys/sysinfo.h>
-static inline int __stdcall GetCpuCount()
+static inline int __STDCALL GetCpuCount()
 {
 	return get_nprocs_conf();
 #endif // __WINDOWS__
@@ -76,7 +81,7 @@ static inline long long int __stdcall GetSysTimeMicros()
 #else
 #include <sys/time.h>
 #include <unistd.h>
-static inline long long int __stdcall GetSysTimeMicros()
+static inline long long int __STDCALL GetSysTimeMicros()
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);

@@ -6,12 +6,16 @@
 #endif
 
 #ifdef __WINDOWS__
+#define __STDCALL __stdcall
+#define __CDECL__	__cdecl
 #ifdef STRESS_EXPORTS
 #define Sheeps_API __declspec(dllexport)
 #else
 #define Sheeps_API __declspec(dllimport)
 #endif
 #else
+#define STDCALL
+#define CDECL
 #define Sheeps_API
 #endif // __WINDOWS__
 
@@ -22,9 +26,9 @@ extern int managerPort;
 extern "C" {
 #endif
 
-	Sheeps_API int __stdcall SheepsServerRun(u_short listenPort);
-	Sheeps_API int __stdcall SheepsClientRun(int projectid, bool server);
-	Sheeps_API int __stdcall StressClientStop();
+	Sheeps_API int __STDCALL SheepsServerRun(u_short listenPort);
+	Sheeps_API int __STDCALL SheepsClientRun(int projectid, bool server);
+	Sheeps_API int __STDCALL StressClientStop();
 
 #ifdef __cplusplus
 }

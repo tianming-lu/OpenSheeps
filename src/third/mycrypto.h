@@ -11,13 +11,16 @@
 #endif
 
 #ifdef __WINDOWS__
-
+#define __STDCALL __stdcall
+#define __CDECL__	__cdecl
 #if defined COMMON_LIB || defined STRESS_EXPORTS
 #define crypto_API __declspec(dllexport)
 #else
 #define crypto_API __declspec(dllimport)
 #endif // COMMON_LIB
 #else
+#define __STDCALL
+#define __CDECL__
 #define crypto_API
 #endif
 
@@ -33,23 +36,23 @@ typedef struct {
 extern "C"
 {
 #endif
-crypto_API void     __stdcall   encode_base64(Base64_Context* dst, Base64_Context* src);
-crypto_API int      __stdcall   decode_base64(Base64_Context* dst, Base64_Context* src);
-crypto_API size_t   __stdcall   base64_encode(char *src, int src_len, char *dst);
-crypto_API size_t   __stdcall   base64_decode(char *src, size_t src_len, char *dst);
+crypto_API void     __STDCALL   encode_base64(Base64_Context* dst, Base64_Context* src);
+crypto_API int      __STDCALL   decode_base64(Base64_Context* dst, Base64_Context* src);
+crypto_API size_t   __STDCALL   base64_encode(char *src, int src_len, char *dst);
+crypto_API size_t   __STDCALL   base64_decode(char *src, size_t src_len, char *dst);
 //base64
 
 //urlencode
-crypto_API void __stdcall   urlencode(unsigned char * src, int src_len, unsigned char * dest, int dest_len);
-crypto_API unsigned char* __stdcall urldecode(unsigned char* encd, unsigned char* decd);
+crypto_API void __STDCALL   urlencode(unsigned char * src, int src_len, unsigned char * dest, int dest_len);
+crypto_API unsigned char* __STDCALL urldecode(unsigned char* encd, unsigned char* decd);
 //urlencode
 
 //sha1
-crypto_API void __stdcall GetStringSHA1(char *input, unsigned long length, char *output);
+crypto_API void __STDCALL GetStringSHA1(char *input, unsigned long length, char *output);
 //sha1
 
 //md5
-crypto_API int __stdcall getfilemd5view(const char* filename, char* md5, size_t size);
+crypto_API int __STDCALL getfilemd5view(const char* filename, char* md5, size_t size);
 //md5
 
 #ifdef __cplusplus
