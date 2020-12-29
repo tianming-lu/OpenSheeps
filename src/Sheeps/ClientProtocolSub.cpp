@@ -13,9 +13,11 @@ static std::map<std::string, t_file_info> updatefile, allfile, localfile;
 
 int ClientLogInit(const char *configfile)
 {
-	const char* file = config_get_string_value("LOG", "client_file", "client.log");
+	const char* file = config_get_string_value("LOG", "client_file", "client");
+	char temp[24] = { 0x0 };
+	GetTimeString(time(NULL), temp, sizeof(temp));
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s%s", LogPath, file);
+	snprintf(fullpath, sizeof(fullpath), "%s%s_%s.log", LogPath, file, temp);
 	int loglevel = config_get_int_value("LOG", "client_level", 0);
 	int maxsize = config_get_int_value("LOG", "client_size", 20);
 	int timesplit = config_get_int_value("LOG", "client_time", 3600);
@@ -279,7 +281,7 @@ int client_cmd_9_sync_files(HSOCKET hsock, int cmdNO, cJSON* root)
 			continue;
 		
 		memset(fullpath, 0, sizeof(fullpath));
-		snprintf(fullpath, sizeof(fullpath), "%s%s", DllPath, p + 1);
+		snprintf(fullpath, sizeof(fullpath), "%s%s", EXE_Path, p + 1);
 
 		allfile.insert(std::pair<std::string, t_file_info>(fullpath, finfo));
 
@@ -373,7 +375,7 @@ int client_cmd_10_download_file(HSOCKET hsock, int cmdNO, cJSON* root)
 	}
 
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s%s", DllPath, p + 1);
+	snprintf(fullpath, sizeof(fullpath), "%s%s", EXE_Path, p + 1);
 
 #ifdef __WINDOWS__
 	if (itt->second.file == NULL)

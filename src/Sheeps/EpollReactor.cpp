@@ -138,27 +138,17 @@ static void do_close(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 	uint8_t left_count = 0;
 	if (hsock->_is_close == 0)
 	{
-		if(proto->protolock)
-		{
-			proto->protolock->lock();
-			if (hsock->_is_close == 0)
-			{
-				left_count = __sync_sub_and_fetch (&proto->sockCount, 1);
-				if (hsock->_epoll_type == READ)
-    				proto->ConnectionClosed(hsock);
-				else
-					proto->ConnectionFailed(hsock);	
-			}
-			proto->protolock->unlock();
-		}
-		else
+
+		proto->Lock();
+		if (hsock->_is_close == 0)
 		{
 			left_count = __sync_sub_and_fetch (&proto->sockCount, 1);
 			if (hsock->_epoll_type == READ)
     			proto->ConnectionClosed(hsock);
 			else
 				proto->ConnectionFailed(hsock);	
-		}		
+		}
+		proto->UnLock();
 	}
     
     epoll_del(hsock);
@@ -172,17 +162,10 @@ static void do_connect(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 {
 	if (hsock->_is_close == 0)
 	{
-		if(proto->protolock)
-		{
-			proto->protolock->lock();
-			if (hsock->_is_close == 0)
-				proto->ConnectionMade(hsock);
-			proto->protolock->unlock();
-		}
-		else
-		{
+		proto->Lock();
+		if (hsock->_is_close == 0)
 			proto->ConnectionMade(hsock);
-		}
+		proto->UnLock();
 	}
 
 	if (hsock->_send_buf.offset > 0)
@@ -348,17 +331,11 @@ static void do_read(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 	
 	if (ret == 0 && hsock->_is_close == 0)
 	{
-		if(proto->protolock)
-		{
-			proto->protolock->lock();
-			if (hsock->_is_close == 0)
-				proto->Recved(hsock, hsock->recv_buf, hsock->_recv_buf.offset);
-			proto->protolock->unlock();
-		}
-		else
-		{
+		proto->Lock();
+		if (hsock->_is_close == 0)
 			proto->Recved(hsock, hsock->recv_buf, hsock->_recv_buf.offset);
-		}
+		proto->UnLock();
+
 	}
 	else
 	{
@@ -415,16 +392,11 @@ static void do_accpet(HSOCKET listenhsock, BaseFactory* fc)
 		set_linger_for_fd(fd);
         fcntl(fd, F_SETFL, O_RDWR|O_NONBLOCK);
 		__sync_add_and_fetch(&proto->sockCount, 1);
-		if(proto->protolock)
-		{
-			proto->protolock->lock();
-        	proto->ConnectionMade(hsock);
-        	proto->protolock->unlock();
-		}
-		else
-		{
-			proto->ConnectionMade(hsock);
-		}
+
+		proto->Lock();
+        proto->ConnectionMade(hsock);
+        proto->UnLock();
+
 		if (hsock->_send_buf.offset > 0)
 			epoll_add_write(hsock, WRITE);
 		else
@@ -591,7 +563,7 @@ static bool EpollConnectExTCP(BaseProtocol* proto, HSOCKET hsock)
 
 HSOCKET HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE type)
 {
-	if (proto == NULL || (proto->sockCount == 0 && proto->protoType == SERVER_PROTOCOL && proto->protolock != NULL)) 
+	if (proto == NULL || (proto->sockCount == 0 && proto->protoType == SERVER_PROTOCOL)) 
 		return NULL;
 	HSOCKET hsock = new_hsockt();
 	if (hsock == NULL) 

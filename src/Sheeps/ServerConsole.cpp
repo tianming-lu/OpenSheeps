@@ -9,6 +9,7 @@
 #ifdef __WINDOWS__
 #include "io.h"
 #include "direct.h"
+#include "resource.h"
 #else
 #include <errno.h>
 #include <string.h>
@@ -1220,15 +1221,30 @@ static int get_home_page(HSOCKET hsock)
 
 	if (page_len == 0)
 	{
+#ifdef __WINDOWS__
+		HRSRC rc = FindResource(Sheeps_Module, MAKEINTRESOURCE(IDR_HTML1), RT_HTML);
+		if (rc == NULL)
+		{
+			HsocketClose(hsock);
+			return 0;
+	}
+		HGLOBAL  hGlobal = LoadResource(Sheeps_Module, rc);
+		if (NULL == hGlobal)
+		{
+			HsocketClose(hsock);
+			return 0;
+		}
+		LPVOID  pBuffer = LockResource(hGlobal);
+		page_len = SizeofResource(Sheeps_Module, rc);
+		memcpy(home_page + SPACELEN, pBuffer, page_len);
+		//int ret = fopen_s(&hfile, file, "rb");
+#else
 		char file[256] = { 0x0 };
-		snprintf(file, sizeof(file), "%sconsole.html", DllPath);
+		snprintf(file, sizeof(file), "%sconsole.html", EXE_Path);
 
 		FILE* hfile = NULL;
-#ifdef __WINDOWS__
-		int ret = fopen_s(&hfile, file, "rb");
-#else
 		hfile = fopen(file, "rb");
-#endif
+		//#endif
 		if (hfile == NULL)
 		{
 			LOG(slogid, LOG_ERROR, "%s:%d open file error [%d]\r\n", __func__, __LINE__, errno);
@@ -1237,7 +1253,8 @@ static int get_home_page(HSOCKET hsock)
 		}
 		page_len = (int)fread(home_page + SPACELEN, sizeof(char), PAGESIZE - SPACELEN, hfile);
 		fclose(hfile);
-	}
+#endif
+}
 	int offset = snprintf(home_page, SPACELEN, "HTTP/1.1 200 OK\r\nContent-Length:%d\r\n\r\n", page_len);
 	char* s = home_page + SPACELEN - offset;
 	memmove(s, home_page, offset);

@@ -8,9 +8,11 @@ int slogid = -1;
 
 bool ServerInit(char* configfile)
 {
-	const char* file = config_get_string_value("LOG", "server_file", "server.log");
+	const char* file = config_get_string_value("LOG", "server_file", "server");
+	char temp[24] = { 0x0 };
+	GetTimeString(time(NULL), temp, sizeof(temp));
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s%s", LogPath, file);
+	snprintf(fullpath, sizeof(fullpath), "%s%s_%s.log", LogPath, file, temp);
 	int loglevel = config_get_int_value("LOG", "server_level", 0);
 	int maxsize = config_get_int_value("LOG", "serveer_size", 20);
 	int timesplit = config_get_int_value("LOG", "server_time", 3600);

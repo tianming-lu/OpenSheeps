@@ -179,6 +179,7 @@
     <ClInclude Include="ClientProtocolSub.h" />
     <ClInclude Include="Reactor.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="ServerConsole.h" />
     <ClInclude Include="ServerProtocol.h" />
     <ClInclude Include="ServerStress.h" />
@@ -209,7 +210,11 @@
     <ClCompile Include="TaskManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\webConsole\console.html" />
     <None Include="Sheeps.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Sheeps.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

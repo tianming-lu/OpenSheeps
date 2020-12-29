@@ -54,6 +54,9 @@
     <ClInclude Include="Reactor.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -97,5 +100,11 @@
     <None Include="Sheeps.def">
       <Filter>源文件</Filter>
     </None>
+    <None Include="..\..\webConsole\console.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Sheeps.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

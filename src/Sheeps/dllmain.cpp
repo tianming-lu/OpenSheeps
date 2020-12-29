@@ -10,25 +10,26 @@ BOOL APIENTRY DllMain( HMODULE hModule,
                        LPVOID lpReserved
                      )
 {
+	Sheeps_Module = hModule;
 	int i = 0;
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
-		i = GetModuleFileNameA(hModule, DllPath, MAX_PATH);
+		i = GetModuleFileNameA(NULL, EXE_Path, MAX_PATH);
 		while (i > -1)
 		{
-			if (DllPath[i] == '\\' || DllPath[i] == '/')
+			if (EXE_Path[i] == '\\' || EXE_Path[i] == '/')
 				break;
 			else
 			{
-				DllPath[i] = 0x0;
+				EXE_Path[i] = 0x0;
 				i--;
 			}
 		}
-		snprintf(ConfigFile, MAX_PATH, "%ssheeps.ini", DllPath);
-		snprintf(ProjectPath, MAX_PATH, "%sproject\\", DllPath);
-		snprintf(RecordPath, MAX_PATH, "%srecord\\", DllPath);
-		snprintf(LogPath, MAX_PATH, "%slog\\", DllPath);
+		snprintf(ConfigFile, MAX_PATH, "%ssheeps.ini", EXE_Path);
+		snprintf(ProjectPath, MAX_PATH, "%sproject\\", EXE_Path);
+		snprintf(RecordPath, MAX_PATH, "%srecord\\", EXE_Path);
+		snprintf(LogPath, MAX_PATH, "%slog\\", EXE_Path);
 		_mkdir(ProjectPath);
 		_mkdir(RecordPath);
 		_mkdir(LogPath);

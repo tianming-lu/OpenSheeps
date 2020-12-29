@@ -87,7 +87,7 @@ static void getFiles(char* dir_path,const char* subpro_path, std::map<std::strin
 			{
 				snprintf(fullpath, sizeof(fullpath), "%s\\%s", dir_path, fileinfo.name);
 				char shortpath[128] = { 0x0 };
-				snprintf(shortpath, sizeof(shortpath), ".\\%s", fullpath + strlen(DllPath));
+				snprintf(shortpath, sizeof(shortpath), ".\\%s", fullpath + strlen(EXE_Path));
 
 				t_file_update info = { 0x0 };
 				getfilemd5view(fullpath, info.fmd5, sizeof(info.fmd5));
@@ -202,7 +202,7 @@ static int server_cmd_10_download_file(HSOCKET hsock, ServerProtocol* proto, int
 	}
 
 	char fullpath[256] = { 0x0 };
-	snprintf(fullpath, sizeof(fullpath), "%s%s", DllPath, p + 1);
+	snprintf(fullpath, sizeof(fullpath), "%s%s", EXE_Path, p + 1);
 	FILE* hfile;
 #ifdef __WINDOWS__
 	int ret = fopen_s(&hfile, fullpath, "rb");

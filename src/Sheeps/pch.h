@@ -14,6 +14,8 @@
 #ifdef __WINDOWS__
 #define WIN32_LEAN_AND_MEAN             // 从 Windows 头文件中排除极少使用的内容
 #include <windows.h>
+
+extern HMODULE Sheeps_Module;
 #else
 #define MAX_PATH 260
 #endif // __WINDOWS__
@@ -24,7 +26,7 @@
 #include "sqlite3.h"
 #include "Config.h"
 
-extern char DllPath[];
+extern char EXE_Path[];
 extern char ConfigFile[];
 extern char ProjectPath[];
 extern char RecordPath[];

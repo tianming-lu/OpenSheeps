@@ -1,6 +1,8 @@
 ﻿#ifndef _COMMON_H_
 #define _COMMON_H_
 #include <stddef.h>
+#include <time.h>
+#include <stdio.h>
 
 #if !defined(__WINDOWS__) && (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))
 #define __WINDOWS__
@@ -88,6 +90,17 @@ static inline long long int __STDCALL GetSysTimeMicros()
 	return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 #endif // __WINDOWS__
+
+static inline void GetTimeString(time_t ctime, char* buf, size_t size)
+{
+	struct tm tmm;
+#ifdef __WINDOWS__
+	localtime_s(&tmm, &ctime);
+#else
+	localtime_r(&ctime, &tmm);
+#endif // __WINDOWS__
+	snprintf(buf, size, "%04d%02d%02d%02d%02d%02d", tmm.tm_year + 1900, tmm.tm_mon + 1, tmm.tm_mday, tmm.tm_hour, tmm.tm_min, tmm.tm_sec);
+}
 
 #ifdef __cplusplus
 }

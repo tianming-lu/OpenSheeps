@@ -303,9 +303,6 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 		{
 			return NULL;
 		}
-		char path[256] = { 0x0 };
-		snprintf(path, sizeof(path), "%stask%03d.log", LogPath, taskID);
-		task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
 		task->messageList = new(std::nothrow) std::vector<t_cache_message*>;
 		task->userAll = new(std::nothrow) std::list<HUserEvent>;
 		task->userDes = new(std::nothrow) std::list<HUserEvent>;
@@ -423,6 +420,10 @@ int create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool i
 	task->machineID = machineid;
 	task->ignoreErr = ignorerr;
 	
+	char path[256] = { 0x0 };
+	snprintf(path, sizeof(path), "%stask_%d_%d_%03d.log", LogPath, projectid, machineid, task->taskID);
+	task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
+
 	if (default_api.taskstart)
 		default_api.taskstart(task);
 

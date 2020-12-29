@@ -2,7 +2,12 @@
 
 #include "pch.h"
 
-char DllPath[MAX_PATH] = { 0x0 };
+#ifdef __WINDOWS__
+HMODULE Sheeps_Module;
+#endif // __WINDOWS__
+
+
+char EXE_Path[MAX_PATH] = { 0x0 };
 char ConfigFile[MAX_PATH] = { 0x0 };
 char ProjectPath[MAX_PATH] = { 0x0 };
 char RecordPath[MAX_PATH] = { 0x0 };
@@ -17,14 +22,14 @@ __attribute__((constructor)) void _init(void)  //告诉gcc把这个函数扔到i
     Dl_info dl_info;  
     if (dladdr((void*)_init, &dl_info))        //第二个参数就是获取的结果
 	{
-        snprintf(DllPath, MAX_PATH, "%s", dl_info.dli_fname);
-		char* p = strrchr(DllPath, '/');    //找到绝对路径中最后一个"/"
+        snprintf(EXE_Path, MAX_PATH, "%s", dl_info.dli_fname);
+		char* p = strrchr(EXE_Path, '/');    //找到绝对路径中最后一个"/"
 		*(p + 1) = 0x0;                            //舍弃掉最后“/”之后的文件名，只需要路径
 	}
-    snprintf(ConfigFile, MAX_PATH, "%ssheeps.ini", DllPath);
-	snprintf(ProjectPath, MAX_PATH, "%sproject/", DllPath);
-	snprintf(RecordPath, MAX_PATH, "%srecord/", DllPath);
-	snprintf(LogPath, MAX_PATH, "%slog/", DllPath);
+    snprintf(ConfigFile, MAX_PATH, "%ssheeps.ini", EXE_Path);
+	snprintf(ProjectPath, MAX_PATH, "%sproject/", EXE_Path);
+	snprintf(RecordPath, MAX_PATH, "%srecord/", EXE_Path);
+	snprintf(LogPath, MAX_PATH, "%slog/", EXE_Path);
 	mkdir(ProjectPath, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 	mkdir(RecordPath, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 	mkdir(LogPath, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
