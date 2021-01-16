@@ -433,9 +433,13 @@ static void send_console_msg(HSOCKET hsock, cJSON* root)
 	char* data = cJSON_PrintUnformatted(root);
 	char buf[128] = { 0x0 };
 	int clen = (int)strlen(data);
-	int n = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin:*\r\nContent-Type: application/json\r\nContent-Lenth: %zd\r\n\r\n", strlen(data));
-	HsocketSend(hsock, buf, n);
-	HsocketSend(hsock, data, clen);
+	int n = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin:*\r\nContent-Type: application/json\r\nContent-Lenth: %d\r\n\r\n", clen);
+	//HsocketSend(hsock, buf, n);
+	//HsocketSend(hsock, data, clen);
+	HBUFF hbuff = HsocketGetBuff();
+	HsocketSetBuff(hbuff, buf, n);
+	HsocketSetBuff(hbuff, data, clen);
+	HsocketSendBuff(hsock, hbuff);
 	free(data);
 	cJSON_Delete(root);
 }

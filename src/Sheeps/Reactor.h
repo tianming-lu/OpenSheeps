@@ -65,7 +65,7 @@ typedef struct _IOCP_BUFF
 	SOCKET		fd;
 	DWORD		flags;
 	struct _IOCP_SOCKET* hsock;
-}IOCP_BUFF;
+}IOCP_BUFF, *HBUFF;
 #else
 typedef struct _EPOLL_BUFF
 {
@@ -224,6 +224,10 @@ extern "C"
 	Reactor_API bool	__STDCALL	HsocketSend(HSOCKET hsock, const char* data, int len);
 	Reactor_API bool	__STDCALL	HsocketClose(HSOCKET hsock);
 	Reactor_API int		__STDCALL	HsocketSkipBuf(HSOCKET hsock, int len);
+
+	Reactor_API	HBUFF	__STDCALL	HsocketGetBuff();
+	Reactor_API	bool	__STDCALL	HsocketSetBuff(IOCP_BUFF* IocpBuff, const char* data, int len);
+	Reactor_API	bool	__STDCALL	HsocketSendBuff(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff);
 
 #ifdef __cplusplus
 }

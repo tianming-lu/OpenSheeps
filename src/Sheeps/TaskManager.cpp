@@ -201,12 +201,6 @@ static inline void user_set_next_timer(t_task_config* task, ReplayProtocol* prot
 	}
 }
 
-static inline void task_delete_user(t_task_config* task, ReplayProtocol* proto, HUserEvent hue)
-{
-	push_userDes_back(task, hue);
-	DeleteTimerQueueTimer(task->hTimerQueue, hue->timer, NULL);
-}
-
 VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 {
 	HUserEvent hue = (HUserEvent)lpParam;
@@ -229,10 +223,15 @@ VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 		}
 		else
 		{
-			proto->Destroy();
-			proto->LastError[0] = 0x0;
-			proto->UnLock();
-			task_delete_user(task, proto, hue);
+			HANDLE timer = InterlockedExchangePointer(&hue->timer, NULL);
+			if (timer)
+			{
+				DeleteTimerQueueTimer(task->hTimerQueue, timer, NULL);
+				proto->Destroy();
+				proto->LastError[0] = 0x0;
+				proto->UnLock();
+				push_userDes_back(task, hue);
+			}
 		}
 	}
 	//user_set_next_timer(task, proto, hue);
