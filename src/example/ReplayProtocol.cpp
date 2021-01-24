@@ -36,7 +36,7 @@ UserProtocol::~UserProtocol()
 {	/*析构函数*/
 }
 
-void UserProtocol::Init()
+void UserProtocol::EventInit()
 {	/*用户初始化，用户实例被创建后会被调用一次*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 }
@@ -75,83 +75,79 @@ void UserProtocol::ConnectionClosed(HSOCKET hsock)   //类销毁后，可能导�
 	}
 }
 
-void UserProtocol::Recved(HSOCKET hsock, const char* data, int len)
+void UserProtocol::ConnectionRecved(HSOCKET hsock, const char* data, int len)
 {	/*当用户连接收到消息后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port），以及数据指针（data）和消息长度（len）*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d][%.*s]", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, len, data);
 	TaskUserSocketSkipBuf(hsock, len);
 	this->PlayState = PLAY_NORMAL;
 }
 
-void UserProtocol::TimeOut()
-{
-	//TaskUserLog(this, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
-}
-
-void UserProtocol::Event(uint8_t event_type, const char* ip, int port, const char* content, int clen, bool udp)
+void UserProtocol::EventConnectOpen(const char* ip, int port, bool udp)
 {
 	//TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 	t_connection_info info = { 0x0 };
 	std::map<int, t_connection_info>::iterator it;
-	HSOCKET conn_hsock;
-
-	HSOCKET* hsock;
-	switch (event_type)
+	
+	TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]", ip, port);
+	this->PlayState = PLAY_PAUSE;
+	HSOCKET conn_hsock = TaskUserSocketConnet(this, ip, port, TCP_CONN);
+	if (conn_hsock == NULL)
 	{
-	case TYPE_CONNECT: //连接事件
-		TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]", ip, port);
-		this->PlayState = PLAY_PAUSE;
-		conn_hsock = TaskUserSocketConnet(this, ip, port, TCP_CONN);
-		if (conn_hsock == NULL)
+		TaskUserDead(this, "%s:%d conect failed!", __func__, __LINE__);
+		return;
+	}
+	it = this->Connection.find(port);
+	info.hsock = conn_hsock;
+	if (it == this->Connection.end())
+	{
+		this->Connection.insert(std::pair<int, t_connection_info>(port, info));
+	}
+	else
+	{
+		if (it->second.hsock != NULL)
 		{
-			TaskUserDead(this, "%s:%d conect failed!", __func__, __LINE__);
-			return;
+			TaskUserSocketClose(it->second.hsock);
+			it->second.hsock = NULL;
 		}
-		it = this->Connection.find(port);
-		info.hsock = conn_hsock;
-		if (it == this->Connection.end())
-		{
-			this->Connection.insert(std::pair<int, t_connection_info>(port, info));
-		}
-		else
-		{
-			if (it->second.hsock != NULL)
-			{
-				TaskUserSocketClose(it->second.hsock);
-				it->second.hsock = NULL;
-			}
-			it->second.hsock = conn_hsock;
-		}
-		break;
-	case TYPE_CLOSE:	//关闭连接事件
-		TaskUserLog(this, LOG_DEBUG, "user conclose[%s:%d]", ip, port);
-		hsock = this->GetScokFromConnection(ip, port);
-		if (hsock != NULL)
-		{
-			TaskUserSocketClose(*hsock);
-			*hsock = NULL;
-		}
-		break;
-	case TYPE_SEND:	//向连接发送消息事件
-		TaskUserLog(this, LOG_DEBUG, "user send[%s:%d [%s]]", ip, port, content);
-		hsock = this->GetScokFromConnection(ip, port);
-		if (hsock != NULL)
-		{
-			TaskUserSocketSend(*hsock, (char*)content, clen);
-			this->PlayState = PLAY_PAUSE;
-		}
-		break;
-	default:
-		break;
+		it->second.hsock = conn_hsock;
+	}
+}
+void UserProtocol::EventConnectClose(const char* ip, int port, bool udp) 
+{
+	//TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
+	TaskUserLog(this, LOG_DEBUG, "user conclose[%s:%d]", ip, port);
+	HSOCKET* hsock = this->GetScokFromConnection(ip, port);
+	if (hsock != NULL)
+	{
+		TaskUserSocketClose(*hsock);
+		*hsock = NULL;
 	}
 }
 
-void UserProtocol::ReInit()
+void UserProtocol::EventSend(const char* ip, int port, const char* content, int clen, bool udp)
+{
+	//TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
+	TaskUserLog(this, LOG_DEBUG, "user send[%s:%d [%s]]", ip, port, content);
+	HSOCKET* hsock = this->GetScokFromConnection(ip, port);
+	if (hsock != NULL)
+	{
+		TaskUserSocketSend(*hsock, (char*)content, clen);
+		this->PlayState = PLAY_PAUSE;
+	}
+}
+
+void UserProtocol::EventTimeOut()
+{
+	TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
+}
+
+void UserProtocol::EventReInit()
 {	//用户重置到初始状态
 	TaskUserLog(this, LOG_NORMAL, "%s:%d %s", __func__, __LINE__, this->LastError);
 	this->CloseAllConnection();
 }
 
-void UserProtocol::Destroy()
+void UserProtocol::EventDestroy()
 {	/*任务终止时，调用次函数，关闭所有连接，并且HSOCKET 句柄变量置为NULL*/
 	TaskUserLog(this, LOG_NORMAL, "%s:%d %s", __func__, __LINE__, this->LastError);
 	this->CloseAllConnection();

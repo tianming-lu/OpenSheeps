@@ -82,7 +82,7 @@ void ServerProtocol::ConnectionClosed(HSOCKET hsock)
 	}
 }
 
-void ServerProtocol::Recved(HSOCKET hsock, const char* data, int len)
+void ServerProtocol::ConnectionRecved(HSOCKET hsock, const char* data, int len)
 {
 	return this->CheckReq(hsock, hsock->peer_ip, hsock->peer_port, data, len);
 }

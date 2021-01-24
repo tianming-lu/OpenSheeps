@@ -34,10 +34,10 @@
 #include <mutex>
 #endif // __WINDOWS__
 
-
 enum CONN_TYPE {
 	TCP_CONN = 0,
-	UDP_CONN = 1
+	UDP_CONN = 1,
+	ITMER = 2
 };
 
 enum PROTOCOL_TPYE {
@@ -47,6 +47,8 @@ enum PROTOCOL_TPYE {
 
 class BaseFactory;
 class BaseProtocol;
+
+typedef void (*timer_callback) (BaseProtocol*); 
 
 #ifdef __WINDOWS__
 struct _IOCP_SOCKET;
@@ -65,14 +67,15 @@ typedef struct _IOCP_BUFF
 	SOCKET		fd;
 	DWORD		flags;
 	struct _IOCP_SOCKET* hsock;
-}IOCP_BUFF, *HBUFF;
+}IOCP_BUFF, *HNETBUFF;
 #else
 typedef struct _EPOLL_BUFF
 {
+	char* buff;
 	size_t offset;
 	size_t size;
 	uint8_t lock_flag;
-}EPOLL_BUFF, * HBUFF;
+}EPOLL_BUFF, * HNETBUFF;
 #endif
 
 #ifdef __WINDOWS__
@@ -104,6 +107,8 @@ typedef struct _EPOLL_SOCKET
 	EPOLL_BUFF		_recv_buf;
 	char*			_sendbuff;
 	EPOLL_BUFF		_send_buf;
+	//timer
+	timer_callback  _callback;
 }EPOLL_SOCKET, * HSOCKET;
 #endif // __WINDOWS__
 
@@ -186,7 +191,7 @@ public:
 	virtual void ConnectionMade(HSOCKET hsock) = 0;
 	virtual void ConnectionFailed(HSOCKET hsock) = 0;
 	virtual void ConnectionClosed(HSOCKET hsock) = 0;
-	virtual void Recved(HSOCKET hsock, const char* data, int len) = 0;
+	virtual void ConnectionRecved(HSOCKET hsock, const char* data, int len) = 0;
 };
 
 class BaseFactory
@@ -225,9 +230,13 @@ extern "C"
 	Reactor_API bool	__STDCALL	HsocketClose(HSOCKET hsock);
 	Reactor_API int		__STDCALL	HsocketSkipBuf(HSOCKET hsock, int len);
 
-	Reactor_API	HBUFF	__STDCALL	HsocketGetBuff();
-	Reactor_API	bool	__STDCALL	HsocketSetBuff(IOCP_BUFF* IocpBuff, const char* data, int len);
-	Reactor_API	bool	__STDCALL	HsocketSendBuff(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff);
+	Reactor_API	HNETBUFF	__STDCALL	HsocketGetBuff();
+	Reactor_API	bool	__STDCALL	HsocketSetBuff(HNETBUFF netbuff, const char* data, int len);
+	Reactor_API	bool	__STDCALL	HsocketSendBuff(HSOCKET IocpSock, HNETBUFF netbuff);
+#ifndef __WINDOWS__
+	Reactor_API	HSOCKET	__STDCALL	TimerCreate(BaseProtocol* proto, int duetime, int looptime, timer_callback callback);
+	Reactor_API void 	__STDCALL	TimerDelete(HSOCKET hsock);
+#endif
 
 #ifdef __cplusplus
 }

@@ -83,18 +83,16 @@ typedef struct {
 	bool		udp;
 }t_cache_message, *HMESSAGE;
 
-#ifdef __WINDOWS__
 typedef struct _UserEvent {
+#ifdef __WINDOWS__
 	HANDLE			timer;
 	ReplayProtocol* user;
 	//HTASKCFG		task;
-}UserEvent, * HUserEvent;
 #else
-typedef struct _UserEvent {
-	time_t			timer;
+	HSOCKET			timer;
 	ReplayProtocol* user;
-}UserEvent, * HUserEvent;
 #endif // __WINDOWS__
+}UserEvent, * HUserEvent;
 
 typedef struct {
 	int			logfd;
@@ -110,8 +108,6 @@ typedef struct {
 	bool							stopMessageCache;
 #ifdef __WINDOWS__
 	HANDLE hTimerQueue;
-#else
-	int hTimerQueue;
 #endif
 
 	uint16_t	userNumber;
@@ -142,6 +138,9 @@ public:
 	virtual ~ReplayProtocol() {};
 
 public:
+#ifndef __WINDOWS__
+	HUserEvent		_timerevent;
+#endif
 	HTASKCFG	Task = NULL;
 	int			UserNumber = 0;
 	bool		SelfDead = false;
@@ -150,15 +149,17 @@ public:
 	char		LastError[128] = {0x0};
 
 public:
-	virtual void Init() = 0;
+	virtual void EventInit() = 0;
 	virtual void ConnectionMade(HSOCKET hsock) = 0;
 	virtual void ConnectionFailed(HSOCKET hsock) = 0;
 	virtual void ConnectionClosed(HSOCKET hsock) = 0;
-	virtual void Recved(HSOCKET hsock, const char* data, int len) = 0;
-	virtual void Event(uint8_t event_type, const char* ip, int port, const char* content, int clen, bool udp) = 0;
-	virtual void TimeOut() = 0;
-	virtual void ReInit() = 0;
-	virtual void Destroy() = 0;
+	virtual void ConnectionRecved(HSOCKET hsock, const char* data, int len) = 0;
+	virtual void EventConnectOpen(const char* ip, int port, bool udp) = 0;
+	virtual void EventConnectClose(const char* ip, int port, bool udp) = 0;
+	virtual void EventSend(const char* ip, int port, const char* content, int clen, bool udp) = 0;
+	virtual void EventTimeOut() = 0;
+	virtual void EventReInit() = 0;
+	virtual void EventDestroy() = 0;
 };
 
 //受控端逻辑API

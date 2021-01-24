@@ -436,7 +436,7 @@ static void send_console_msg(HSOCKET hsock, cJSON* root)
 	int n = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin:*\r\nContent-Type: application/json\r\nContent-Lenth: %d\r\n\r\n", clen);
 	//HsocketSend(hsock, buf, n);
 	//HsocketSend(hsock, data, clen);
-	HBUFF hbuff = HsocketGetBuff();
+	HNETBUFF hbuff = HsocketGetBuff();
 	HsocketSetBuff(hbuff, buf, n);
 	HsocketSetBuff(hbuff, data, clen);
 	HsocketSendBuff(hsock, hbuff);

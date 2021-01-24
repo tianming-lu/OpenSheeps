@@ -37,7 +37,7 @@ install:
 	mkdir $(INSTALLDIR)/bin -p;
 	cp Starter/$(OUTFILE) $(INSTALLDIR)/bin;
 	cp example/example $(INSTALLDIR)/bin;
-	cp x64/Release/sheeps/sheeps.ini $(INSTALLDIR)/bin;
+	cp x64/sheeps/Release/sheeps.ini $(INSTALLDIR)/bin;
 	cp ../webConsole/console.html $(INSTALLDIR)/bin;
 	@list='$(SODIRS)'; for subdir in $$list; do \
 	echo "cp $$subdir/*.so $(INSTALLDIR)/bin/"; \

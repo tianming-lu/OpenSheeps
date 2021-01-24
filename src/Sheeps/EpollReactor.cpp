@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/sysinfo.h>
+#include <sys/timerfd.h>
 
 #define DATA_BUFSIZE 5120
 
@@ -320,8 +321,29 @@ static int do_read_tcp(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 	return 0;
 }
 
+static void do_timer_callback(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
+{
+	uint64_t value;
+	read(hsock->fd, &value, sizeof(uint64_t)); //必须读取，否则定时器异常
+	if (hsock->_is_close == 0)
+	{
+		hsock->_callback(proto);
+		epoll_mod_read(hsock, READ);
+	}
+	else
+	{
+		epoll_del(hsock);
+		close(hsock->fd);
+		release_hsock(hsock);
+	}
+	
+}
+
 static void do_read(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 {
+	if (hsock->_conn_type == ITMER)
+		return do_timer_callback(hsock, fc, proto);
+
 	if (__sync_fetch_and_or(&hsock->_recv_buf.lock_flag, 1)) return;
 	int ret = 0;
 	if(hsock->_conn_type == UDP_CONN)
@@ -333,7 +355,7 @@ static void do_read(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 	{
 		proto->Lock();
 		if (hsock->_is_close == 0)
-			proto->Recved(hsock, hsock->recv_buf, hsock->_recv_buf.offset);
+			proto->ConnectionRecved(hsock, hsock->recv_buf, hsock->_recv_buf.offset);
 		proto->UnLock();
 
 	}
@@ -592,6 +614,41 @@ HSOCKET HsocketConnect(BaseProtocol* proto, const char* ip, int port, CONN_TYPE 
 	return hsock;
 }
 
+HSOCKET TimerCreate(BaseProtocol* proto, int duetime, int looptime, timer_callback callback)
+{
+	HSOCKET hsock = new_hsockt();
+	if (hsock == NULL) 
+		return NULL;
+	int tfd = timerfd_create(CLOCK_MONOTONIC, 0);   //创建定时器
+    if(tfd == -1) {
+		release_hsock(hsock);
+        return NULL;
+    }
+	hsock->fd = tfd;
+	hsock->_conn_type = ITMER;
+	hsock->_callback = callback;
+	hsock->_user = proto;
+	hsock->factory = proto->factory;
+
+    struct itimerspec time_intv; //用来存储时间
+    time_intv.it_value.tv_sec = duetime/1000; //设定2s超时
+    time_intv.it_value.tv_nsec = (duetime%1000)*1000000;
+    time_intv.it_interval.tv_sec = looptime/1000;   //每隔2s超时
+    time_intv.it_interval.tv_nsec = (looptime%1000)*1000000;
+
+    timerfd_settime(tfd, 0, &time_intv, NULL);  //启动定时器
+	epoll_add_read(hsock, READ);
+    return hsock;
+}
+
+void TimerDelete(HSOCKET hsock)
+{
+	hsock->_is_close = 1;
+	//epoll_del(hsock);
+	//close(hsock->fd);
+	//release_hsock(hsock);
+}
+
 static void HsocketSendUdp(HSOCKET hsock, const char* data, int len)
 {
 	socklen_t socklen = sizeof(hsock->peer_addr);
@@ -645,6 +702,54 @@ bool HsocketSend(HSOCKET hsock, const char* data, int len)
 		HsocketSendUdp(hsock, data, len);
 	else
 		HsocketSendTcp(hsock, data, len);
+	return true;
+}
+
+EPOLL_BUFF* HsocketGetBuff()
+{
+	EPOLL_BUFF* epoll_Buff = (EPOLL_BUFF*)malloc(sizeof(EPOLL_BUFF));
+	if (epoll_Buff){
+		memset(epoll_Buff, 0x0, sizeof(EPOLL_BUFF));
+		epoll_Buff->buff = (char*)malloc(DATA_BUFSIZE);
+		if (epoll_Buff->buff){
+			*(epoll_Buff->buff) = 0x0;
+			epoll_Buff->size = DATA_BUFSIZE;
+		}
+	}
+	return epoll_Buff;
+}
+
+bool HsocketSetBuff(EPOLL_BUFF* epoll_Buff, const char* data, int len)
+{
+	if (epoll_Buff == NULL) return false;
+	int left = epoll_Buff->size - epoll_Buff->offset;
+	if (left >= len)
+	{
+		memcpy(epoll_Buff->buff + epoll_Buff->offset, data, len);
+		epoll_Buff->offset += len;
+	}
+	else
+	{
+		char* new_ptr = (char*)realloc(epoll_Buff->buff, epoll_Buff->size + len);
+		if (new_ptr)
+		{
+			epoll_Buff->buff = new_ptr;
+			memcpy(epoll_Buff->buff + epoll_Buff->offset, data, len);
+			epoll_Buff->offset += len;
+		}
+	}
+	return true;
+}
+
+bool HsocketSendBuff(EPOLL_SOCKET* hsock, EPOLL_BUFF* epoll_Buff)
+{
+	if (hsock == NULL || epoll_Buff == NULL) return false;
+	if (hsock->_conn_type == UDP_CONN)
+		HsocketSendUdp(hsock, epoll_Buff->buff, epoll_Buff->offset);
+	else
+		HsocketSendTcp(hsock, epoll_Buff->buff, epoll_Buff->offset);
+	free(epoll_Buff->buff);
+	free(epoll_Buff);
 	return true;
 }
 

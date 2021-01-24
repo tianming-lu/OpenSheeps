@@ -22,7 +22,7 @@ public:
 	void ConnectionMade(HSOCKET hsock);
 	void ConnectionFailed(HSOCKET hsock);
 	void ConnectionClosed(HSOCKET hsock);
-	void Recved(HSOCKET hsock, const char* data, int len);
+	void ConnectionRecved(HSOCKET hsock, const char* data, int len);
 	int	 Loop();
 	int  Destroy();
 

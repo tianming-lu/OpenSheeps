@@ -51,7 +51,7 @@ void ClientProtocol::ConnectionClosed(HSOCKET hsock)
 	TaskManagerRuning = false;
 }
 
-void ClientProtocol::Recved(HSOCKET hsock, const char* data, int len)
+void ClientProtocol::ConnectionRecved(HSOCKET hsock, const char* data, int len)
 {
 	return this->CheckReq(hsock, data, len);
 }

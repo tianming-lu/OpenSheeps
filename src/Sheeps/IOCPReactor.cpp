@@ -1,6 +1,6 @@
-﻿#include "pch.h"
-#include "Reactor.h"
+﻿#include "Reactor.h"
 #include <Ws2tcpip.h>
+#include <time.h>
 #include <map>
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -293,7 +293,7 @@ static void ProcessIO(IOCP_SOCKET* IocpSock, IOCP_BUFF* IocpBuff)
 			proto->Lock();
 			if (IocpSock->fd != INVALID_SOCKET)
 			{
-				proto->Recved(IocpSock, IocpSock->recv_buf, IocpBuff->offset);
+				proto->ConnectionRecved(IocpSock, IocpSock->recv_buf, IocpBuff->offset);
 				proto->UnLock();
 			}
 			else

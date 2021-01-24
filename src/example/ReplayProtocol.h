@@ -17,15 +17,17 @@ public:
 	std::map<int, t_connection_info> Connection;
 
 public:
-	void Init();
+	void EventInit();
 	void ConnectionMade(HSOCKET hsock);
 	void ConnectionFailed(HSOCKET hsock);
 	void ConnectionClosed(HSOCKET hsock);
-	void Recved(HSOCKET hsock, const char* data, int len);
-	void TimeOut();
-	void Event(uint8_t event_type, const char* ip, int port, const char* content, int clen, bool udp);
-	void ReInit();
-	void Destroy();
+	void ConnectionRecved(HSOCKET hsock, const char* data, int len);
+	void EventConnectOpen(const char* ip, int port, bool udp);
+	void EventConnectClose(const char* ip, int port, bool udp);
+	void EventSend(const char* ip, int port, const char* content, int clen, bool udp);
+	void EventTimeOut();
+	void EventReInit();
+	void EventDestroy();
 
 	HSOCKET* GetScokFromConnection(const char* ip, int port);
 	bool CloseAllConnection();

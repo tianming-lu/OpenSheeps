@@ -72,7 +72,7 @@ static void destroy_task(HTASKCFG task)
 	{
 		ue = *iter;
 		user = ue->user;
-		user->Destroy();
+		user->EventDestroy();
 		if (user->sockCount == 0 && default_api.destory)
 		{
 			default_api.destory(user);		//若连接未关闭，可能导致崩溃
@@ -114,7 +114,7 @@ static void ReInit(ReplayProtocol* proto, bool loop)
 		proto->SelfDead = false;
 		proto->PlayState = PLAY_NORMAL;
 		proto->MsgPointer = { 0x0 };
-		proto->ReInit();
+		proto->EventReInit();
 	}
 }
 
@@ -154,7 +154,7 @@ static void Loop(ReplayProtocol* proto)
 {
 	if (proto->PlayState == PLAY_PAUSE)		//播放暂停
 	{
-		proto->TimeOut();
+		proto->EventTimeOut();
 		update_user_time_clock(proto);
 		return;
 	}
@@ -165,15 +165,19 @@ static void Loop(ReplayProtocol* proto)
 		message = task_get_next_message(proto, false);
 	if (message == NULL)
 	{
-		proto->TimeOut();
+		proto->EventTimeOut();
 		return;
 	}
 	switch (message->type)
 	{
 	case TYPE_CONNECT: /*连接事件*/
+		proto->EventConnectOpen(message->ip, message->port, message->udp);
+		break;
 	case TYPE_CLOSE:	/*关闭连接事件*/
+		proto->EventConnectClose(message->ip, message->port, message->udp);
+		break;
 	case TYPE_SEND:	/*向连接发送消息事件*/
-		proto->Event(message->type, message->ip, message->port, message->content, (int)message->contentlen, message->udp);
+		proto->EventSend(message->ip, message->port, message->content, (int)message->contentlen, message->udp);
 		break;
 	case TYPE_REINIT:	/*用户重置事件，关闭所有连接，初始化用户资源*/
 		ReInit(proto, message->isloop);
@@ -227,7 +231,7 @@ VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 			if (timer)
 			{
 				DeleteTimerQueueTimer(task->hTimerQueue, timer, NULL);
-				proto->Destroy();
+				proto->EventDestroy();
 				proto->LastError[0] = 0x0;
 				proto->UnLock();
 				push_userDes_back(task, hue);
@@ -235,6 +239,38 @@ VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 		}
 	}
 	//user_set_next_timer(task, proto, hue);
+}
+#else
+void  userWorkFunc(BaseProtocol* user)
+{
+	ReplayProtocol* proto = (ReplayProtocol*)user;
+	HUserEvent hue = proto->_timerevent;
+	t_task_config* task = proto->Task;
+
+	proto->Lock();
+	if (proto->SelfDead == false)
+	{
+		Loop(proto);
+		proto->UnLock();
+	}
+	else
+	{
+		if (task->ignoreErr)
+		{
+			ReInit(proto, true);
+			proto->LastError[0] = 0x0;
+			proto->UnLock();
+		}
+		else
+		{
+			proto->EventDestroy();
+			proto->LastError[0] = 0x0;
+			proto->UnLock();
+			TimerDelete(hue->timer);
+			hue->timer = NULL;
+			push_userDes_back(task, hue);
+		}
+	}
 }
 #endif // __WINDOWS__
 
@@ -253,6 +289,12 @@ int taskWorkerThread(void* pParam)
 #ifdef __WINDOWS__
 	DeleteTimerQueueEx(task->hTimerQueue, INVALID_HANDLE_VALUE);
 #else
+	std::list<HUserEvent>::iterator iter;
+	for (iter = task->userAll->begin(); iter != task->userAll->end(); ++iter)
+	{
+		if ((*iter)->timer)
+			TimerDelete((*iter)->timer);
+	}
 #endif
 	destroy_task(task);
 	return 0;
@@ -308,9 +350,10 @@ static HTASKCFG getTask_by_taskId(uint8_t taskID, bool create)
 		task->userDesLock = new(std::nothrow) std::mutex;
 #ifdef __WINDOWS__
 		task->hTimerQueue = CreateTimerQueue();
+		if (!task->messageList || !task->userAll || !task->userDes || !task->userDesLock  || !task->hTimerQueue)
 #else
+		if (!task->messageList || !task->userAll || !task->userDes || !task->userDesLock)
 #endif
-		if (!task->messageList || !task->userAll || !task->userDes || !task->userDesLock|| !task->hTimerQueue)
 		{
 			LOG(clogId, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
 			if (task->messageList) delete task->messageList;
@@ -371,6 +414,9 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 				user->Task = task;
 				user->UserNumber = task->userNumber++;
 				ue->user = user;
+				#ifndef __WINDOWS__
+				user->_timerevent = ue;
+				#endif
 			}
 			else
 			{
@@ -388,7 +434,7 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 		{
 			task->userAll->push_back(ue);
 			task->userCount++;
-			user->Init();
+			user->EventInit();
 		}
 		else
 		{
@@ -402,6 +448,7 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 			continue;
 		}
 #else
+		ue->timer = TimerCreate(ue->user, 10, 20, userWorkFunc);
 #endif
 	}
 	return 0;
