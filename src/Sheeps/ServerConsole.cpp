@@ -16,6 +16,9 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
+
+extern char _binary_console_html_start[];
+extern char _binary_console_html_end[];
 #endif // !__WINDOWS__
 
 #define SQL_SIZE 1024
@@ -1241,22 +1244,9 @@ static int get_home_page(HSOCKET hsock)
 		LPVOID  pBuffer = LockResource(hGlobal);
 		page_len = SizeofResource(Sheeps_Module, rc);
 		memcpy(home_page + SPACELEN, pBuffer, page_len);
-		//int ret = fopen_s(&hfile, file, "rb");
 #else
-		char file[256] = { 0x0 };
-		snprintf(file, sizeof(file), "%sconsole.html", EXE_Path);
-
-		FILE* hfile = NULL;
-		hfile = fopen(file, "rb");
-		//#endif
-		if (hfile == NULL)
-		{
-			LOG(slogid, LOG_ERROR, "%s:%d open file error [%d]\r\n", __func__, __LINE__, errno);
-			HsocketClose(hsock);
-			return 0;
-		}
-		page_len = (int)fread(home_page + SPACELEN, sizeof(char), PAGESIZE - SPACELEN, hfile);
-		fclose(hfile);
+		page_len = _binary_console_html_end - _binary_console_html_start;
+		memcpy(home_page + SPACELEN, _binary_console_html_start, page_len);
 #endif
 }
 	int offset = snprintf(home_page, SPACELEN, "HTTP/1.1 200 OK\r\nContent-Length:%d\r\n\r\n", page_len);

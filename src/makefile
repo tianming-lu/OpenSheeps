@@ -5,6 +5,7 @@ OUTFILE = starter
 INSTALLDIR = ./out
 
 all:
+	rm -f Sheeps/console.html && cp ../webConsole/console.html Sheeps/
 	@list='$(SUBDIRS)'; for subdir in $$list; do \
 	echo "MAKING ALL IN $$subdir"; \
 	(cd $$subdir && make OUTFILE=$(OUTFILE)); \
@@ -38,7 +39,6 @@ install:
 	cp Starter/$(OUTFILE) $(INSTALLDIR)/bin;
 	cp example/example $(INSTALLDIR)/bin;
 	cp x64/sheeps/Release/sheeps.ini $(INSTALLDIR)/bin;
-	cp ../webConsole/console.html $(INSTALLDIR)/bin;
 	@list='$(SODIRS)'; for subdir in $$list; do \
 	echo "cp $$subdir/*.so $(INSTALLDIR)/bin/"; \
 	(cp $$subdir/*.so $(INSTALLDIR)/bin/); \
