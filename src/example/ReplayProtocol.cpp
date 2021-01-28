@@ -1,4 +1,10 @@
-﻿#include "ReplayProtocol.h"
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+#include "ReplayProtocol.h"
 
 
 int TaskStart(HTASKCFG task)

@@ -1,4 +1,10 @@
-﻿//{{NO_DEPENDENCIES}}
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+//{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ 生成的包含文件。
 // 供 Sheeps.rc 使用
 //

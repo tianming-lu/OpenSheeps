@@ -1,4 +1,10 @@
-﻿// StressClient.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+// StressClient.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 //
 #include "pch.h"
 #include "SheepsMain.h"

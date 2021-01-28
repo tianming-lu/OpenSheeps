@@ -1,4 +1,10 @@
-﻿// pch.cpp: 与预编译标头对应的源文件
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+// pch.cpp: 与预编译标头对应的源文件
 
 #include "pch.h"
 

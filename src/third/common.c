@@ -1,4 +1,10 @@
-﻿// common.cpp : 定义静态库的函数。
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+// common.cpp : 定义静态库的函数。
 //
 
 #include "common.h"

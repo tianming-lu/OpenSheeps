@@ -1,4 +1,10 @@
-﻿#ifndef _REACTOR_H_
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+#ifndef _REACTOR_H_
 #define _REACTOR_H_
 
 #if !defined(__WINDOWS__) && (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))

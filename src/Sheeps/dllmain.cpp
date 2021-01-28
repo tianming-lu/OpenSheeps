@@ -1,4 +1,10 @@
-﻿// dllmain.cpp : 定义 DLL 应用程序的入口点。
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+// dllmain.cpp : 定义 DLL 应用程序的入口点。
 #include "pch.h"
 #include "stdio.h"
 #include "direct.h"

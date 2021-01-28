@@ -1,4 +1,11 @@
-﻿#include "pch.h"
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+
+#include "pch.h"
 #include "ClientProtocol.h"
 #include "ClientProtocolSub.h"
 #include "TaskManager.h"

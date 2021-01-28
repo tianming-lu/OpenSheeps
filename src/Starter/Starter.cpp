@@ -1,4 +1,10 @@
-﻿#include "Starter.h"
+﻿/*
+*	Copyright(c) 2020 lutianming email：641471957@qq.com
+*
+*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
+*/
+
+#include "Starter.h"
 #include <iostream>
 
 short		defaultlisten = 0;
