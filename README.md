@@ -19,7 +19,7 @@
 
 #### 并发设计
 
-本系统使用自有的一套基于windows IOCP实现的多线程Proactory网络模型，在尽可能获得高并发的同时，简化业务逻辑的开发难度。因此使用者应该了解两个概念HSOCKET、ReplayProtocol，HSOCKET为连接句柄，表示一个网络连接。ReplayProtocol为业务逻辑处理基类,在本系统中表示一个压测用户，每一个网络事件的产生，都会调用对应ReplayProtocol对象中的成员函数进行处理。每个连接都绑定一个ReplayProtocol对象，同时多个连接可以绑定到同一个对象，以应对单个用户在业务处理中需要连接多个服务，同时又不增加业务处理的难度。
+本系统使用自有的一套基于windows IOCP实现的多线程Proactory网络模型，在尽可能获得高并发的同时，简化业务逻辑的开发难度。因此使用者应该了解两个概念HSOCKET、ReplayProtocol，HSOCKET为连接句柄，表示一个网络连接。ReplayProtocol为业务逻辑处理基类,在本系统中表示一个压测用户，每一个网络事件的产生，都会调用对应ReplayProtocol对象中的成员函数进行处理。每个连接都绑定一个ReplayProtocol对象，同时多个连接可以绑定到同一个对象，以应对单个用户在业务处理中需要连接多个服务，同时又不增加业务处理的难度。本系统现已支持在linux下运行，linux下采用epoll实现，同时保持API与windows下保持一致
 
 #### 录制设计：
 
