@@ -1,16 +1,10 @@
-<!-- 
-*	Copyright(c) 2020 lutianming email：641471957@qq.com
-* 
-*	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
- -->
-
 <html>
     <head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>控制台</title>
         <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
     </head>
     <body bgcolor="#E1FFFF">
         <header><h1>Sheeps压力测试系统管理后台</h1></header><br>
-        <nav><a class="nav" id="task" href="javascript:void(null);">任务管理</a> | <a class="nav" id="record" href="javascript:void(null);">录制管理</a> | <a class="nav" id="proxy" href="javascript:void(null);">代理列表</a> | <a class="nav" id="agent" href="javascript:void(null);">负载端列表</a></nav><br>
+        <nav><a class="nav" id="task" href="javascript:void(null);">任务管理</a> | <a class="nav" id="record" href="javascript:void(null);">录制管理</a> | <a class="nav" id="proxy" href="javascript:void(null);">代理列表</a> | <a class="nav" id="agent" href="javascript:void(null);">负载端列表</a> | <a class="nav" id="about" href="javascript:void(null);">关于Sheeps</a></nav><br>
         <content>
             <table width="100%">
                 <tr bgcolor="#FFA07A"><td><bhead><!--bhead--></bhead></td></tr>
@@ -47,6 +41,9 @@ $(document).ready(function(){
     }
     else if (nav_id == "agent"){
         click_nav_agent();
+    }
+    else if (nav_id == "about"){
+        click_nav_about();
     }
     else{
       click_nav_task();
@@ -554,6 +551,11 @@ $(document).ready(function(){
       var row = "<tr id=\"list"+ i + "\"><td>"+i+"</td><td width=\"200\">"+ item.addr +"</td><td width=\"80\">"+ item.cpu +"</td><td>" + item.ready+"</td></tr>"
       $("#list").append(row);
     }
+  }
+
+  function click_nav_about(){
+    $("bhead").append("版权所有：卢天明 email：641471957@qq.com</br></br>")
+    $("bhead").append("项目地址：<a href=\"https://gitee.com/lutianming/Sheeps.git\" target=\"_blank\">https://gitee.com/lutianming/Sheeps.git</a>")
   }
 });
 </script>
