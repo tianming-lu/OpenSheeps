@@ -118,7 +118,7 @@ static void ReInit(ReplayProtocol* proto, bool loop)
 	else
 	{
 		proto->SelfDead = false;
-		proto->PlayState = PLAY_NORMAL;
+		proto->PlayMode = PLAY_NORMAL;
 		proto->MsgPointer = { 0x0 };
 		proto->EventReInit();
 	}
@@ -158,14 +158,14 @@ static HMESSAGE task_get_next_message(ReplayProtocol* proto, bool fast)
 
 static void Loop(ReplayProtocol* proto)
 {
-	if (proto->PlayState == PLAY_PAUSE)		//播放暂停
+	if (proto->PlayMode == PLAY_PAUSE)		//播放暂停
 	{
 		proto->EventTimeOut();
 		update_user_time_clock(proto);
 		return;
 	}
 	HMESSAGE message = NULL;
-	if (proto->PlayState == PLAY_FAST)		//快进模式 or 正常播放模式
+	if (proto->PlayMode == PLAY_FAST)		//快进模式 or 正常播放模式
 		message = task_get_next_message(proto, true);	/*获取下一步用户需要处理的事件消息*/
 	else
 		message = task_get_next_message(proto, false);
@@ -183,7 +183,7 @@ static void Loop(ReplayProtocol* proto)
 		proto->EventConnectClose(message->ip, message->port, message->udp);
 		break;
 	case TYPE_SEND:	/*向连接发送消息事件*/
-		proto->EventSend(message->ip, message->port, message->content, (int)message->contentlen, message->udp);
+		proto->EventConnectSend(message->ip, message->port, message->content, (int)message->contentlen, message->udp);
 		break;
 	case TYPE_REINIT:	/*用户重置事件，关闭所有连接，初始化用户资源*/
 		ReInit(proto, message->isloop);

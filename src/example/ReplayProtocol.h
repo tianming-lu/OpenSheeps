@@ -24,16 +24,17 @@ public:
 
 public:
 	void EventInit();
+	void EventConnectOpen(const char* ip, int port, bool udp);
+	void EventConnectClose(const char* ip, int port, bool udp);
+	void EventConnectSend(const char* ip, int port, const char* content, int clen, bool udp);
+	void EventTimeOut();
+	void EventReInit();
+	void EventDestroy();
 	void ConnectionMade(HSOCKET hsock);
 	void ConnectionFailed(HSOCKET hsock);
 	void ConnectionClosed(HSOCKET hsock);
 	void ConnectionRecved(HSOCKET hsock, const char* data, int len);
-	void EventConnectOpen(const char* ip, int port, bool udp);
-	void EventConnectClose(const char* ip, int port, bool udp);
-	void EventSend(const char* ip, int port, const char* content, int clen, bool udp);
-	void EventTimeOut();
-	void EventReInit();
-	void EventDestroy();
+	
 
 	HSOCKET* GetScokFromConnection(const char* ip, int port);
 	bool CloseAllConnection();

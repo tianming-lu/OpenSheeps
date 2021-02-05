@@ -37,13 +37,12 @@ enum loglevel { LOG_TRACE = 0, LOG_DEBUG, LOG_NORMAL, LOG_ERROR, LOG_FAULT, LOG_
 #endif
 
 enum {
+	NOTHING = 0x00,	//复合动作,什么都不做
+	DELAY = 0x01,	//复合动作,延迟消息并暂停
 	//发送录制协议时返回确认发送数据包或者丢弃数据包，默认是DOSEND
-	DOSEND = 0x01,
-	GIVEUP = 0x02,
-	//复合动作,延迟消息并暂停
-	DELAY = 0x04,
+	DOSEND = 0x02,
+	GIVEUP = 0x04,
 	//确定用户播放状态
-	NOTHING = 0x10,
 	NORMAL = 0x20,
 	PAUSE = 0x40,
 	FAST = 0x80
@@ -150,22 +149,23 @@ public:
 	HTASKCFG	Task = NULL;
 	int			UserNumber = 0;
 	bool		SelfDead = false;
-	uint8_t		PlayState = PLAY_NORMAL;
+	uint8_t		PlayMode = PLAY_NORMAL;
 	MSGPointer	MsgPointer = { 0x0 };
 	char		LastError[128] = {0x0};
 
 public:
 	virtual void EventInit() = 0;
+	virtual void EventConnectOpen(const char* ip, int port, bool udp) = 0;
+	virtual void EventConnectClose(const char* ip, int port, bool udp) = 0;
+	virtual void EventConnectSend(const char* ip, int port, const char* content, int clen, bool udp) = 0;
+	virtual void EventTimeOut() = 0;
+	virtual void EventReInit() = 0;
+	virtual void EventDestroy() = 0;
 	virtual void ConnectionMade(HSOCKET hsock) = 0;
 	virtual void ConnectionFailed(HSOCKET hsock) = 0;
 	virtual void ConnectionClosed(HSOCKET hsock) = 0;
 	virtual void ConnectionRecved(HSOCKET hsock, const char* data, int len) = 0;
-	virtual void EventConnectOpen(const char* ip, int port, bool udp) = 0;
-	virtual void EventConnectClose(const char* ip, int port, bool udp) = 0;
-	virtual void EventSend(const char* ip, int port, const char* content, int clen, bool udp) = 0;
-	virtual void EventTimeOut() = 0;
-	virtual void EventReInit() = 0;
-	virtual void EventDestroy() = 0;
+	
 };
 
 //受控端逻辑API

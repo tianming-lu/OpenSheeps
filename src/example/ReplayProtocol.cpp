@@ -50,13 +50,13 @@ void UserProtocol::EventInit()
 void UserProtocol::ConnectionMade(HSOCKET hsock)
 {	/*当用户连接目标ip端口成功后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, hsock->fd);
-	this->PlayState = PLAY_NORMAL;
+	this->PlayMode = PLAY_NORMAL;
 }
 
 void UserProtocol::ConnectionFailed(HSOCKET hsock)
 {	/*当用户连接目标ip端口失败后，调用此函数，并传递对应网络地址（ip）和端口（port）*/
 	TaskUserLog(this, LOG_FAULT,"%s:%d [%s:%d]", __func__, __LINE__, hsock->peer_ip, hsock->peer_port);
-	this->PlayState = PLAY_NORMAL;
+	this->PlayMode = PLAY_NORMAL;
 	TaskUserDead(this, "connection failed");
 	std::map<int, t_connection_info>::iterator it = this->Connection.find(hsock->peer_port);
 	if (it != this->Connection.end())
@@ -85,7 +85,7 @@ void UserProtocol::ConnectionRecved(HSOCKET hsock, const char* data, int len)
 {	/*当用户连接收到消息后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port），以及数据指针（data）和消息长度（len）*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d][%.*s]", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, len, data);
 	TaskUserSocketSkipBuf(hsock, len);
-	this->PlayState = PLAY_NORMAL;
+	this->PlayMode = PLAY_NORMAL;
 }
 
 void UserProtocol::EventConnectOpen(const char* ip, int port, bool udp)
@@ -95,7 +95,7 @@ void UserProtocol::EventConnectOpen(const char* ip, int port, bool udp)
 	std::map<int, t_connection_info>::iterator it;
 	
 	TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]", ip, port);
-	this->PlayState = PLAY_PAUSE;
+	this->PlayMode = PLAY_PAUSE;
 	HSOCKET conn_hsock = TaskUserSocketConnet(this, ip, port, TCP_CONN);
 	if (conn_hsock == NULL)
 	{
@@ -130,7 +130,7 @@ void UserProtocol::EventConnectClose(const char* ip, int port, bool udp)
 	}
 }
 
-void UserProtocol::EventSend(const char* ip, int port, const char* content, int clen, bool udp)
+void UserProtocol::EventConnectSend(const char* ip, int port, const char* content, int clen, bool udp)
 {
 	//TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 	TaskUserLog(this, LOG_DEBUG, "user send[%s:%d [%s]]", ip, port, content);
@@ -138,7 +138,7 @@ void UserProtocol::EventSend(const char* ip, int port, const char* content, int 
 	if (hsock != NULL)
 	{
 		TaskUserSocketSend(*hsock, (char*)content, clen);
-		this->PlayState = PLAY_PAUSE;
+		this->PlayMode = PLAY_PAUSE;
 	}
 }
 
