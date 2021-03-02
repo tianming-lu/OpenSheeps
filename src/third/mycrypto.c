@@ -102,7 +102,7 @@ static int decode_base64_internal(Base64_Context *dst, Base64_Context *src, cons
     return 0;
 }
 
-void encode_base64(Base64_Context *dst, Base64_Context *src)
+void __STDCALL encode_base64(Base64_Context *dst, Base64_Context *src)
 {
     static u_char   basis64[] =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -110,7 +110,7 @@ void encode_base64(Base64_Context *dst, Base64_Context *src)
     encode_base64_internal(dst, src, basis64, 1);
 }
 
-int decode_base64(Base64_Context *dst, Base64_Context *src)
+int __STDCALL decode_base64(Base64_Context *dst, Base64_Context *src)
 {
     static u_char   basis64[] = {
         77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77,
@@ -135,7 +135,7 @@ int decode_base64(Base64_Context *dst, Base64_Context *src)
     return decode_base64_internal(dst, src, basis64);
 }
 
-size_t base64_encode(char *src, int src_len, char *dst)
+size_t __STDCALL base64_encode(char *src, int src_len, char *dst)
 {
 	if (src == NULL)
 		return -1;
@@ -157,7 +157,7 @@ size_t base64_encode(char *src, int src_len, char *dst)
     return temp.len;
 }
 
-size_t base64_decode(char *src, size_t src_len, char *dst)
+size_t __STDCALL base64_decode(char *src, size_t src_len, char *dst)
 {
 	if(src == NULL)
 		return -1;
@@ -195,7 +195,7 @@ static int is_alpha_number_char(unsigned char c) {
     return 0;
 }
 
-void urlencode(unsigned char * src, int src_len, unsigned char * dest,
+void __STDCALL urlencode(unsigned char * src, int src_len, unsigned char * dest,
         int dest_len) {
     unsigned char ch;
     int len = 0;
@@ -218,7 +218,7 @@ void urlencode(unsigned char * src, int src_len, unsigned char * dest,
     return;
 }
 
-unsigned char* urldecode(unsigned char* encd, unsigned char* decd) {
+unsigned char* __STDCALL urldecode(unsigned char* encd, unsigned char* decd) {
     size_t j, i;
     unsigned char *cd = encd;
     char p[2];
@@ -253,7 +253,7 @@ unsigned char* urldecode(unsigned char* encd, unsigned char* decd) {
 //urlencode
 
 //sha1
-void GetStringSHA1(char *input, unsigned long length, char *output)
+void __STDCALL GetStringSHA1(char *input, unsigned long length, char *output)
 {
     if (NULL == input || NULL == output)
         return;
@@ -304,7 +304,7 @@ static int getfilemd5(const char* filename, unsigned char* md5)
 	return 0;
 }
 
-int getfilemd5view(const char* filename, char* md5, size_t size)
+int __STDCALL getfilemd5view(const char* filename, char* md5, size_t size)
 {
 	unsigned char omd5[16] = { 0x0 };
 

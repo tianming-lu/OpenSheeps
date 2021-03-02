@@ -13,7 +13,7 @@
 #ifdef __WINDOWS__
 #include <Winsock2.h>
 #include <Ws2tcpip.h>
-int GetHostByName(char* name, char* buf, size_t size)
+int __STDCALL GetHostByName(char* name, char* buf, size_t size)
 {
 	struct addrinfo hints;
 	struct addrinfo* res, * cur;

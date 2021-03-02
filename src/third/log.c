@@ -182,7 +182,7 @@ static int RegisterLogInternal(LOG_Context* ctx)
 	return -1;
 }
 
-int RegisterLog(const char* filename, int level, int rotatesize, int rotateintval, int filenum)
+int __STDCALL RegisterLog(const char* filename, int level, int rotatesize, int rotateintval, int filenum)
 {
 	LOG_Context ctx;
 	memset(&ctx, 0x0, sizeof(LOG_Context));
@@ -196,7 +196,7 @@ int RegisterLog(const char* filename, int level, int rotatesize, int rotateintva
 	return ret;
 }
 
-int CloseLog(int fd)
+int __STDCALL CloseLog(int fd)
 {
 	if (fd < 0)
 		return -1;
@@ -219,7 +219,7 @@ static int strncasecmp(const char* input_buffer, const char* s2, register int n)
 }
 #endif
 
-int GetLogLevel(const char* loglevelstr) 
+int __STDCALL GetLogLevel(const char* loglevelstr)
 {
 	if(!strncasecmp(loglevelstr, "trace", 5))
 		return LOG_TRACE;
@@ -235,13 +235,13 @@ int GetLogLevel(const char* loglevelstr)
 		return LOG_NONE;	
 }
 
-void SetLogLevel(int fd, int level)
+void __STDCALL SetLogLevel(int fd, int level)
 {
 	LOG_Context* nctx = &LogArray[fd];
 	nctx->LogLevel = level;
 }
 
-int CheckLogLevel(int fd, int level)
+int __STDCALL CheckLogLevel(int fd, int level)
 {
 	if (fd < 0 || GETLOGLEVEL(fd) > level)
 		return -1;
@@ -280,13 +280,13 @@ void LOG(int fd, int level, const char* fmt, ...)
 #endif
 }
 
-char* GetLogStr(int loglevel)
+char* __STDCALL GetLogStr(int loglevel)
 {
 	return LogString[loglevel];
 }
 
 #ifdef __WINDOWS__
-HANDLE	GetLogFileHandle(int fd)
+HANDLE	__STDCALL GetLogFileHandle(int fd)
 #else
 int GetLogFileHandle(int fd)
 #endif
@@ -386,7 +386,7 @@ static void ScanLogs()
 	}
 }
 
-void LogLoop()
+void __STDCALL LogLoop()
 {
 	ScanLogs();
 }

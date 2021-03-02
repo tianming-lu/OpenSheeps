@@ -460,7 +460,7 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 	return 0;
 }
 
-int create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, BaseFactory* factory)
+int __STDCALL create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, BaseFactory* factory)
 {
 	t_task_config* task;
 	task = getTask_by_taskId(taskid, true);
@@ -484,7 +484,7 @@ int create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool i
 	return 0;
 }
 
-void set_task_log_level(uint8_t level, uint8_t taskID)
+void __STDCALL set_task_log_level(uint8_t level, uint8_t taskID)
 {
 	HTASKCFG task = getTask_by_taskId(taskID, false);
 	if (task != NULL)
@@ -509,7 +509,7 @@ void set_task_log_level(uint8_t level, uint8_t taskID)
 	return false;
 }*/
 
-bool stop_task_by_id(uint8_t taskID)
+bool __STDCALL stop_task_by_id(uint8_t taskID)
 {
 	HTASKCFG task;
 	std::map<int, HTASKCFG>::iterator iter;
@@ -525,7 +525,7 @@ bool stop_task_by_id(uint8_t taskID)
 	return false;
 }
 
-bool insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t port, char* content, uint64_t timestamp, uint32_t microsecond, bool udp)
+bool __STDCALL insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t port, char* content, uint64_t timestamp, uint32_t microsecond, bool udp)
 {
 	HTASKCFG task;
 	task = getTask_by_taskId(taskID, false);
@@ -572,7 +572,7 @@ bool insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t p
 	return true;
 }
 
-int task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory)
+int __STDCALL task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory)
 {
 	t_task_config* task;
 	task = getTask_by_taskId(taskid, false);
@@ -582,7 +582,7 @@ int task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory)
 	return 0;
 }
 
-bool TaskUserSocketClose(HSOCKET hsock)
+bool __STDCALL TaskUserSocketClose(HSOCKET hsock)
 {
 #ifdef __WINDOWS__
 	if (hsock == NULL) return false;
@@ -709,7 +709,7 @@ static void TaskManagerForever(int projectid)
 	}
 }
 
-void TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server)
+void __STDCALL TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server)
 {
 	default_api.create = create;
 	default_api.destory = destory;

@@ -141,14 +141,14 @@ static int read_config_file(const char* file)
 	return 0;
 }
 
-int config_init(const char* file)
+int __STDCALL config_init(const char* file)
 {
 	if (MapConfig == NULL)
 		MapConfig =  new(std::nothrow) std::map<std::string, void*>;
 	return read_config_file(file);
 }
 
-int netaddr_in_config(const char* ip, int port, const char* section, const char* key) 
+int __STDCALL netaddr_in_config(const char* ip, int port, const char* section, const char* key)
 {
 	char addr[32] = { 0x0 };
 	snprintf(addr, sizeof(addr), "%s:%d", ip, port);
@@ -170,7 +170,7 @@ int netaddr_in_config(const char* ip, int port, const char* section, const char*
 	return 0;
 }
 
-const char* config_get_string_value(const char* section, const char* key, const char* def)
+const char* __STDCALL config_get_string_value(const char* section, const char* key, const char* def)
 {
 	std::map<std::string, void*>::iterator iter;
 
@@ -186,7 +186,7 @@ const char* config_get_string_value(const char* section, const char* key, const 
 	return (char*)iter->second;
 }
 
-int config_get_int_value(const char* section, const char* key, int def)
+int __STDCALL config_get_int_value(const char* section, const char* key, int def)
 {
 	std::map<std::string, void*>::iterator iter;
 
@@ -203,7 +203,7 @@ int config_get_int_value(const char* section, const char* key, int def)
 	return  atoi((char*)iter->second);
 }
 
-bool config_get_bool_value(const char* section, const char* key, bool def)
+bool __STDCALL config_get_bool_value(const char* section, const char* key, bool def)
 {
 	std::map<std::string, void*>::iterator iter;
 

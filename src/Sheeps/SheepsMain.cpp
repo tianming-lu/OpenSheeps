@@ -84,7 +84,7 @@ static int SheepsFactoryRun(const char* sheepsIp, int sheepsPort, int projectId,
 	return 0;
 }
 
-int SheepsServerRun(u_short listenPort)
+int __STDCALL SheepsServerRun(u_short listenPort)
 {
 	config_init(ConfigFile);
 	if (listenPort <=  0)
@@ -96,7 +96,7 @@ int SheepsServerRun(u_short listenPort)
 	return listenPort;
 }
 
-int SheepsClientRun(int projectid, bool server)
+int __STDCALL SheepsClientRun(int projectid, bool server)
 {
 	config_init(ConfigFile);
 	const char* sheepsIp = config_get_string_value("agent", "srv_ip", "127.0.0.1");
@@ -111,7 +111,7 @@ int SheepsClientRun(int projectid, bool server)
 	return 0;
 }
 
-int StressClientStop()
+int __STDCALL StressClientStop()
 {
 	FactoryStop(sheepsfc);
 	//ReactorStop(sheepsfc);

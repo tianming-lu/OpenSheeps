@@ -8,7 +8,7 @@
 
 #define MD5STEP(f, a, x, y, z, data, s) ( a += f(x, y, z) + data,  a = a<<s | a>>(32-s),  a += x )
 
-void MD5Init(LPMD5_Context ctx)
+void __STDCALL MD5Init(LPMD5_Context ctx)
 {
     ctx->stat[0] = 0x67452301;
     ctx->stat[1] = 0xefcdab89;
@@ -102,7 +102,7 @@ static void MD5Transform(uint32_t stat[4], uint32_t const buf[16])
 	stat[3] += d;
 }
 
-void MD5Update(LPMD5_Context ctx, unsigned char const *buf, unsigned len)
+void __STDCALL MD5Update(LPMD5_Context ctx, unsigned char const *buf, unsigned len)
 {
     register uint32_t t;
 
@@ -136,7 +136,7 @@ void MD5Update(LPMD5_Context ctx, unsigned char const *buf, unsigned len)
     memcpy(ctx->buf, buf, len);
 }
 
-void MD5Final(unsigned char digest[16], LPMD5_Context ctx)
+void __STDCALL MD5Final(unsigned char digest[16], LPMD5_Context ctx)
 {
     unsigned int count;
     unsigned char *p;
@@ -163,14 +163,14 @@ void MD5Final(unsigned char digest[16], LPMD5_Context ctx)
     memset(ctx, 0, sizeof(MD5_Context));
 }
 
-void MD5Digest( const unsigned char *message, int len, unsigned char *digest) {
+void __STDCALL MD5Digest( const unsigned char *message, int len, unsigned char *digest) {
 	MD5_Context ctx;
 	MD5Init (&ctx);
 	MD5Update (&ctx, message, len);
 	MD5Final (digest, &ctx);
 }
 
-void MD5DigestHex( const unsigned char *message, int len, unsigned char *digest) {
+void __STDCALL MD5DigestHex( const unsigned char *message, int len, unsigned char *digest) {
 	MD5_Context ctx;
 	unsigned char h[16];
 	char xdigit[] = "0123456789abcdef";
@@ -186,7 +186,7 @@ void MD5DigestHex( const unsigned char *message, int len, unsigned char *digest)
 	*digest = '\0';
 }
 
-void MD5HMAC (const unsigned char *password,  unsigned pass_len,
+void __STDCALL MD5HMAC (const unsigned char *password,  unsigned pass_len,
 		const unsigned char *challenge, unsigned chal_len,
 		unsigned char response[16])
 {
@@ -226,7 +226,7 @@ void MD5HMAC (const unsigned char *password,  unsigned pass_len,
 	MD5Final (response, &ctx);
 }
 
-void MD5HMAC2 (const unsigned char *password,  unsigned pass_len,
+void __STDCALL MD5HMAC2 (const unsigned char *password,  unsigned pass_len,
 		const unsigned char *challenge, unsigned chal_len,
 		const unsigned char *challenge2, unsigned chal_len2,
 		unsigned char response[16])

@@ -58,7 +58,7 @@ void SHA1ProcessMessageBlock(SHA1Context *);
  * * sha Error Code. 
  * * 
  * */  
-int SHA1Reset(SHA1Context *context)//初始化状态  
+int __STDCALL SHA1Reset(SHA1Context *context)//初始化状态  
 {  
     if (!context)  
     {  
@@ -97,7 +97,7 @@ int SHA1Reset(SHA1Context *context)//初始化状态
  * * sha Error Code. 
  * * 
  * */  
-int SHA1Result( SHA1Context *context,uint8_t Message_Digest[SHA1HashSize])  
+int __STDCALL SHA1Result( SHA1Context *context,uint8_t Message_Digest[SHA1HashSize])
 {  
     int i;  
     if (!context || !Message_Digest)  
@@ -150,7 +150,7 @@ int SHA1Result( SHA1Context *context,uint8_t Message_Digest[SHA1HashSize])
  * * 
  * */  
   
-int SHA1Input( SHA1Context *context,const uint8_t *message_array, unsigned length)  
+int __STDCALL SHA1Input( SHA1Context *context,const uint8_t *message_array, unsigned length)
 {  
     if (!length)  
     {  
