@@ -4,8 +4,6 @@
 *	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
 */
 
-// pch.cpp: 与预编译标头对应的源文件
-
 #include "pch.h"
 
 #ifdef __WINDOWS__
@@ -18,7 +16,6 @@ char ConfigFile[MAX_PATH] = { 0x0 };
 char ProjectPath[MAX_PATH] = { 0x0 };
 char RecordPath[MAX_PATH] = { 0x0 };
 char LogPath[MAX_PATH] = { 0x0 };
-// 当使用预编译的头时，需要使用此源文件，编译才能成功。
 
 #ifndef __WINDOWS__ //for linux
 #include "dlfcn.h"
