@@ -16,6 +16,7 @@ DWORD written;
 
 
 bool TaskManagerRuning = false;
+bool log_stdout = false;
 
 std::map<int, t_task_config*> taskAll;
 std::map<int, t_task_config*> taskDel;
@@ -642,6 +643,8 @@ void TaskLog(HTASKCFG task, uint8_t level, const char* fmt, ...)
 #else
 	write(GetLogFileHandle(logfd), buf, l);
 #endif // __WINDOWS__
+	if (log_stdout)
+		printf("%.*s", l, buf);
 }
 
 void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
@@ -674,6 +677,8 @@ void TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...)
 #else
 	write(GetLogFileHandle(logfd), buf, l);
 #endif // __WINDOWS__
+	if (log_stdout)
+		printf("%.*s", l, buf);
 }
 
 static void TaskManagerForever(int projectid) 
@@ -718,6 +723,7 @@ void __STDCALL TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destor
 
 	if (!SheepsClientRun(projectid, server))
 	{
+		log_stdout = config_get_bool_value("LOG", "stdout", false);
 		TaskManagerForever(projectid);
 	}
 	else
