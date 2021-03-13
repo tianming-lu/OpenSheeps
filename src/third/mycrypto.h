@@ -59,6 +59,7 @@ crypto_API void __STDCALL GetStringSHA1(char *input, unsigned long length, char 
 
 //md5
 crypto_API int __STDCALL getfilemd5view(const char* filename, char* md5, size_t size);
+crypto_API int __STDCALL getstringmd5view(const char* data, size_t data_len, char* md5, size_t size);
 //md5
 
 #ifdef __cplusplus

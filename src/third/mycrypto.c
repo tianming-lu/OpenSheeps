@@ -320,4 +320,31 @@ int __STDCALL getfilemd5view(const char* filename, char* md5, size_t size)
 	}
 	return 0;
 }
+
+static int getstringmd5(const char* data, size_t size, unsigned char* md5)
+{
+    MD5_Context ctx;
+    MD5Init(&ctx);
+
+    MD5Update(&ctx, (const unsigned char*)data, (int)size);
+    MD5Final(md5, &ctx);
+    return 0;
+}
+
+int __STDCALL getstringmd5view(const char* data, size_t data_len, char* md5, size_t size)
+{
+    unsigned char omd5[16] = { 0x0 };
+
+    if (getstringmd5(data, data_len, omd5))
+        return -1;
+
+    char* s = md5;
+    int l = 0;
+    int i = 0;
+    for (i = 0; i < 16; i++)
+    {
+        l += snprintf(s + l, size - l, "%02x", omd5[i]);
+    }
+    return 0;
+}
 //md5

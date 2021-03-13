@@ -17,6 +17,7 @@ DWORD written;
 
 bool TaskManagerRuning = false;
 bool log_stdout = false;
+bool user_revive = false;
 
 std::map<int, t_task_config*> taskAll;
 std::map<int, t_task_config*> taskDel;
@@ -398,7 +399,8 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 		ue = NULL;
 		user = NULL;
 		isNew = false;
-		ue = get_userDes_front(task);
+		if (user_revive)
+			ue = get_userDes_front(task);
 		if (ue == NULL)
 		{
 			isNew = true;
@@ -724,6 +726,7 @@ void __STDCALL TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destor
 	if (!SheepsClientRun(projectid, server))
 	{
 		log_stdout = config_get_bool_value("LOG", "stdout", false);
+		user_revive = config_get_bool_value("mode", "revive", false);
 		TaskManagerForever(projectid);
 	}
 	else

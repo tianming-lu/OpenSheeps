@@ -67,8 +67,8 @@ static int MsgSend(HSOCKET hsock, int cmdNo, char* data, int len)
 #ifdef __WINDOWS__
 static void getFiles(char* dir_path,const char* subpro_path, std::map<std::string, t_file_update>* files)
 {
-	if (strcmp(ProjectPath, dir_path) != 0 && strcmp(dir_path, subpro_path) != 0)
-		return;
+	/*if (strcmp(ProjectPath, dir_path) != 0 && strcmp(dir_path, subpro_path) != 0)
+		return;*/
 
 	intptr_t hFile = 0;
 	struct _finddata_t fileinfo;
@@ -84,7 +84,7 @@ static void getFiles(char* dir_path,const char* subpro_path, std::map<std::strin
 			memset(fullpath, 0, sizeof(fullpath));
 			if ((fileinfo.attrib & _A_SUBDIR))
 			{
-				snprintf(fullpath, sizeof(fullpath), "%s%s", dir_path, fileinfo.name);
+				snprintf(fullpath, sizeof(fullpath), "%s\\%s", dir_path, fileinfo.name);
 				if (strcmp(fileinfo.name, ".") == 0 || strcmp(fileinfo.name, "..") == 0)
 					continue;
 				getFiles(fullpath, subpro_path, files);
