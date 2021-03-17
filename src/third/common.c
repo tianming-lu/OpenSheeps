@@ -26,7 +26,7 @@ int __STDCALL GetHostByName(char* name, char* buf, size_t size)
 	hints.ai_socktype = SOCK_STREAM; 
 
 	int ret = getaddrinfo(name, NULL, &hints, &res);
-	if (ret == -1)
+	if (ret != 0)
 	{
 		return -1;
 	}
