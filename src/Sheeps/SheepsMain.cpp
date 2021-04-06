@@ -99,8 +99,10 @@ int __STDCALL SheepsServerRun(u_short listenPort)
 int __STDCALL SheepsClientRun(int projectid, bool server)
 {
 	config_init(ConfigFile);
-	const char* sheepsIp = config_get_string_value("agent", "srv_ip", "127.0.0.1");
-	snprintf(managerIp, sizeof(managerIp), "%s", sheepsIp);
+	const char* defip = "127.0.0.1";
+	if (!server)
+		defip = config_get_string_value("agent", "srv_ip", defip);
+	snprintf(managerIp, sizeof(managerIp), "%s", defip);
 	managerPort = config_get_int_value("agent", "srv_port", 1080);
 	u_short listen_port = 0;
 	if (server)

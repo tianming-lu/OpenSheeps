@@ -18,6 +18,7 @@ DWORD written;
 bool TaskManagerRuning = false;
 bool log_stdout = false;
 bool user_revive = false;
+int timer_loop = 500;
 
 std::map<int, t_task_config*> taskAll;
 std::map<int, t_task_config*> taskDel;
@@ -450,14 +451,14 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 			ReInit(user, true);
 		}
 #ifdef __WINDOWS__
-		if (!CreateTimerQueueTimer(&ue->timer, task->hTimerQueue, (WAITORTIMERCALLBACK)userWorkFunc, ue, 10, 20, 0))
+		if (!CreateTimerQueueTimer(&ue->timer, task->hTimerQueue, (WAITORTIMERCALLBACK)userWorkFunc, ue, 0, timer_loop, 0))
 		{
 			printf("CreateTimerQueueTimer failed (%d)\n", GetLastError());
 			push_userDes_back(task, ue);
 			continue;
 		}
 #else
-		ue->timer = TimerCreate(ue->user, 10, 20, userWorkFunc);
+		ue->timer = TimerCreate(ue->user, 10, timer_loop, userWorkFunc);
 #endif
 	}
 	return 0;
@@ -727,6 +728,7 @@ void __STDCALL TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destor
 	{
 		log_stdout = config_get_bool_value("LOG", "stdout", false);
 		user_revive = config_get_bool_value("mode", "revive", false);
+		timer_loop = config_get_int_value("mode", "timer", 500);
 		TaskManagerForever(projectid);
 	}
 	else
