@@ -201,7 +201,7 @@ void getFiles(char* path, std::map<std::string, t_file_info>* files)
 			memset(fullpath, 0, sizeof(fullpath));
 			if ((fileinfo.attrib & _A_SUBDIR))
 			{
-				snprintf(fullpath, sizeof(fullpath), "%s%s", path, fileinfo.name);
+				snprintf(fullpath, sizeof(fullpath), "%s\\%s", path, fileinfo.name);
 				if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0)
 					getFiles(fullpath, files);
 			}

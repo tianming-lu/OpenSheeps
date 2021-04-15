@@ -17,11 +17,11 @@ DWORD written;
 
 bool TaskManagerRuning = false;
 bool log_stdout = false;
-bool user_revive = false;
+bool user_revive = true;
 int timer_loop = 500;
 
 std::map<int, t_task_config*> taskAll;
-std::map<int, t_task_config*> taskDel;
+//std::map<int, t_task_config*> taskDel;
 
 t_replay_dll default_api = { 0x0 };
 
@@ -60,7 +60,7 @@ static inline void push_userDes_back(t_task_config* task, HUserEvent ue)
 
 static void destroy_task(HTASKCFG task)
 {
-	LOG(clogId, LOG_DEBUG, "%s:%d Clean Task !\r\n", __func__, __LINE__);
+	LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task !\r\n", __func__, __LINE__);
 	std::vector<t_cache_message*>::iterator it;
 	for (it = task->messageList->begin(); it != task->messageList->end(); ++it)
 	{
@@ -72,7 +72,7 @@ static void destroy_task(HTASKCFG task)
 	}
 	task->messageList->clear();
 	delete task->messageList;
-
+	LOG(clogId, LOG_DEBUG, "%s:%d Clean Task Message Over!\r\n", __func__, __LINE__);
 	std::list<HUserEvent>::iterator iter;
 	HUserEvent ue = NULL;
 	ReplayProtocol* user = NULL;
@@ -81,23 +81,38 @@ static void destroy_task(HTASKCFG task)
 	{
 		ue = *iter;
 		user = ue->user;
+		LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task User[%d]!\r\n", __func__, __LINE__, user->UserNumber);
+		user->Lock();
 		user->EventDestroy();
+		user->UnLock();
+		LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] EventDestroy Over!\r\n", __func__, __LINE__, user->UserNumber);
+	}
+	TimeSleep(10000);
+	for (iter = task->userAll->begin(); iter != task->userAll->end(); ++iter)
+	{
+		ue = *iter;
+		user = ue->user;
 		if (user->sockCount == 0 && default_api.destory)
 		{
-			default_api.destory(user);		//若连接未关闭，可能导致崩溃
+			LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] Free Start!\r\n", __func__, __LINE__, user->UserNumber);
+			default_api.destory(user);		//若IO线程尚有指向该用户的指针，可能导致崩溃
+			LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] Free Over!\r\n", __func__, __LINE__, user->UserNumber);
 		}
 		else
 		{
 			TaskUserLog(user, LOG_ERROR, "userlist用户连接未完全关闭，导致内存泄漏！");
 			userClean = false;
 		}
+		LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task User[%d] Timer!\r\n", __func__, __LINE__, user->UserNumber);
 		sheeps_free(ue);
+		LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task User[%d] Timer Over!\r\n", __func__, __LINE__, user->UserNumber);
 	}
 
 	delete task->userAll;
+	LOG(clogId, LOG_DEBUG, "%s:%d Clean User All Over!\r\n", __func__, __LINE__);
 	delete task->userDes;
 	delete task->userDesLock;
-
+	LOG(clogId, LOG_DEBUG, "%s:%d Clean User Des Over!\r\n", __func__, __LINE__);
 	if (userClean == true && default_api.taskstop)
 	{
 		default_api.taskstop(task);
@@ -107,7 +122,7 @@ static void destroy_task(HTASKCFG task)
 		TaskLog(task, LOG_ERROR, "尚有用户连接未完全关闭，导致内存泄漏！");
 	}
 	CloseLog(task->logfd);
-	taskDel.erase(task->taskID);
+	//taskDel.erase(task->taskID);
 	sheeps_free(task);
 	LOG(clogId, LOG_DEBUG, "%s:%d Clean Task Over!\r\n", __func__, __LINE__);
 }
@@ -242,9 +257,9 @@ VOID CALLBACK userWorkFunc(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 				DeleteTimerQueueTimer(task->hTimerQueue, timer, NULL);
 				proto->EventDestroy();
 				proto->LastError[0] = 0x0;
-				proto->UnLock();
 				push_userDes_back(task, hue);
 			}
+			proto->UnLock();
 		}
 	}
 	//user_set_next_timer(task, proto, hue);
@@ -296,7 +311,11 @@ int taskWorkerThread(void* pParam)
 		TimeSleep(500);
 	}
 #ifdef __WINDOWS__
-	DeleteTimerQueueEx(task->hTimerQueue, INVALID_HANDLE_VALUE);
+	int ret = DeleteTimerQueueEx(task->hTimerQueue, INVALID_HANDLE_VALUE);
+	if (!ret)
+	{
+		LOG(clogId, LOG_ERROR, "%s:%d 定时器队列关闭错误[%d]", __func__, __LINE__, GetLastError());
+	}
 #else
 	std::list<HUserEvent>::iterator iter;
 	for (iter = task->userAll->begin(); iter != task->userAll->end(); ++iter)
@@ -400,8 +419,8 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 		ue = NULL;
 		user = NULL;
 		isNew = false;
-		if (user_revive)
-			ue = get_userDes_front(task);
+
+		ue = get_userDes_front(task);
 		if (ue == NULL)
 		{
 			isNew = true;
@@ -448,6 +467,8 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 		}
 		else
 		{
+			if (user_revive)
+				user->UserNumber = task->userNumber++;
 			ReInit(user, true);
 		}
 #ifdef __WINDOWS__
@@ -522,7 +543,7 @@ bool __STDCALL stop_task_by_id(uint8_t taskID)
 	{
 		task = iter->second;
 		taskAll.erase(iter);
-		taskDel.insert(std::pair<int, HTASKCFG>(taskID, task));
+		//taskDel.insert(std::pair<int, HTASKCFG>(taskID, task));
 		task->status = TASK_CLEANING;
 		return true;
 	}
@@ -698,7 +719,7 @@ static void TaskManagerForever(int projectid)
 	printf("...");
 	TimeSleep(1000);
 	printf("...");
-	char in[4] = { 0x0 };
+	char in[8] = { 0x0 };
 	char project[16] = { 0x0 };
 	snprintf(project, sizeof(project), "%d", projectid);
 	while (true)
@@ -710,9 +731,9 @@ static void TaskManagerForever(int projectid)
 			printf("状态：连接成功\n");
 		else
 			printf("状态：未连接\n");
-		printf("\n选择:【Q退出】\n操作：");
-		fgets(in, 3, stdin);
-		if (in[0] == 'Q')
+		printf("\n选择:【Quit退出】\n操作：");
+		fgets(in, 8, stdin);
+		if (in[0] == 'Q' && in[1] == 'u' && in[2] == 'i' && in[3] == 't')
 			break;
 	}
 }
@@ -727,7 +748,7 @@ void __STDCALL TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destor
 	if (!SheepsClientRun(projectid, server))
 	{
 		log_stdout = config_get_bool_value("LOG", "stdout", false);
-		user_revive = config_get_bool_value("mode", "revive", false);
+		user_revive = config_get_bool_value("mode", "revive", true);
 		timer_loop = config_get_int_value("mode", "timer", 500);
 		TaskManagerForever(projectid);
 	}

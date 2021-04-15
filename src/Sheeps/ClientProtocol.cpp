@@ -24,15 +24,14 @@ ClientProtocol::~ClientProtocol()
 //固有函数，继承自基类
 void ClientProtocol::ConnectionMade(HSOCKET hsock)
 {
-	LOG(clogId, LOG_DEBUG, "stress server connection made：[%s:%d]\r\n", hsock->peer_ip, hsock->peer_port);
+	LOG(clogId, LOG_DEBUG, "stress server connection made [%s:%d]\r\n", hsock->peer_ip, hsock->peer_port);
 	StressHsocket = hsock;
 
 	HsocketSend(hsock, "sheeps", 6);
 
 	char data[64] = {0x0};
-	snprintf(data, sizeof(data), "{\"CPU\":%d, \"ProjectID\":%d}", GetCpuCount(), this->ProjectID);
+	int len = snprintf(data, sizeof(data), "{\"CPU\":%d, \"ProjectID\":%d}", GetCpuCount(), this->ProjectID);
 
-	int len = int(strlen(data));
 	t_stress_protocol_head head = {0x0};
 	head.msgLen = sizeof(t_stress_protocol_head) + len;
 	head.cmdNo = 1;

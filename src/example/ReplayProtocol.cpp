@@ -21,14 +21,13 @@ int TaskStop(HTASKCFG task)
 
 ReplayProtocol* CreateUser(void)
 {	/*此函数创建一个继承自UserProtocol的对象实例，并返回其指针*/
-	UserProtocol* hdl = new UserProtocol;
-	return hdl;
+	return new UserProtocol;
 }
 
 void DestoryUser(ReplayProtocol* hdl)
 {	/*此函数用于销毁CreateUser函数创建的对象实例*/
 	if (hdl != NULL)
-		delete hdl;
+		delete (UserProtocol*)hdl;
 }
 
 
