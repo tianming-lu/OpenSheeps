@@ -28,7 +28,7 @@ public:
 	void EventConnectClose(const char* ip, int port, bool udp);
 	void EventConnectSend(const char* ip, int port, const char* content, int clen, bool udp);
 	void EventTimeOut();
-	void EventReInit();
+	void EventReset();
 	void EventDestroy();
 	void ConnectionMade(HSOCKET hsock);
 	void ConnectionFailed(HSOCKET hsock);

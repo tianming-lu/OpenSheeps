@@ -138,7 +138,8 @@ static void ReInit(ReplayProtocol* proto, bool loop)
 		proto->SelfDead = false;
 		proto->PlayMode = PLAY_NORMAL;
 		proto->MsgPointer = { 0x0 };
-		proto->EventReInit();
+		proto->EventReset();
+		proto->EventInit();
 	}
 }
 

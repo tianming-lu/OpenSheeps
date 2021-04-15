@@ -146,7 +146,7 @@ void UserProtocol::EventTimeOut()
 	TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 }
 
-void UserProtocol::EventReInit()
+void UserProtocol::EventReset()
 {	//用户重置到初始状态
 	TaskUserLog(this, LOG_NORMAL, "%s:%d %s", __func__, __LINE__, this->LastError);
 	this->CloseAllConnection();

@@ -159,7 +159,7 @@ public:
 	virtual void EventConnectClose(const char* ip, int port, bool udp) = 0;
 	virtual void EventConnectSend(const char* ip, int port, const char* content, int clen, bool udp) = 0;
 	virtual void EventTimeOut() = 0;
-	virtual void EventReInit() = 0;
+	virtual void EventReset() = 0;
 	virtual void EventDestroy() = 0;
 	virtual void ConnectionMade(HSOCKET hsock) = 0;
 	virtual void ConnectionFailed(HSOCKET hsock) = 0;
