@@ -30,8 +30,8 @@
 *.exe
 *.out
 *.app
-/SheepsClient/.vs
-/SheepsClient/Sheeps/x64
-/SheepsClient/Starter/x64
-/SheepsClient/third/x64
-/SheepsClient/example/x64
+/src/.vs
+/src/Sheeps/x64
+/src/Starter/x64
+/src/third/x64
+/src/example/x64
