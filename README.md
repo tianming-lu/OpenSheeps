@@ -91,10 +91,11 @@ __二、回放__
 
 #### 代码引用说明
 
-1.本系统使用了开源的cjson库：https://sourceforge.net/projects/cjson/  
-2.本系统使用了开源的SQLite的C语言库：https://www.sqlite.org/index.html  
-3.本系统使用以前项目积累的sha1和md5算法源码，时间久远已记不清出处  
-4.感谢以上开源代码或项目，如有侵犯版权，请与我联系  
+1.本系统使用了基于MIT授权的cjson库：https://sourceforge.net/projects/cjson/  
+2.本系统使用了基于MIT授权的SQLite的C语言库：https://www.sqlite.org/index.html  
+3.本系统使用了基于MIT授权的jQuery库：https://jquery.com/  
+4.本系统使用以前项目积累的sha1和md5算法源码，时间久远已记不清出处  
+5.感谢以上开源代码或项目，如有侵犯版权，请与我联系  
 
 #### 下载二进制文件
 [点击此处进入下载](https://gitee.com/lutianming/Sheeps/releases)
