@@ -116,11 +116,11 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 
 	char buf[512] = { 0x0 };
 	char tem[128] = { 0x0 };
-	if (taskcfg->loopMode == 0 && taskcfg->ignoreErr == true)
-		snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"IgnoreErr\":true,", taskcfg->taskID, taskcfg->projectID);
-	else
-		snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"IgnoreErr\":false,", taskcfg->taskID, taskcfg->projectID);
 
+	const char* igerr = "false";
+	if (taskcfg->loopMode == 0 && taskcfg->ignoreErr == true)
+		igerr = "true";
+	snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"IgnoreErr\":%s,\"LogLevel\":%d,", taskcfg->taskID, taskcfg->projectID, igerr, taskcfg->logLevel);
 	int machine_id = 0;
 	StressClientMapLock->lock();
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
@@ -507,18 +507,27 @@ static void do_stress_client_log(HSOCKET hsock, cJSON* root, char* uri)
 	if (level == NULL ||taskid == NULL || level->type != cJSON_Number ||taskid->type != cJSON_Number)
 		return;
 
-	char buf[128] = { 0x0 };
-	int n = snprintf(buf + 8, sizeof(buf) - 8, "{\"LogLevel\":%d, \"TaskID\":%d}", level->valueint, taskid->valueint);
-	*(int*)buf = n + 8;
-	*(int*)(buf + 4) = 14;
-
-	StressClientMapLock->lock();
-	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
-	for (; iter != StressClientMap->end(); ++iter)
+	std::map<uint8_t, HTASKCONFIG>::iterator ite;
+	ite = TaskCfg.find(taskid->valueint);
+	if (ite != TaskCfg.end())
 	{
-		HsocketSend(iter->first, buf, n + 8);
+		ite->second->logLevel = level->valueint;
+		if (ite->second->taskState == STATE_RUNING)
+		{
+			char buf[128] = { 0x0 };
+			int n = snprintf(buf + 8, sizeof(buf) - 8, "{\"LogLevel\":%d, \"TaskID\":%d}", level->valueint, taskid->valueint);
+			*(int*)buf = n + 8;
+			*(int*)(buf + 4) = 14;
+			StressClientMapLock->lock();
+			std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
+			for (; iter != StressClientMap->end(); ++iter)
+			{
+				HsocketSend(iter->first, buf, n + 8);
+			}
+			StressClientMapLock->unlock();
+		}
 	}
-	StressClientMapLock->unlock();
+
 	cJSON* res = cJSON_CreateObject();
 	if (res == NULL)
 		return;
@@ -659,6 +668,7 @@ static void do_console_task_info(HSOCKET hsock, cJSON* root, char* uri)
 	cJSON_AddNumberToObject(data, "space_time", taskcfg->spaceTime);
 	cJSON_AddNumberToObject(data, "loop_mode", taskcfg->loopMode);
 	cJSON_AddNumberToObject(data, "ignor_error", taskcfg->ignoreErr);
+	cJSON_AddNumberToObject(data, "log_level", taskcfg->logLevel);
 	cJSON_AddStringToObject(data, "db_file", taskcfg->dbName);
 	cJSON* replay = cJSON_CreateArray();
 	if (replay == NULL)
@@ -773,6 +783,7 @@ static void do_console_task_list(HSOCKET hsock, cJSON* root, char* uri)
 		cJSON_AddNumberToObject(item, "task_id", info->taskID);
 		cJSON_AddNumberToObject(item,"state", info->taskState);
 		cJSON_AddStringToObject(item, "des", info->taskDes);
+		cJSON_AddNumberToObject(item, "log_level", info->logLevel);
 		cJSON_AddItemToArray(array, item);
 	}
 	send_console_msg(hsock, res);
@@ -1263,6 +1274,43 @@ static int get_home_page(HSOCKET hsock)
 	return 0;
 }
 
+static int get_query_lib(HSOCKET hsock)
+{
+	HRSRC rc = FindResourceA(Sheeps_Module, MAKEINTRESOURCEA(IDR_JS1), "JS");
+	if (rc == NULL)
+	{
+		HsocketClose(hsock);
+		return 0;
+	}
+	HGLOBAL  hGlobal = LoadResource(Sheeps_Module, rc);
+	if (NULL == hGlobal)
+	{
+		HsocketClose(hsock);
+		return 0;
+	}
+	LPVOID  pBuffer = LockResource(hGlobal);
+	int flen = SizeofResource(Sheeps_Module, rc);
+
+	char buf[128] = { 0x0 };
+	int offset = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nCache-Control: public, max-age=31536000\r\nContent-Type: application/javascript\r\nContent-Length:%d\r\n\r\n", flen);
+
+	HsocketSend(hsock, buf, offset);
+	HsocketSend(hsock, (const char*)pBuffer, flen);
+
+	HsocketClose(hsock);
+	return 0;
+}
+
+static int get_static_file(HSOCKET hsock, const char* uri)
+{
+	if (strcmp(uri, "/") == 0)
+		return get_home_page(hsock);
+	if (strcmp(uri, "/jquery.min.js") == 0)
+		return get_query_lib(hsock);
+	HsocketClose(hsock);
+	return 0;
+}
+
 int CheckConsoleRequest(HSOCKET hsock, ServerProtocol* proto, const char* data, int len)
 {
 	if (len < 4)
@@ -1277,8 +1325,8 @@ int CheckConsoleRequest(HSOCKET hsock, ServerProtocol* proto, const char* data, 
 
 	char uri[256] = { 0x0 };
 	get_uri_string(data, uri, sizeof(uri));
-	if (strcmp(uri, "/") == 0)
-		return get_home_page(hsock);
+	if (strncmp(data, "GET", 3) == 0)
+		return get_static_file(hsock, uri);
 
 	char* content = (char*)sheeps_malloc((size_t)len + 1);
 	if (content == NULL)

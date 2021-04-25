@@ -1,3 +1,3 @@
-;1.Ç¿ÖÆµ¼³öº¯Êý,Î´Ê¹ÓÃ__declspec(dllexport)µ¼³öµÄº¯ÊýÍ¨¹ý´ËÅäÖÃÇ¿ÖÆµ¼³ö
-;2.µÚÈý·½¾²Ì¬¿âÖÐÊ¹ÓÃ__declspec(dllexport)µ¼³ö£¬µ«Sheeps.dllÎ´µ÷ÓÃµÄº¯ÊýÄ£¿éÍ¨¹ý´ËÅäÖÃÇ¿ÖÆµ¼³ö
+;1.å¼ºåˆ¶å¯¼å‡ºå‡½æ•°,æœªä½¿ç”¨__declspec(dllexport)å¯¼å‡ºçš„å‡½æ•°é€šè¿‡æ­¤é…ç½®å¼ºåˆ¶å¯¼å‡º
+;2.ç¬¬ä¸‰æ–¹é™æ€åº“ä¸­ä½¿ç”¨__declspec(dllexport)å¯¼å‡ºï¼Œä½†Sheeps.dllæœªè°ƒç”¨çš„å‡½æ•°æ¨¡å—é€šè¿‡æ­¤é…ç½®å¼ºåˆ¶å¯¼å‡º
 EXPORTS

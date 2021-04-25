@@ -6,7 +6,7 @@
 
 <html>
     <head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>控制台</title>
-        <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+        <script src="jquery.min.js"></script>
     </head>
     <body bgcolor="#E1FFFF">
         <header><h1>Sheeps压力测试系统管理后台</h1></header><br>
@@ -214,12 +214,12 @@ $(document).ready(function(){
       <td width=\"200\"><input type=\"text\" style=\"width:60\"><a class=\"task_user\" href=\"javascript:void(null);\">增减人数</a></td>\
       <td width=\"300\">\
         <select id=\"loglevel\" style=\"width:80\">\
-          <option value =\"0\">TRACE</option>\
-          <option value =\"1\">DEBUG</option>\
-          <option value =\"2\">NORMAL</option>\
-          <option value =\"3\">ERROR</option>\
-          <option value =\"4\">FAULT</option>\
-          <option value =\"5\">NONE</option>\
+          <option value =\"0\" "+log_select(0, item.log_level) +">TRACE</option>\
+          <option value =\"1\" "+log_select(1, item.log_level) +">DEBUG</option>\
+          <option value =\"2\" "+log_select(2, item.log_level) +">NORMAL</option>\
+          <option value =\"3\" "+log_select(3, item.log_level) +">ERROR</option>\
+          <option value =\"4\" "+log_select(4, item.log_level) +">FAULT</option>\
+          <option value =\"5\" "+log_select(5, item.log_level) +">NONE</option>\
         </select>\
       <a class=\"task_loglevel\" href=\"javascript:void(null);\">设定日志等级</a></td>\
       <td><a class=\"task_delete\" href=\"javascript:void(null);\">删除</a></td></tr>"
@@ -230,6 +230,13 @@ $(document).ready(function(){
     show_task_user();
     show_task_delete();
     show_task_loglevel();
+  }
+
+  function log_select(pos, value)
+  {
+    if (pos == value)
+      return "selected"
+    return ""
   }
 
   function show_task_list_select(){

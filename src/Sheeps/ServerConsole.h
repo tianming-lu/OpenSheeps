@@ -37,6 +37,8 @@ typedef struct {
 	uint16_t	spaceTime;
 	uint8_t		loopMode; //0循环 1不循环 2实时回放
 	bool		ignoreErr;
+	uint8_t		logLevel;
+
 	uint8_t		taskState;
 	char		taskDes[64];
 	char		dbName[64];

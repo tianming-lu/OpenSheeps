@@ -101,6 +101,7 @@
       <Filter>源文件</Filter>
     </None>
     <None Include="..\..\webConsole\console.html" />
+    <None Include="..\..\webConsole\jquery.min.js" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Sheeps.rc">

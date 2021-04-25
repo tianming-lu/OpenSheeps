@@ -175,7 +175,7 @@ extern "C"
 {
 #endif
 
-int		__STDCALL	create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, BaseFactory* factory);
+int		__STDCALL	create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, int loglevel, BaseFactory* factory);
 bool	__STDCALL	insert_message_by_taskId(uint8_t taskID, uint8_t type, char* ip, uint32_t port, char* content, uint64_t timestamp, uint32_t microsecond, bool udp);
 bool	__STDCALL	stop_task_by_id(uint8_t taskID);
 int		__STDCALL	task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory* factory);

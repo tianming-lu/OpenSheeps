@@ -211,6 +211,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\webConsole\console.html" />
+    <None Include="..\..\webConsole\jquery.min.js" />
     <None Include="Sheeps.def" />
   </ItemGroup>
   <ItemGroup>

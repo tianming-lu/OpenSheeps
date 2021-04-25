@@ -92,20 +92,21 @@ static void destroy_task(HTASKCFG task)
 	{
 		ue = *iter;
 		user = ue->user;
+		int user_number = user->UserNumber;
 		if (user->sockCount == 0 && default_api.destory)
 		{
-			LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] Free Start!\r\n", __func__, __LINE__, user->UserNumber);
+			LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] Free Start!\r\n", __func__, __LINE__, user_number);
 			default_api.destory(user);		//若IO线程尚有指向该用户的指针，可能导致崩溃
-			LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] Free Over!\r\n", __func__, __LINE__, user->UserNumber);
+			LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] Free Over!\r\n", __func__, __LINE__, user_number);
 		}
 		else
 		{
 			TaskUserLog(user, LOG_ERROR, "userlist用户连接未完全关闭，导致内存泄漏！");
 			userClean = false;
 		}
-		LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task User[%d] Timer!\r\n", __func__, __LINE__, user->UserNumber);
+		LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task User[%d] Timer!\r\n", __func__, __LINE__, user_number);
 		sheeps_free(ue);
-		LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task User[%d] Timer Over!\r\n", __func__, __LINE__, user->UserNumber);
+		LOG(clogId, LOG_DEBUG, "%s:%d Start Clean Task User[%d] Timer Over!\r\n", __func__, __LINE__, user_number);
 	}
 
 	delete task->userAll;
@@ -486,7 +487,7 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 	return 0;
 }
 
-int __STDCALL create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, BaseFactory* factory)
+int __STDCALL create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, int loglevel, BaseFactory* factory)
 {
 	t_task_config* task;
 	task = getTask_by_taskId(taskid, true);
@@ -500,7 +501,7 @@ int __STDCALL create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machine
 	
 	char path[256] = { 0x0 };
 	snprintf(path, sizeof(path), "%stask_%d_%d_%03d.log", LogPath, projectid, machineid, task->taskID);
-	task->logfd = RegisterLog(path, LOG_TRACE, 20, 86400, 2);
+	task->logfd = RegisterLog(path, loglevel, 20, 86400, 2);
 
 	if (default_api.taskstart)
 		default_api.taskstart(task);
