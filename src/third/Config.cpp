@@ -77,7 +77,7 @@ static int push_value(char* buf, int len, char* section, size_t secsize)
 	char* p = strchr(buf, '=');
 	if (p == NULL)
 	{
-		if ((uint8_t)*buf == 0xEF && (uint8_t)*(buf + 1) == 0xBB && (uint8_t)*(buf + 2) == 0xBF)
+		if ((char)*buf == 0xEF && (char)*(buf + 1) == 0xBB && (char)*(buf + 2) == 0xBF)
 		{	//处理utf-8 bom 头
 			memmove(buf, buf + 3, (size_t)n - 3);
 			n -= 3;

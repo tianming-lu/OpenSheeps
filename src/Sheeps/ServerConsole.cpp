@@ -25,6 +25,10 @@
 
 extern char _binary_console_html_start[];
 extern char _binary_console_html_end[];
+extern char _binary_jquery_min_js_start[];
+extern char _binary_jquery_min_js_end[];
+extern char _binary_favicon_ico_start[];
+extern char _binary_favicon_ico_end[];
 #endif // !__WINDOWS__
 
 #define SQL_SIZE 1024
@@ -120,7 +124,7 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	const char* igerr = "false";
 	if (taskcfg->loopMode == 0 && taskcfg->ignoreErr == true)
 		igerr = "true";
-	snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"IgnoreErr\":%s,\"LogLevel\":%d,", taskcfg->taskID, taskcfg->projectID, igerr, taskcfg->logLevel);
+	snprintf(tem, sizeof(tem), "{\"TaskID\":%d,\"projectID\":%d,\"IgnoreErr\":%s,\"LogLevel\":%d,\"Parms\":\"%s\",", taskcfg->taskID, taskcfg->projectID, igerr, taskcfg->logLevel, taskcfg->parms);
 	int machine_id = 0;
 	StressClientMapLock->lock();
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
@@ -551,6 +555,7 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	{
 		return;
 	}
+	cJSON* parms = cJSON_GetObjectItem(root, "parms");
 
 	HTASKCONFIG task = (HTASKCONFIG)sheeps_malloc(sizeof(TaskConfig));
 	if (task == NULL)
@@ -576,6 +581,8 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	task->spaceTime = space->valueint;
 	task->loopMode = loop->valueint;
 	task->ignoreErr = ignor->valueint == 0? false:true;
+	if (parms && parms->type == cJSON_String)
+		snprintf(task->parms, sizeof(parms), "%s", parms->valuestring);
 	snprintf(task->dbName, sizeof(task->dbName), "%s", dbfile->valuestring);
 	snprintf(task->taskDes, sizeof(task->taskDes), "%s", des->valuestring);
 	task->replayAddr = new(std::nothrow) std::list<Readdr*>;
@@ -669,6 +676,7 @@ static void do_console_task_info(HSOCKET hsock, cJSON* root, char* uri)
 	cJSON_AddNumberToObject(data, "loop_mode", taskcfg->loopMode);
 	cJSON_AddNumberToObject(data, "ignor_error", taskcfg->ignoreErr);
 	cJSON_AddNumberToObject(data, "log_level", taskcfg->logLevel);
+	cJSON_AddStringToObject(data, "parms", taskcfg->parms);
 	cJSON_AddStringToObject(data, "db_file", taskcfg->dbName);
 	cJSON* replay = cJSON_CreateArray();
 	if (replay == NULL)
@@ -1276,6 +1284,10 @@ static int get_home_page(HSOCKET hsock)
 
 static int get_query_lib(HSOCKET hsock)
 {
+	const char* file = NULL;
+	int flen = 0;
+
+#ifdef __WINDOWS__
 	HRSRC rc = FindResourceA(Sheeps_Module, MAKEINTRESOURCEA(IDR_JS1), "JS");
 	if (rc == NULL)
 	{
@@ -1288,14 +1300,52 @@ static int get_query_lib(HSOCKET hsock)
 		HsocketClose(hsock);
 		return 0;
 	}
-	LPVOID  pBuffer = LockResource(hGlobal);
-	int flen = SizeofResource(Sheeps_Module, rc);
-
+	file = (const char*)LockResource(hGlobal);
+	flen = SizeofResource(Sheeps_Module, rc);
+#else
+	flen = _binary_jquery_min_js_end - _binary_jquery_min_js_start;
+	file = _binary_jquery_min_js_start;
+#endif // __WINDOWS__
 	char buf[128] = { 0x0 };
-	int offset = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nCache-Control: public, max-age=31536000\r\nContent-Type: application/javascript\r\nContent-Length:%d\r\n\r\n", flen);
+	int offset = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nCache-Control: public,max-age=31536000\r\nContent-Type: application/javascript\r\nContent-Length:%d\r\n\r\n", flen);
 
 	HsocketSend(hsock, buf, offset);
-	HsocketSend(hsock, (const char*)pBuffer, flen);
+	HsocketSend(hsock, file, flen);
+
+	HsocketClose(hsock);
+	return 0;
+}
+
+static int get_favicon(HSOCKET hsock)
+{
+	const char* file = NULL;
+	int flen = 0;
+
+#ifdef __WINDOWS__
+	HRSRC rc = FindResourceA(Sheeps_Module, MAKEINTRESOURCEA(IDI_ICON1), "ICO");
+	if (rc == NULL)
+	{
+		HsocketClose(hsock);
+		return 0;
+	}
+	HGLOBAL  hGlobal = LoadResource(Sheeps_Module, rc);
+	if (NULL == hGlobal)
+	{
+		HsocketClose(hsock);
+		return 0;
+	}
+
+	file = (const char*)LockResource(hGlobal);
+	flen = SizeofResource(Sheeps_Module, rc);
+#else
+	flen = _binary_favicon_ico_end - _binary_favicon_ico_start;
+	file = _binary_favicon_ico_start;
+#endif // __WINDOWS__
+	char buf[128] = { 0x0 };
+	int offset = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nCache-Control: public,max-age=31536000\r\nContent-Type: image/x-icon\r\nContent-Length:%d\r\n\r\n", flen);
+
+	HsocketSend(hsock, buf, offset);
+	HsocketSend(hsock, file, flen);
 
 	HsocketClose(hsock);
 	return 0;
@@ -1307,6 +1357,8 @@ static int get_static_file(HSOCKET hsock, const char* uri)
 		return get_home_page(hsock);
 	if (strcmp(uri, "/jquery.min.js") == 0)
 		return get_query_lib(hsock);
+	if (strcmp(uri, "/favicon.ico") == 0)
+		return get_favicon(hsock);
 	HsocketClose(hsock);
 	return 0;
 }

@@ -52,12 +52,13 @@ static inline void ReleaseIOCP_Buff(IOCP_BUFF* IocpBuff)
 	pst_free(IocpBuff);
 }
 
-static SOCKET GetListenSock(int port)
+static SOCKET GetListenSock(const char* addr, int port)
 {
 	SOCKET listenSock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 
 	SOCKADDR_IN serAdd = {0x0};
-	serAdd.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+	//serAdd.sin_addr.S_un.S_addr = inet_addr(addr);
+	inet_pton(AF_INET, addr, &serAdd.sin_addr);
 	serAdd.sin_family = AF_INET;
 	serAdd.sin_port = htons(port);
 
@@ -471,7 +472,7 @@ int __STDCALL FactoryRun(BaseFactory* fc)
 
 	if (fc->ServerPort != 0)
 	{
-		fc->Listenfd = GetListenSock(fc->ServerPort);
+		fc->Listenfd = GetListenSock(fc->ServerAddr, fc->ServerPort);
 		if (fc->Listenfd == SOCKET_ERROR)
 			return -2;
 

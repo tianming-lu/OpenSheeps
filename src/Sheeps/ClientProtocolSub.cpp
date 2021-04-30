@@ -68,10 +68,11 @@ int client_cmd_2_task_init(HSOCKET hsock, int cmdNO, cJSON* root)
 	cJSON* machineId = cJSON_GetObjectItem(root, "MachineID");
 	cJSON* ignoreErr = cJSON_GetObjectItem(root, "IgnoreErr");
 	cJSON* logLevel = cJSON_GetObjectItem(root, "LogLevel");
-	if (taskId == NULL || projectId == NULL || userCount == NULL || machineId == NULL || logLevel == NULL ||
+	cJSON* parms = cJSON_GetObjectItem(root, "Parms");
+	if (taskId == NULL || projectId == NULL || userCount == NULL || machineId == NULL || logLevel == NULL || parms == NULL ||
 		taskId->type != cJSON_Number || projectId->type != cJSON_Number ||
 		userCount->type != cJSON_Number || machineId->type != cJSON_Number ||
-		logLevel->type != cJSON_Number)
+		logLevel->type != cJSON_Number || parms->type != cJSON_String)
 	{
 		MsgResponse(hsock, cmdNO, 1, "参数错误");
 		return -1;
@@ -85,8 +86,9 @@ int client_cmd_2_task_init(HSOCKET hsock, int cmdNO, cJSON* root)
 		ignorerr = true;
 	int usercount = userCount->valueint;
 	int loglevel = logLevel->valueint;
+	char* sparms = parms->valuestring;
 
-	create_new_task(taskid, projectid, machineid, ignorerr, usercount, loglevel, hsock->factory);
+	create_new_task(taskid, projectid, machineid, ignorerr, usercount, loglevel, sparms, hsock->factory);
 	return 0;
 }
 

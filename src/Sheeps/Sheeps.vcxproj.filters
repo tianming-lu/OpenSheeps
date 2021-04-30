@@ -102,6 +102,7 @@
     </None>
     <None Include="..\..\webConsole\console.html" />
     <None Include="..\..\webConsole\jquery.min.js" />
+	<None Include="..\..\webConsole\favicon.ico" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Sheeps.rc">

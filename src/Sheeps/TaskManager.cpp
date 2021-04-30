@@ -87,7 +87,8 @@ static void destroy_task(HTASKCFG task)
 		user->UnLock();
 		LOG(clogId, LOG_DEBUG, "%s:%d Clean Task User[%d] EventDestroy Over!\r\n", __func__, __LINE__, user->UserNumber);
 	}
-	TimeSleep(10000);
+	int timewait = config_get_int_value(NULL, "wait", 10);
+	TimeSleep(timewait*1000);
 	for (iter = task->userAll->begin(); iter != task->userAll->end(); ++iter)
 	{
 		ue = *iter;
@@ -487,7 +488,7 @@ static int task_add_user(HTASKCFG task, int userCount, BaseFactory* factory)
 	return 0;
 }
 
-int __STDCALL create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, int loglevel, BaseFactory* factory)
+int __STDCALL create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machineid, bool ignorerr, int userconut, int loglevel, const char* parms, BaseFactory* factory)
 {
 	t_task_config* task;
 	task = getTask_by_taskId(taskid, true);
@@ -498,6 +499,7 @@ int __STDCALL create_new_task(uint8_t taskid, uint8_t projectid, uint8_t machine
 	task->projectID = projectid;
 	task->machineID = machineid;
 	task->ignoreErr = ignorerr;
+	snprintf(task->parms, sizeof(task->parms), "%s", parms);
 	
 	char path[256] = { 0x0 };
 	snprintf(path, sizeof(path), "%stask_%d_%d_%03d.log", LogPath, projectid, machineid, task->taskID);

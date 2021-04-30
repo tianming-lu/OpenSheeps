@@ -38,6 +38,7 @@ typedef struct {
 	uint8_t		loopMode; //0循环 1不循环 2实时回放
 	bool		ignoreErr;
 	uint8_t		logLevel;
+	char		parms[128];
 
 	uint8_t		taskState;
 	char		taskDes[64];

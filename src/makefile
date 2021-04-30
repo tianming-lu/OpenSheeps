@@ -5,7 +5,6 @@ OUTFILE = starter
 INSTALLDIR = ./out
 
 all:
-	rm -f Sheeps/console.html && cp ../webConsole/console.html Sheeps/
 	@list='$(SUBDIRS)'; for subdir in $$list; do \
 	echo "MAKING ALL IN $$subdir"; \
 	(cd $$subdir && make OUTFILE=$(OUTFILE)); \

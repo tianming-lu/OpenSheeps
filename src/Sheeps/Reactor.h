@@ -205,10 +205,11 @@ class BaseFactory
 public:
 	BaseFactory() {};
 	virtual ~BaseFactory() {};
-	void Set(Reactor* rec, uint16_t listenport) { this->reactor = rec; this->ServerPort = listenport; };
+	void Set(Reactor* rec, const char* addr, uint16_t listenport) { this->reactor = rec, snprintf(this->ServerAddr, sizeof(this->ServerAddr), addr); this->ServerPort = listenport; };
 
 public:
-	Reactor* reactor = NULL;
+	Reactor*	reactor = NULL;
+	char		ServerAddr[16] = { 0x0 };
 	uint16_t	ServerPort = 0;
 #ifdef __WINDOWS__
 	SOCKET		Listenfd = NULL;

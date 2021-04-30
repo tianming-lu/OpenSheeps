@@ -25,6 +25,6 @@ typedef struct dllAPI
 {
 	void* dllHandle;
 	SheepsServerRun   run;
-	SheepsServerStop  stop;
+	//SheepsServerStop  stop;
 }t_sheeps_dll;
 #endif // !_STARTER_H_

@@ -49,12 +49,13 @@ static void release_hsock(HSOCKET hsock)
 	}
 }
 
-static int get_listen_sock(int port)
+static int get_listen_sock(const char* ip, int port)
 {
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	//addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	inet_pton(AF_INET, ip, &addr.sin_addr);
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if(fd < 0) {
 		return -1;
@@ -531,7 +532,7 @@ int	FactoryRun(BaseFactory* fc)
 	
 	if (fc->ServerPort > 0)
 	{
-		fc->Listenfd = get_listen_sock(fc->ServerPort);
+		fc->Listenfd = get_listen_sock(fc->ServerAddr, fc->ServerPort);
 		HSOCKET hsock = new_hsockt();
 		if (hsock == NULL) return -1;
 		hsock->fd = fc->Listenfd;

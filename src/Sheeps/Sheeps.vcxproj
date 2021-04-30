@@ -212,6 +212,7 @@
   <ItemGroup>
     <None Include="..\..\webConsole\console.html" />
     <None Include="..\..\webConsole\jquery.min.js" />
+	<None Include="..\..\webConsole\favicon.ico" />
     <None Include="Sheeps.def" />
   </ItemGroup>
   <ItemGroup>

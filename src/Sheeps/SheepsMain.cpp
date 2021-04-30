@@ -64,12 +64,12 @@ static int SheepsFactoryRun(const char* sheepsIp, int sheepsPort, int projectId,
 	}
 	if (sheepsIp == NULL || sheepsPort <= 0)
 	{
-		sheepsfc->Set(rec, listenPort);
+		sheepsfc->Set(rec, "0.0.0.0", listenPort);
 		sheepsfc->StressServerPort = 0;
 	}
 	else
 	{
-		sheepsfc->Set(rec, listenPort);
+		sheepsfc->Set(rec, "0.0.0.0", listenPort);
 		memcpy(sheepsfc->StressServerIp, sheepsIp, strlen(sheepsIp));
 		sheepsfc->StressServerPort = sheepsPort;
 		sheepsfc->projectid = projectId;
