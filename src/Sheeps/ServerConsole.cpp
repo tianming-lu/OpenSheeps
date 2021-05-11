@@ -1351,6 +1351,46 @@ static int get_favicon(HSOCKET hsock)
 	return 0;
 }
 
+#ifdef __WINDOWS__
+#include "io.h"
+#include "direct.h"
+static int get_sheeps_zip(HSOCKET hsock)
+{
+	const char* filename = "./sheeps.zip";
+	int ret = 0;
+#ifdef _WIN64
+	struct _stat64 finfo;
+	ret = _stat64(filename, &finfo);
+#else
+	struct _stat32 finfo;
+	ret = _stat32(filename, &finfo);
+#endif //  _WIN64
+
+	if (ret < 0)
+		return -1;
+
+	char* data = (char*)malloc(finfo.st_size);
+	if (data == NULL)
+		return -1;
+	memset(data, 0, finfo.st_size);
+
+	FILE* file = NULL;
+	ret = fopen_s(&file, filename, "rb");
+	if (file == NULL)
+		return -1;
+	fread(data, sizeof(char), finfo.st_size, file);
+	fclose(file);
+
+	char buf[128] = { 0x0 };
+	int offset = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: application/zip\r\nContent-Length:%llu\r\n\r\n", finfo.st_size);
+	HsocketSend(hsock, buf, offset);
+	HsocketSend(hsock, data, (int)finfo.st_size);
+	free(data);
+	return 0;
+}
+#endif // __WINDOWS__
+
+
 static int get_static_file(HSOCKET hsock, const char* uri)
 {
 	if (strcmp(uri, "/") == 0)
@@ -1359,6 +1399,11 @@ static int get_static_file(HSOCKET hsock, const char* uri)
 		return get_query_lib(hsock);
 	if (strcmp(uri, "/favicon.ico") == 0)
 		return get_favicon(hsock);
+#ifdef __WINDOWS__
+	if (strcmp(uri, "/sheeps.zip") == 0)
+		return get_sheeps_zip(hsock);
+#endif // __WINDOWS__
+
 	HsocketClose(hsock);
 	return 0;
 }

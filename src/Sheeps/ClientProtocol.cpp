@@ -44,13 +44,13 @@ void ClientProtocol::ConnectionMade(HSOCKET hsock)
 	TaskManagerRuning = true;
 }
 
-void ClientProtocol::ConnectionFailed(HSOCKET hsock)
+void ClientProtocol::ConnectionFailed(HSOCKET hsock, int err)
 {
 	//LOG(logId, LOG_DEBUG, "stress server connection failed:[%s:%d]\r\n", ip, port);
 	this->StressHsocket = NULL;
 }
 
-void ClientProtocol::ConnectionClosed(HSOCKET hsock)
+void ClientProtocol::ConnectionClosed(HSOCKET hsock, int err)
 {
 	LOG(clogId, LOG_DEBUG, "stress server connection closed：[%s:%d] socket = %lld\r\n", hsock->peer_ip, hsock->peer_port, hsock->fd);
 	this->StressHsocket = NULL;

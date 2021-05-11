@@ -57,7 +57,7 @@ void ServerProtocol::ConnectionMade(HSOCKET hsock)
 	HsocketClose(hsock);
 }
 
-void ServerProtocol::ConnectionFailed(HSOCKET hsock)
+void ServerProtocol::ConnectionFailed(HSOCKET hsock, int err)
 {
 	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	switch (this->peerType)
@@ -71,7 +71,7 @@ void ServerProtocol::ConnectionFailed(HSOCKET hsock)
 	HsocketClose(this->initSock);
 }
 
-void ServerProtocol::ConnectionClosed(HSOCKET hsock)
+void ServerProtocol::ConnectionClosed(HSOCKET hsock, int err)
 {
 	LOG(slogid, LOG_DEBUG, "%s:%d %p\r\n", __func__, __LINE__, hsock);
 	if (this->peerType == PEER_PROXY)

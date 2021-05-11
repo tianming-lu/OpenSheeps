@@ -42,18 +42,18 @@ UserProtocol::~UserProtocol()
 }
 
 void UserProtocol::EventInit()
-{	/*用户初始化，用户实例被创建后会被调用一次*/
+{	/*用户初始化，用户实例被创建后会被调用一次 */
 	TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 }
 
 void UserProtocol::ConnectionMade(HSOCKET hsock)
-{	/*当用户连接目标ip端口成功后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
+{	/*当用户连接目标ip端口成功后，调用此函数，hsock为连接句柄 */
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, hsock->fd);
 	this->PlayMode = PLAY_NORMAL;
 }
 
-void UserProtocol::ConnectionFailed(HSOCKET hsock)
-{	/*当用户连接目标ip端口失败后，调用此函数，并传递对应网络地址（ip）和端口（port）*/
+void UserProtocol::ConnectionFailed(HSOCKET hsock, int err)
+{	/*当用户连接目标ip端口失败后，调用此函数, hsock为连接句柄, err为错误码 */
 	TaskUserLog(this, LOG_FAULT,"%s:%d [%s:%d]", __func__, __LINE__, hsock->peer_ip, hsock->peer_port);
 	this->PlayMode = PLAY_NORMAL;
 	TaskUserDead(this, "connection failed");
@@ -67,8 +67,8 @@ void UserProtocol::ConnectionFailed(HSOCKET hsock)
 	}
 }
 
-void UserProtocol::ConnectionClosed(HSOCKET hsock)   //类销毁后，可能导致野指针
-{	/*当用户连接关闭后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port）*/
+void UserProtocol::ConnectionClosed(HSOCKET hsock, int err)   //类销毁后，可能导致野指针
+{	/*当用户连接关闭后，调用此函数， hsock为连接句柄, err为错误码 */
 	TaskUserLog(this, LOG_FAULT, "%s:%d [%s:%d] socket = %lld", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, hsock->fd);
 	std::map<int, t_connection_info>::iterator it = this->Connection.find(hsock->peer_port);
 	if (it != this->Connection.end())
@@ -81,19 +81,18 @@ void UserProtocol::ConnectionClosed(HSOCKET hsock)   //类销毁后，可能导�
 }
 
 void UserProtocol::ConnectionRecved(HSOCKET hsock, const char* data, int len)
-{	/*当用户连接收到消息后，调用此函数，hsock为连接句柄，并传递对应网络地址（ip）和端口（port），以及数据指针（data）和消息长度（len）*/
+{	/*当用户连接收到消息后，调用此函数，hsock为连接句柄，以及数据指针（data）和消息长度（len）*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d [%s:%d][%.*s]", __func__, __LINE__, hsock->peer_ip, hsock->peer_port, len, data);
 	TaskUserSocketSkipBuf(hsock, len);
 	this->PlayMode = PLAY_NORMAL;
 }
 
 void UserProtocol::EventConnectOpen(const char* ip, int port, bool udp)
-{
-	//TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
+{	/*连接事件通知，用户需要连接指定的ip和端口，udp == true表示这是一个udp连接*/
+	TaskUserLog(this, LOG_DEBUG, "%s:%d  %s:%d", __func__, __LINE__, ip, port);
 	t_connection_info info = { 0x0 };
 	std::map<int, t_connection_info>::iterator it;
 	
-	TaskUserLog(this, LOG_DEBUG, "user connect[%s:%d]", ip, port);
 	this->PlayMode = PLAY_PAUSE;
 	HSOCKET conn_hsock = TaskUserSocketConnet(this, ip, port, TCP_CONN);
 	if (conn_hsock == NULL)
@@ -118,8 +117,7 @@ void UserProtocol::EventConnectOpen(const char* ip, int port, bool udp)
 	}
 }
 void UserProtocol::EventConnectClose(const char* ip, int port, bool udp) 
-{
-	//TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
+{	/*连接关闭事件通知，用户需要关闭指定的ip和端口的连接（如果连接存在），udp == true表示这是一个udp连接*/
 	TaskUserLog(this, LOG_DEBUG, "user conclose[%s:%d]", ip, port);
 	HSOCKET* hsock = this->GetScokFromConnection(ip, port);
 	if (hsock != NULL)
@@ -130,8 +128,7 @@ void UserProtocol::EventConnectClose(const char* ip, int port, bool udp)
 }
 
 void UserProtocol::EventConnectSend(const char* ip, int port, const char* content, int clen, bool udp)
-{
-	//TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
+{	/*连接发送消息事件通知，用户需要向指定的ip和端口的连接发送消息（如果连接存在），udp == true表示这是一个udp连接*/
 	TaskUserLog(this, LOG_DEBUG, "user send[%s:%d [%s]]", ip, port, content);
 	HSOCKET* hsock = this->GetScokFromConnection(ip, port);
 	if (hsock != NULL)
@@ -142,18 +139,18 @@ void UserProtocol::EventConnectSend(const char* ip, int port, const char* conten
 }
 
 void UserProtocol::EventTimeOut()
-{
+{	/*定时器超时事件通知*/
 	TaskUserLog(this, LOG_DEBUG, "%s:%d", __func__, __LINE__);
 }
 
 void UserProtocol::EventReset()
-{	//用户重置到初始状态
+{	/*用户状态重置事件，重置用户数据*/
 	TaskUserLog(this, LOG_NORMAL, "%s:%d %s", __func__, __LINE__, this->LastError);
 	this->CloseAllConnection();
 }
 
 void UserProtocol::EventDestroy()
-{	/*任务终止时，调用次函数，关闭所有连接，并且HSOCKET 句柄变量置为NULL*/
+{	/*用户销毁事件，清理用户数据，关闭所有连接*/
 	TaskUserLog(this, LOG_NORMAL, "%s:%d %s", __func__, __LINE__, this->LastError);
 	this->CloseAllConnection();
 }

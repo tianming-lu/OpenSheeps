@@ -20,13 +20,13 @@ copyfile:
 	cp ../../webConsole/favicon.ico ./
 
 build: $(TARGET)
-	
+
 $(TARGET):$(OBJ)
 	$(CC) $(CFLAGS) -shared -o $@ $^ $(LIB)
 %.o: %.cpp
-	$(CXX) $(CFLAGS) $(INC) -c $< 	 
+	$(CXX) $(CFLAGS) $(INC) -c $<
 %.o: %.c
-	$(CC) $(CFLAGS) $(INC) -c $< 	 
+	$(CC) $(CFLAGS) $(INC) -c $<
 %.o: %.html
 	ld -r -b binary -o $@ $<
 %.o: %.js
@@ -36,4 +36,4 @@ $(TARGET):$(OBJ)
 
 clean:
 	rm -f *.o *.so *.html *.js *.ico
-	rm -f $(TARGET) 	
+	rm -f $(TARGET)

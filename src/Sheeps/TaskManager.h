@@ -163,8 +163,8 @@ public:
 	virtual void EventReset() = 0;
 	virtual void EventDestroy() = 0;
 	virtual void ConnectionMade(HSOCKET hsock) = 0;
-	virtual void ConnectionFailed(HSOCKET hsock) = 0;
-	virtual void ConnectionClosed(HSOCKET hsock) = 0;
+	virtual void ConnectionFailed(HSOCKET hsock, int err) = 0;
+	virtual void ConnectionClosed(HSOCKET hsock, int err) = 0;
 	virtual void ConnectionRecved(HSOCKET hsock, const char* data, int len) = 0;
 	
 };
