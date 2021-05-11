@@ -152,9 +152,9 @@ static void do_close(HSOCKET hsock, BaseFactory* fc, BaseProtocol* proto)
 		{
 			left_count = __sync_sub_and_fetch (&proto->sockCount, 1);
 			if (hsock->_epoll_type == READ)
-    			proto->ConnectionClosed(hsock);
+    			proto->ConnectionClosed(hsock, errno);
 			else
-				proto->ConnectionFailed(hsock);	
+				proto->ConnectionFailed(hsock, errno);	
 		}
 		proto->UnLock();
 	}
