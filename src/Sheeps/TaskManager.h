@@ -123,17 +123,17 @@ typedef struct {
 
 }t_task_config, *HTASKCFG;
 
-typedef ReplayProtocol* (*CREATEAPI)();
-typedef void(*DESTORYAPI)(ReplayProtocol*);
-typedef int(*INIT)(HTASKCFG);
+typedef ReplayProtocol* (*CREATE_CALLBACK)();
+typedef void(*DESTORY_CALLBACK)(ReplayProtocol*);
+typedef int(*TASK_CALLBACK)(HTASKCFG);
 typedef int(*UNPACK)(const char*, int, int, const char*, int);
 typedef struct dllAPI
 {
-	CREATEAPI   create;
-	DESTORYAPI  destory;
-	INIT		taskstart;
-	INIT		taskstop;
-	INIT		unpack;
+	CREATE_CALLBACK   create;
+	DESTORY_CALLBACK  destory;
+	TASK_CALLBACK		taskstart;
+	TASK_CALLBACK		taskstop;
+	TASK_CALLBACK		unpack;
 }t_replay_dll;
 
 class ReplayProtocol :
@@ -183,7 +183,7 @@ int		__STDCALL	task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactor
 void	__STDCALL	set_task_log_level(uint8_t level, uint8_t taskID);
 
 //项目业务逻辑API
-Task_API void	__STDCALL	TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server);
+Task_API void	__STDCALL	TaskManagerRun(int projectid, CREATE_CALLBACK create, DESTORY_CALLBACK destory, TASK_CALLBACK taskstart, TASK_CALLBACK taskstop, bool server);
 Task_API bool	__CDECL__	TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
 Task_API bool	__STDCALL	TaskUserSocketClose(HSOCKET hsock);
 Task_API void	__CDECL__	TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);

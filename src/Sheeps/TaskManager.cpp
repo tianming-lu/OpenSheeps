@@ -742,7 +742,7 @@ static void TaskManagerForever(int projectid)
 	}
 }
 
-void __STDCALL TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server)
+void __STDCALL TaskManagerRun(int projectid, CREATE_CALLBACK create, DESTORY_CALLBACK destory, TASK_CALLBACK taskstart, TASK_CALLBACK taskstop, bool server)
 {
 	default_api.create = create;
 	default_api.destory = destory;

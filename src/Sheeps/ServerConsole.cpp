@@ -1382,7 +1382,7 @@ static int get_sheeps_zip(HSOCKET hsock)
 	fclose(file);
 
 	char buf[128] = { 0x0 };
-	int offset = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: application/zip\r\nContent-Length:%llu\r\n\r\n", finfo.st_size);
+	int offset = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: application/zip\r\nContent-Length:%llu\r\n\r\n", (unsigned long long)finfo.st_size);
 	HsocketSend(hsock, buf, offset);
 	HsocketSend(hsock, data, (int)finfo.st_size);
 	free(data);
