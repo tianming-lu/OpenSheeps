@@ -41,7 +41,7 @@
 
 
 ``` 
-Task_API void	__STDCALL	TaskManagerRun(int projectid, CREATEAPI create, DESTORYAPI destory, INIT taskstart, INIT taskstop, bool server);
+Task_API void	__STDCALL	TaskManagerRun(int projectid, CREATE_CALLBACK create, DESTORY_CALLBACK destory, TASK_CALLBACK taskstart, TASK_CALLBACK taskstop, bool server);
 Task_API bool	__CDECL__	TaskUserDead(ReplayProtocol* proto, const char* fmt, ...);
 Task_API bool	__STDCALL	TaskUserSocketClose(HSOCKET hsock);
 Task_API void	__CDECL__	TaskUserLog(ReplayProtocol* proto, uint8_t level, const char* fmt, ...);
