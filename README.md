@@ -16,14 +16,3 @@
 
 ![输入图片说明](https://images.gitee.com/uploads/images/2021/0516/174654_4447df60_1564139.png "屏幕截图.png")
 ![输入图片说明](https://images.gitee.com/uploads/images/2021/0516/174911_be63afe7_1564139.png "屏幕截图.png")
-
-#### 代码引用说明
-
-1.本系统使用了基于MIT授权的cjson库：https://sourceforge.net/projects/cjson/  
-2.本系统使用了基于MIT授权的SQLite的C语言库：https://www.sqlite.org/index.html  
-3.本系统使用了基于MIT授权的jQuery库：https://jquery.com/  
-4.本系统使用以前项目积累的sha1和md5算法源码，时间久远已记不清出处  
-5.感谢以上开源代码或项目，如有侵犯版权，请与我联系  
-
-
-
