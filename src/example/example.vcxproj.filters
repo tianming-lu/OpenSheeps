@@ -18,12 +18,12 @@
     <ClCompile Include="example.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="ReplayProtocol.cpp">
+    <ClCompile Include="UserProtocol.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ReplayProtocol.h">
+    <ClInclude Include="UserProtocol.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

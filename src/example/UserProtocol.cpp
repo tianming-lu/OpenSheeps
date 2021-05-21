@@ -4,7 +4,7 @@
 *	Sheeps may be copied only under the terms of the GNU Affero General Public License v3.0
 */
 
-#include "ReplayProtocol.h"
+#include "UserProtocol.h"
 
 
 int TaskStart(HTASKCFG task)

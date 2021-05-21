@@ -146,10 +146,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="example.cpp" />
-    <ClCompile Include="ReplayProtocol.cpp" />
+    <ClCompile Include="UserProtocol.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ReplayProtocol.h" />
+    <ClInclude Include="UserProtocol.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
