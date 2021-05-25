@@ -24,6 +24,8 @@ typedef struct
 bool StressServerInit();
 int ServerUnInit();
 
+int sync_files(HSOCKET hsock, int projectid);
+
 int CheckStressRequest(HSOCKET hsock, ServerProtocol* proto, const char* data, int len);
 void StressConnectionClosed(HSOCKET hsock, ServerProtocol* proto);
 

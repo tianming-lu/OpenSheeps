@@ -383,9 +383,6 @@ DWORD WINAPI serverWorkerThread(LPVOID pParam)
 		}
 		else if (0 == dwIoSize && (READ == IocpBuff->type || WRITE == IocpBuff->type))
 		{
-			err = GetLastError();
-			if (IocpBuff == NULL || WAIT_TIMEOUT == err || ERROR_IO_PENDING == err)
-				continue;
 			Close(IocpSock, IocpBuff, err);
 			continue;
 		}

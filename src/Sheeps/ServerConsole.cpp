@@ -1173,6 +1173,25 @@ static void do_project_config(HSOCKET hsock, cJSON* root, char* uri)
 	send_console_msg(hsock, res);
 }
 
+static void do_sync_files(HSOCKET hsock, cJSON* root, char* uri)
+{
+	cJSON* res = cJSON_CreateObject();
+	if (NULL == res)
+		return;
+
+	StressClientMapLock->lock();
+	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
+	for (; iter != StressClientMap->end(); ++iter)
+	{
+		iter->second->ready = 0;
+		sync_files(iter->first, iter->second->projectid);
+	}
+	StressClientMapLock->unlock();
+
+	cJSON_AddStringToObject(res, "ret", "OK");
+	send_console_msg(hsock, res);
+}
+
 std::map<std::string, serverConsole_cmd_cb> ConsoleFunc{
 	{std::string("/api/client_list"),	do_stress_client_list},		//受控端列表
 	{std::string("/api/client_open"),	do_stress_client_local},	//开启或者关闭本地受控端
@@ -1191,7 +1210,8 @@ std::map<std::string, serverConsole_cmd_cb> ConsoleFunc{
 	{std::string("/api/db_list"),		do_proxy_database_file},	//db文件列表
 	{std::string("/api/db_delete"),		do_proxy_database_delete},	//删除db
 	{std::string("/api/db_rename"),		do_proxy_database_name},	//db改名
-	{std::string("/api/project"),		do_project_config}			//项目配置
+	{std::string("/api/project"),		do_project_config},			//项目配置
+	{std::string("/api/sync_files"),	do_sync_files}
 };
 
 static void do_request_by_uri(HSOCKET hsock, cJSON* root, char* uri)

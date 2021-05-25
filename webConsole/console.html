@@ -30,9 +30,11 @@ $(document).ready(function(){
   sData = sData.replace('?', '');
   nav_click(sData);
   $(".nav").click(function(){
+    nav_id = $(this).attr("id");
+    if (nav_id == "download")
+      return;
     $("bhead").empty();
     $("#list").empty();
-    nav_id = $(this).attr("id");
     nav_click(nav_id);
   });
   function nav_click(nav_id){
@@ -68,11 +70,13 @@ $(document).ready(function(){
       <option value ="0">是</option>\
       <option value ="1">否</option>\
       <option value ="2">实时回放</option>\
-    </select><input id="ignor_err" type="checkbox" value="">忽略错误</br>');
+    </select><input id="ignor_err" type="checkbox" value=""><a id="ignor_text">忽略错误</a></br>');
     $("bhead").append('文件：<select id="db_file"></select></br>');
     $("bhead").append('回放端口：<table id="replay"></table>');
     $("bhead").append('</br><a id="add_task" href="javascript:void(null);">添加任务</a>');
+    
     show_task_project_config();
+    show_task_select_loop_change();
     show_task_select_dbfile_change();
     show_task_select_dbfile();
     show_task_add();
@@ -91,12 +95,26 @@ $(document).ready(function(){
           return;
         }
         for (i = 0; i < array.length; i++){
-          for (var key in array[i])
-          {
+          for (var key in array[i]){
             var row = '<option value ="'+ key+'">'+array[i][key]+'</option>'
             $("#project").append(row);
           }
         }
+      }
+    });
+  }
+
+  function show_task_select_loop_change(){
+    $("#loop").change(function(){
+      var value = $("#loop").val()
+      if (value == 1){
+        $("#ignor_err").hide();
+        $("#ignor_err").prop("checked",false);
+        $("#ignor_text").hide();
+      }
+      else{
+        $("#ignor_err").show();
+        $("#ignor_text").show();
       }
     });
   }
@@ -242,7 +260,7 @@ $(document).ready(function(){
   function show_task_list_select(){
     $("#list td").click(function () {
       var tdSeq = $(this).parent().find("td").index($(this));
-      console.log(tdSeq);
+      //console.log(tdSeq);
       if (tdSeq > 2 ) return;
       var trSeq = $(this).parent().parent().find("tr").index($(this).parent());
       var task_id = Number($("#list tr:gt(0):eq("+trSeq+") td:eq(0)").text());
@@ -542,7 +560,11 @@ $(document).ready(function(){
   }
 
   function click_nav_agent(){
-    $("bhead").append("此处显示当前负载端列表，控制端服务端口号默认为1080");
+    $("bhead").append("此处显示当前负载端列表，控制端服务端口号默认为1080</br></br>");
+    $("bhead").append('资源同步:&nbsp;&nbsp;<a id="sync_file" href="javascript:void(null);">立即执行</a>');
+    $("#sync_file").click(function(){
+      show_sync_files({});
+    });
     $.ajax({
         type: "post",
         url: $.get_host() + "/api/client_list",
@@ -550,6 +572,16 @@ $(document).ready(function(){
         dataType: "json",
         success:show_agent_list
     });
+  }
+
+  function show_sync_files(jsondata){
+    $.ajax({
+        type: "post",
+        url: $.get_host() + "/api/sync_files",
+        data: JSON.stringify(jsondata),
+        dataType: "json",
+        success: null
+      });
   }
 
   function show_agent_list(content){
@@ -561,7 +593,11 @@ $(document).ready(function(){
     }
     for (i = 0; i < array.length; i++){
       item = array[i];
-      var row = "<tr id=\"list"+ i + "\"><td>"+i+"</td><td width=\"200\">"+ item.addr +"</td><td width=\"80\">"+ item.cpu +"</td><td>" + item.ready+"</td></tr>"
+      var ready = "完成"
+      if (item.ready == 0){
+        ready = "未完成"
+      }
+      var row = "<tr id=\"list"+ i + "\"><td>"+i+"</td><td width=\"200\">"+ item.addr +"</td><td width=\"80\">"+ item.cpu +"</td><td>" + ready +"</td></tr>"
       $("#list").append(row);
     }
   }

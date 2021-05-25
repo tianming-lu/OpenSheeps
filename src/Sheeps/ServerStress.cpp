@@ -17,6 +17,9 @@ std::map<HSOCKET, HCLIENTINFO>* StressClientMap;
 std::mutex* StressClientMapLock = NULL;
 
 static std::map<std::string, t_file_update> updatefile;
+static char* upfilestr = NULL;
+static int upfilestr_len = 0;
+static time_t upfilelast = 0;
 
 bool StressServerInit()
 {
@@ -115,32 +118,40 @@ static void getFiles(char* dir_path,const char* subpro_path, std::map<std::strin
 }
 #endif
 
-static int sync_files(HSOCKET hsock, int projectid)
+int sync_files(HSOCKET hsock, int projectid)
 {
-	updatefile.clear();
-	char subpro_path[256] = { 0x0 };
-	snprintf(subpro_path, sizeof(subpro_path), "%s%d", ProjectPath, projectid);
-#ifdef __WINDOWS__
-	getFiles(ProjectPath, subpro_path, &updatefile);
-#endif // __WINDOWS__
-	cJSON* root = cJSON_CreateObject();
-	cJSON* array = cJSON_CreateArray();
-	cJSON_AddItemToObject(root, "filelist", array);
-	std::map<std::string, t_file_update>::iterator iter;
-	for (iter = updatefile.begin(); iter != updatefile.end(); ++iter)
+	time_t ctime = time(NULL);
+	if (upfilestr == NULL || ctime - upfilelast > 10)
 	{
-		cJSON* item = cJSON_CreateObject();
-		cJSON_AddStringToObject(item, "File", iter->first.c_str());
-		cJSON_AddNumberToObject(item, "Size", (const double)(iter->second.size));
-		cJSON_AddStringToObject(item, "Md5", iter->second.fmd5);
-		cJSON_AddItemToArray(array, item);
+		updatefile.clear();
+		char subpro_path[256] = { 0x0 };
+		snprintf(subpro_path, sizeof(subpro_path), "%s%d", ProjectPath, projectid);
+#ifdef __WINDOWS__
+		getFiles(ProjectPath, subpro_path, &updatefile);
+#endif // __WINDOWS__
+		cJSON* root = cJSON_CreateObject();
+		cJSON* array = cJSON_CreateArray();
+		cJSON_AddItemToObject(root, "filelist", array);
+		std::map<std::string, t_file_update>::iterator iter;
+		for (iter = updatefile.begin(); iter != updatefile.end(); ++iter)
+		{
+			cJSON* item = cJSON_CreateObject();
+			cJSON_AddStringToObject(item, "File", iter->first.c_str());
+			cJSON_AddNumberToObject(item, "Size", (const double)(iter->second.size));
+			cJSON_AddStringToObject(item, "Md5", iter->second.fmd5);
+			cJSON_AddItemToArray(array, item);
+		}
+		char* data = cJSON_PrintUnformatted(root);
+		if (upfilestr)
+			free(upfilestr);
+		upfilestr = data;
+		upfilestr_len = (int)strlen(upfilestr);
+		upfilelast = ctime;
+		cJSON_Delete(root);
 	}
-
-	char* data = cJSON_PrintUnformatted(root);
-	MsgSend(hsock, 9, data, (int)strlen(data));
+	
+	MsgSend(hsock, 9, upfilestr, upfilestr_len);
 	//LOG(slogid, LOG_DEBUG, "%s\r\n", data);
-	free(data);
-	cJSON_Delete(root);
 	return 0;
 }
 
