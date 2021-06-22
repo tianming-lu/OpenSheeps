@@ -9,7 +9,7 @@
 
 [了解更多详细信息，点击此处阅读WIKI](https://gitee.com/lutianming/Sheeps/wikis/pages)  
 或者  
-[如有疑问，提交Issues](http://https://gitee.com/lutianming/Sheeps/issues)
+[如有疑问，提交Issues](https://gitee.com/lutianming/Sheeps/issues)
 
 #### 下载二进制文件
 [点击此处进入下载页](https://gitee.com/lutianming/Sheeps/releases)
