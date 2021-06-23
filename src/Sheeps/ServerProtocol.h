@@ -29,11 +29,17 @@ enum
 	PROXY_CONNECTED
 };
 
+enum {
+	AGENT_DEFAULT = 0,
+	AGENT_READY,
+	AGENT_FAIL
+};
+
 typedef struct {
 	const char* ip;
 	int			port;
 	short		cpu;
-	bool		ready;
+	int			ready;
 	uint8_t		projectid;
 }t_client_info, * HCLIENTINFO;
 

@@ -26,8 +26,13 @@
 #endif
 #endif
 
+int filesync_init()
+{
+	return 0;
+}
+
 int main()
 {
 	int projectid = 0;
-    TaskManagerRun(projectid, CreateUser, DestoryUser, TaskStart, TaskStop, true);
+    TaskManagerRun(projectid, filesync_init, CreateUser, DestoryUser, TaskStart, TaskStop, true);
 }

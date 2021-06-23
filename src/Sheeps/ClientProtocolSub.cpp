@@ -228,8 +228,15 @@ int sendUpfileMsg(HSOCKET hsock)
 {
 	if (updatefile.empty())
 	{
-		MsgResponse(hsock, 11, 0, "OK");
 		LOG(clogId, LOG_DEBUG, "%s-%d files sync done!\r\n", __func__, __LINE__);
+		int ret = task_filesync_done();
+		if (ret != 0)
+		{
+			LOG(clogId, LOG_ERROR, "%s-%d files sync function error!\r\n", __func__, __LINE__);
+			MsgResponse(hsock, 11, -1, "Fail");
+			return 0;
+		}
+		MsgResponse(hsock, 11, 0, "OK");
 		return 1;
 	}
 	std::map<std::string, t_file_info>::iterator itt;

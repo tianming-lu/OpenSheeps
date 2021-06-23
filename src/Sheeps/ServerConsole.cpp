@@ -97,7 +97,7 @@ static int task_client_count(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	int count = 0;
 	for (; iter != StressClientMap->end(); ++iter)
 	{
-		if (iter->second->projectid == taskcfg->projectID)
+		if (iter->second->projectid == taskcfg->projectID && iter->second->ready == AGENT_READY)
 			count++;
 	}
 	StressClientMapLock->unlock();
@@ -130,7 +130,7 @@ static void task_push_init(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
 	for (; iter != StressClientMap->end(); ++iter)
 	{
-		if (iter->second->projectid != taskcfg->projectID)
+		if (iter->second->projectid != taskcfg->projectID || iter->second->ready == AGENT_FAIL)
 			continue;
 
 		int user_count = a;
@@ -183,7 +183,7 @@ static void task_push_add_once_user(HTASKRUN runtask, HTASKCONFIG taskcfg)
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
 	for (; iter != StressClientMap->end(); ++iter)
 	{
-		if (iter->second->projectid != taskcfg->projectID)
+		if (iter->second->projectid != taskcfg->projectID || iter->second->ready == AGENT_FAIL)
 			continue;
 		user_count = a;
 		if (b > 0)
@@ -329,7 +329,7 @@ static void task_push_record_msg_to_client(HTASKRUN runtask, HTASKCONFIG taskcfg
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
 	for (; iter != StressClientMap->end(); ++iter)
 	{
-		if (iter->second->projectid != taskcfg->projectID)
+		if (iter->second->projectid != taskcfg->projectID || iter->second->ready == AGENT_FAIL)
 			continue;
 		HsocketSend(iter->first, buf, n + 8);
 	}
@@ -460,6 +460,7 @@ static void send_console_msg(HSOCKET hsock, cJSON* root)
 static void do_stress_client_list(HSOCKET hsock, cJSON* root, char* uri)
 {
 	LOG(slogid, LOG_DEBUG, "%s:%d\r\n", __func__, __LINE__);
+
 	cJSON* res = cJSON_CreateObject();
 	if (res == NULL)
 		return;
@@ -471,12 +472,16 @@ static void do_stress_client_list(HSOCKET hsock, cJSON* root, char* uri)
 	}
 	cJSON_AddItemToObject(res, "data", array);
 
+	cJSON* projectid = cJSON_GetObjectItem(root, "project_id");
+
 	char addr[32] = { 0x0 };
 	StressClientMapLock->lock();
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
 	for (; iter != StressClientMap->end(); ++iter)
 	{
 		HCLIENTINFO info = iter->second;
+		if (projectid && cJSON_IsNumber(projectid) && projectid->valueint != info->projectid)
+			continue;
 
 		cJSON* item = cJSON_CreateObject();
 		if (item == NULL)
@@ -487,6 +492,10 @@ static void do_stress_client_list(HSOCKET hsock, cJSON* root, char* uri)
 		cJSON_AddStringToObject(item, "addr", addr);
 		cJSON_AddNumberToObject(item, "cpu", info->cpu);
 		cJSON_AddNumberToObject(item, "ready", info->ready);
+		cJSON_AddNumberToObject(item, "project_id", info->projectid);
+		char prokey[4] = { 0x0 };
+		snprintf(prokey, sizeof(prokey), "%d", info->projectid);
+		cJSON_AddStringToObject(item, "project_name", config_get_string_value("project", prokey, "未配置"));
 		cJSON_AddItemToArray(array, item);
 	}
 	StressClientMapLock->unlock();
@@ -539,6 +548,76 @@ static void do_stress_client_log(HSOCKET hsock, cJSON* root, char* uri)
 	send_console_msg(hsock, res);
 }
 
+static void do_console_task_change_replay(HTASKCONFIG taskcfg, cJSON* array)
+{
+	std::list<Readdr*>::iterator itr;
+	for (itr = taskcfg->replayAddr->begin(); itr != taskcfg->replayAddr->end(); ++itr) {
+		sheeps_free(*itr);
+	}
+	taskcfg->replayAddr->clear();
+	taskcfg->changeAddr->clear();
+	if (array != NULL && array->type == cJSON_Array)
+	{
+		for (int i = 0; i < cJSON_GetArraySize(array); i++)
+		{
+			cJSON* item = cJSON_GetArrayItem(array, i);
+			if (item == NULL || item->type != cJSON_Object)
+				continue;
+
+			cJSON* src = cJSON_GetObjectItem(item, "src");
+			if (src == NULL || src->type != cJSON_String)
+				continue;
+			Readdr* addr = (Readdr*)sheeps_malloc(sizeof(Readdr));
+			if (addr == NULL)
+			{
+				LOG(slogid, LOG_ERROR, "%s:%d malloc error\r\n", __func__, __LINE__);
+				continue;
+			}
+			snprintf(addr->srcAddr, sizeof(addr->srcAddr), "%s", src->valuestring);
+
+			cJSON* dst = cJSON_GetObjectItem(item, "dst");
+			if (dst != NULL && src->type == cJSON_String)
+			{
+				snprintf(addr->dstAddr, sizeof(addr->dstAddr), "%s", dst->valuestring);
+				taskcfg->changeAddr->insert(std::pair<std::string, Readdr*>(std::string(src->valuestring), addr));
+			}
+			taskcfg->replayAddr->push_back(addr);
+		}
+	}
+}
+
+static void do_console_task_change(HSOCKET hsock, cJSON* taskid, cJSON* projectid, cJSON* total, 
+	cJSON* once, cJSON* space, cJSON* loop, cJSON* ignor, cJSON* dbfile, cJSON* des, cJSON* parms,
+	cJSON* array)
+{
+	if (!taskid || !cJSON_IsNumber(taskid))
+		return;
+	std::map<uint8_t, HTASKCONFIG>::iterator iter;
+	iter = TaskCfg.find(taskid->valueint);
+	if (iter == TaskCfg.end())
+		return;
+	HTASKCONFIG taskcfg = iter->second;
+	if (projectid && cJSON_IsNumber(projectid))
+	{
+		taskcfg->projectID = projectid->valueint;
+		char prokey[4] = { 0x0 };
+		snprintf(prokey, sizeof(prokey), "%d", taskcfg->projectID);
+		snprintf(taskcfg->projectName, sizeof(taskcfg->projectName), "%s", config_get_string_value("project", prokey, "未配置"));
+	}
+	if (total && cJSON_IsNumber(total)) taskcfg->totalUser = total->valueint;
+	if (once && cJSON_IsNumber(once)) taskcfg->onceUser = once->valueint;
+	if (space && cJSON_IsNumber(space)) taskcfg->spaceTime = space->valueint;
+	if (loop && cJSON_IsNumber(loop)) taskcfg->loopMode = loop->valueint;
+	if (ignor && cJSON_IsNumber(ignor)) taskcfg->ignoreErr = ignor->valueint == 0 ? false : true;
+	if (des && cJSON_IsString(des)) snprintf(taskcfg->taskDes, sizeof(taskcfg->taskDes), "%s", des->valuestring);
+	if (parms && cJSON_IsString(parms)) snprintf(taskcfg->parms, sizeof(parms), "%s", parms->valuestring);
+	
+	if (dbfile && cJSON_IsString(dbfile)) {
+		snprintf(taskcfg->dbName, sizeof(taskcfg->dbName), "%s", dbfile->valuestring);
+		do_console_task_change_replay(taskcfg, array);
+	}
+}
+
 static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 {
 	cJSON* projectid = cJSON_GetObjectItem(root, "project_id");
@@ -548,14 +627,30 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	cJSON* loop = cJSON_GetObjectItem(root, "loop_mode");
 	cJSON* ignor = cJSON_GetObjectItem(root, "ignor_error");
 	cJSON* dbfile = cJSON_GetObjectItem(root, "db_file");
+	
 	cJSON* des = cJSON_GetObjectItem(root, "des");
+
+	cJSON* parms = cJSON_GetObjectItem(root, "parms");
+	cJSON* array = cJSON_GetObjectItem(root, "replay");
+	cJSON* taskid = cJSON_GetObjectItem(root, "task_id");
+
+	cJSON* res = cJSON_CreateObject();
+	if (res == NULL)
+		return;
+	if (taskid)
+	{
+		do_console_task_change(hsock, taskid, projectid, total, once, space, loop, ignor, dbfile, des, parms, array);
+		cJSON_AddStringToObject(res, "ret", "OK");
+		send_console_msg(hsock, res);
+		return;
+	}
+
 	if (projectid == NULL || total == NULL || once == NULL || space == NULL || loop == NULL || ignor == NULL || dbfile == NULL || des == NULL||
 		projectid->type != cJSON_Number || total->type != cJSON_Number || once->type != cJSON_Number ||space->type != cJSON_Number || 
 		loop->type != cJSON_Number || ignor->type != cJSON_Number || dbfile->type != cJSON_String ||des->type != cJSON_String)
 	{
 		return;
 	}
-	cJSON* parms = cJSON_GetObjectItem(root, "parms");
 
 	HTASKCONFIG task = (HTASKCONFIG)sheeps_malloc(sizeof(TaskConfig));
 	if (task == NULL)
@@ -576,6 +671,10 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	else
 		task->taskID = taskIndex++;
 	task->projectID = projectid->valueint;
+	char prokey[4] = { 0x0 };
+	snprintf(prokey, sizeof(prokey), "%d", task->projectID);
+	snprintf(task->projectName, sizeof(task->projectName), "%s", config_get_string_value("project", prokey, "未配置"));
+
 	task->totalUser = total->valueint;
 	task->onceUser = once->valueint;
 	task->spaceTime = space->valueint;
@@ -602,7 +701,7 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 		TaskCfgLock->unlock();
 		return;
 	}
-	cJSON* array = cJSON_GetObjectItem(root, "replay");
+	
 	if (array != NULL && array->type == cJSON_Array)
 	{
 		for (int i = 0; i < cJSON_GetArraySize(array); i++)
@@ -633,9 +732,7 @@ static void do_console_task_create(HSOCKET hsock, cJSON* root, char* uri)
 	}
 	TaskCfg.insert(std::pair<uint8_t, HTASKCONFIG>(task->taskID, task));
 	TaskCfgLock->unlock();
-	cJSON* res = cJSON_CreateObject();
-	if (res == NULL)
-		return;
+	
 	cJSON_AddStringToObject(res, "ret", "OK");
 	send_console_msg(hsock, res);
 }
@@ -658,7 +755,7 @@ static void do_console_task_info(HSOCKET hsock, cJSON* root, char* uri)
 		send_console_msg(hsock, res);
 		return;
 	}
-	HTASKCONFIG taskcfg = iter->second;
+	HTASKCONFIG info = iter->second;
 	cJSON* data = cJSON_CreateObject();
 	if (data == NULL)
 	{
@@ -667,17 +764,28 @@ static void do_console_task_info(HSOCKET hsock, cJSON* root, char* uri)
 		return;
 	}
 	cJSON_AddItemToObject(res, "data", data);
-	cJSON_AddNumberToObject(data, "task_id", taskcfg->taskID);
-	cJSON_AddStringToObject(data, "des", taskcfg->taskDes);
-	cJSON_AddNumberToObject(data, "project_id", taskcfg->projectID);
-	cJSON_AddNumberToObject(data, "total_user", taskcfg->totalUser);
-	cJSON_AddNumberToObject(data, "once_user", taskcfg->onceUser);
-	cJSON_AddNumberToObject(data, "space_time", taskcfg->spaceTime);
-	cJSON_AddNumberToObject(data, "loop_mode", taskcfg->loopMode);
-	cJSON_AddNumberToObject(data, "ignor_error", taskcfg->ignoreErr);
-	cJSON_AddNumberToObject(data, "log_level", taskcfg->logLevel);
-	cJSON_AddStringToObject(data, "parms", taskcfg->parms);
-	cJSON_AddStringToObject(data, "db_file", taskcfg->dbName);
+	cJSON_AddNumberToObject(data, "task_id", info->taskID);
+	cJSON_AddNumberToObject(data, "state", info->taskState);
+	if (info->taskState == 1)
+	{
+		TaskRunLock->lock();
+		std::map<uint8_t, HTASKRUN>::iterator iter;
+		iter = TaskRun.find(info->taskID);
+		if (iter != TaskRun.end())
+			cJSON_AddNumberToObject(data, "left_user", info->totalUser - iter->second->userCount);
+		TaskRunLock->unlock();
+	}
+	cJSON_AddStringToObject(data, "des", info->taskDes);
+	cJSON_AddNumberToObject(data, "project_id", info->projectID);
+	cJSON_AddStringToObject(data, "project_name", info->projectName);
+	cJSON_AddNumberToObject(data, "total_user", info->totalUser);
+	cJSON_AddNumberToObject(data, "once_user", info->onceUser);
+	cJSON_AddNumberToObject(data, "space_time", info->spaceTime);
+	cJSON_AddNumberToObject(data, "loop_mode", info->loopMode);
+	cJSON_AddNumberToObject(data, "ignor_error", info->ignoreErr);
+	cJSON_AddNumberToObject(data, "log_level", info->logLevel);
+	cJSON_AddStringToObject(data, "parms", info->parms);
+	cJSON_AddStringToObject(data, "db_file", info->dbName);
 	cJSON* replay = cJSON_CreateArray();
 	if (replay == NULL)
 	{
@@ -686,8 +794,8 @@ static void do_console_task_info(HSOCKET hsock, cJSON* root, char* uri)
 		return;
 	}
 	cJSON_AddItemToObject(data, "replay", replay);
-	std::list<Readdr*>::iterator it = taskcfg->replayAddr->begin();
-	for (;it != taskcfg->replayAddr->end(); ++it)
+	std::list<Readdr*>::iterator it = info->replayAddr->begin();
+	for (;it != info->replayAddr->end(); ++it)
 	{
 		cJSON* item = cJSON_CreateObject();
 		if (item == NULL) continue;
@@ -780,18 +888,55 @@ static void do_console_task_list(HSOCKET hsock, cJSON* root, char* uri)
 	}
 	cJSON_AddItemToObject(res, "data", array);
 
+	cJSON* project = cJSON_GetObjectItem(root, "project_id");
 	std::map<uint8_t, HTASKCONFIG>::iterator iter = TaskCfg.begin();
 	for (; iter != TaskCfg.end(); ++iter)
 	{
 		HTASKCONFIG info = iter->second;
-
+		if (project && cJSON_IsNumber(project) && project->valueint != info->projectID)
+			continue;
 		cJSON* item = cJSON_CreateObject();
 		if (item == NULL)
 			continue;
 		cJSON_AddNumberToObject(item, "task_id", info->taskID);
 		cJSON_AddNumberToObject(item,"state", info->taskState);
+		if (info->taskState == 1)
+		{
+			TaskRunLock->lock();
+			std::map<uint8_t, HTASKRUN>::iterator iter;
+			iter = TaskRun.find(info->taskID);
+			if (iter != TaskRun.end())
+				cJSON_AddNumberToObject(item, "left_user", info->totalUser - iter->second->userCount);
+			TaskRunLock->unlock();
+		}
 		cJSON_AddStringToObject(item, "des", info->taskDes);
+		cJSON_AddNumberToObject(item, "project_id", info->projectID);
+		cJSON_AddStringToObject(item, "project_name", info->projectName);
+		cJSON_AddNumberToObject(item, "total_user", info->totalUser);
+		cJSON_AddNumberToObject(item, "once_user", info->onceUser);
+		cJSON_AddNumberToObject(item, "space_time", info->spaceTime);
+		cJSON_AddNumberToObject(item, "loop_mode", info->loopMode);
+		cJSON_AddNumberToObject(item, "ignor_error", info->ignoreErr);
 		cJSON_AddNumberToObject(item, "log_level", info->logLevel);
+		cJSON_AddStringToObject(item, "parms", info->parms);
+		cJSON_AddStringToObject(item, "db_file", info->dbName);
+		cJSON* replay = cJSON_CreateArray();
+		if (replay == NULL)
+		{
+			cJSON_AddStringToObject(res, "ret", "Failed");
+			send_console_msg(hsock, res);
+			return;
+		}
+		cJSON_AddItemToObject(item, "replay", replay);
+		std::list<Readdr*>::iterator it = info->replayAddr->begin();
+		for (;it != info->replayAddr->end(); ++it)
+		{
+			cJSON* item = cJSON_CreateObject();
+			if (item == NULL) continue;
+			cJSON_AddStringToObject(item, "src", (*it)->srcAddr);
+			cJSON_AddStringToObject(item, "dst", (*it)->dstAddr);
+			cJSON_AddItemToArray(replay, item);
+		}
 		cJSON_AddItemToArray(array, item);
 	}
 	send_console_msg(hsock, res);
@@ -1179,11 +1324,15 @@ static void do_sync_files(HSOCKET hsock, cJSON* root, char* uri)
 	if (NULL == res)
 		return;
 
+	cJSON* project = cJSON_GetObjectItem(root, "project_id");
+
 	StressClientMapLock->lock();
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter = StressClientMap->begin();
 	for (; iter != StressClientMap->end(); ++iter)
 	{
-		iter->second->ready = 0;
+		if (project && cJSON_IsNumber(project) && project->valueint != iter->second->projectid)
+				continue;
+		iter->second->ready = AGENT_DEFAULT;
 		sync_files(iter->first, iter->second->projectid);
 	}
 	StressClientMapLock->unlock();

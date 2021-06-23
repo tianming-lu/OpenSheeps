@@ -311,10 +311,17 @@ end_free:
 
 static int server_cmd_11_sync_files_over(HSOCKET hsock, ServerProtocol* proto, int cmdNO, cJSON* root)
 {
+
+	cJSON* ret = cJSON_GetObjectItem(root, "retCode");
 	std::map<HSOCKET, HCLIENTINFO>::iterator iter;
 	iter = StressClientMap->find(hsock);
-	if (iter != StressClientMap->end())
-		iter->second->ready = true;
+	if (ret && cJSON_IsNumber(ret) && iter != StressClientMap->end())
+	{
+		if (ret->valueint == 0)
+			iter->second->ready = AGENT_READY;
+		else
+			iter->second->ready = AGENT_FAIL;
+	}
 	return 0;
 }
 

@@ -611,6 +611,13 @@ int __STDCALL task_add_user_by_taskid(uint8_t taskid, int userCount, BaseFactory
 	return 0;
 }
 
+int __STDCALL task_filesync_done()
+{
+	if (default_api.filesync)
+		return default_api.filesync();
+	return 0;
+}
+
 bool __STDCALL TaskUserSocketClose(HSOCKET hsock)
 {
 #ifdef __WINDOWS__
@@ -742,8 +749,9 @@ static void TaskManagerForever(int projectid)
 	}
 }
 
-void __STDCALL TaskManagerRun(int projectid, CREATE_CALLBACK create, DESTORY_CALLBACK destory, TASK_CALLBACK taskstart, TASK_CALLBACK taskstop, bool server)
+void __STDCALL TaskManagerRun(int projectid, FILESYNC_CALLBACK filesync, CREATE_CALLBACK create, DESTORY_CALLBACK destory, TASK_CALLBACK taskstart, TASK_CALLBACK taskstop, bool server)
 {
+	default_api.filesync = filesync;
 	default_api.create = create;
 	default_api.destory = destory;
 	default_api.taskstart = taskstart;

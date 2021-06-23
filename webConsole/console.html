@@ -597,6 +597,9 @@ $(document).ready(function(){
       if (item.ready == 0){
         ready = "未完成"
       }
+      else if(item.ready == 2) {
+        ready = "失败"
+      }
       var row = "<tr id=\"list"+ i + "\"><td>"+i+"</td><td width=\"200\">"+ item.addr +"</td><td width=\"80\">"+ item.cpu +"</td><td>" + ready +"</td></tr>"
       $("#list").append(row);
     }
