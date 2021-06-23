@@ -12,7 +12,11 @@
 [如有疑问，提交Issues](https://gitee.com/lutianming/Sheeps/issues)
 
 #### 下载二进制文件
-[开源版](https://gitee.com/lutianming/Sheeps/releases)     [专业版](https://gitee.com/lutianming/Sheeps/attach_files/748103/download)
+[开源版](https://gitee.com/lutianming/Sheeps/releases)
+包含核心功能动态库，及控制端启动程序，负载端需要用户基于sheeps动态库接口为项目定制开发  
+
+[专业版](https://gitee.com/lutianming/Sheeps/attach_files/748103/download)
+包含核心功能动态库，及控制端和负载端启动程序，内置lua虚拟机，默认使用lua脚本定制项目逻辑
 
 #### 使用预览
 
