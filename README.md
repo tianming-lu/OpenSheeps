@@ -12,7 +12,7 @@
 [如有疑问，提交Issues](https://gitee.com/lutianming/Sheeps/issues)
 
 #### 下载二进制文件
-[点击此处进入下载页](https://gitee.com/lutianming/Sheeps/releases)
+[开源版](https://gitee.com/lutianming/Sheeps/releases)     [专业版](https://gitee.com/lutianming/Sheeps/attach_files/748103/download)
 
 #### 使用预览
 
