@@ -16,7 +16,7 @@
 包含核心功能动态库，及控制端启动程序，负载端需要用户基于sheeps动态库接口为项目定制开发  
 
 [专业版](https://gitee.com/lutianming/Sheeps/attach_files)
-包含核心功能动态库，及控制端和负载端启动程序，内置lua虚拟机，默认使用lua脚本定制项目逻辑
+包含核心功能动态库，及控制端和负载端启动程序，内置lua虚拟机，集成sproto和lua-protobuf库，默认使用lua脚本定制项目逻辑
 
 #### 使用预览
 
