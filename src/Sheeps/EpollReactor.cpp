@@ -669,7 +669,7 @@ static void HsocketSendTcp(HSOCKET hsock, const char* data, int len)
 	int n = 0;
 	while (len > slen)
 	{
-		n = send(hsock->fd, data + n, len - n, MSG_DONTWAIT | MSG_NOSIGNAL);
+		n = send(hsock->fd, data + slen, len - slen, MSG_DONTWAIT | MSG_NOSIGNAL);
 		if(n > 0) 
 		{
 			slen += n;
