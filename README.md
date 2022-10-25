@@ -15,6 +15,9 @@
 [开源版](https://gitee.com/lutianming/Sheeps/releases)
 包含核心功能动态库，及控制端启动程序，负载端需要用户基于sheeps动态库接口为项目定制开发  
 
+[加强版](http://www.supersheeps.cn/)
+包含核心功能动态库，及控制端和负载端启动程序，内置lua虚拟机，集成sproto和lua-protobuf库，默认使用lua脚本定制项目逻辑
+
 #### 使用授权
 由于部分用户希望基于Sheeps项目进行二次闭源开发，鉴于此Sheeps可以提供额外的授权方式，请联系邮箱641471957@qq.com
 
